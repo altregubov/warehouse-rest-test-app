@@ -1,5 +1,8 @@
 # Warehouse REST API Testbench
 
+> [!NOTE]
+> This codebase was fully produced by AI (**Gemini 3.8 flash medium + Antigravity 2.0**).
+
 A clean, lightweight, and idiomatic Go backend service for warehouse inventory management, catalog access filtering, and transactional ordering. Designed for API testing, interactive Swagger UI exploration, and frontend integration.
 
 ---
