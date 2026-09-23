@@ -1,9 +1,28 @@
 # Warehouse REST API Testbench
 
+<p align="center">
+  <img src="https://img.shields.io/badge/Purpose-Educational%20Testbench-orange?style=for-the-badge&logo=mortarboard" alt="Educational Purpose" />
+  <img src="https://img.shields.io/badge/Go-1.24+-00ADD8?style=for-the-badge&logo=go&logoColor=white" alt="Go" />
+  <img src="https://img.shields.io/badge/PostgreSQL-16-336791?style=for-the-badge&logo=postgresql&logoColor=white" alt="PostgreSQL" />
+  <img src="https://img.shields.io/badge/Docker-Compose-2496ED?style=for-the-badge&logo=docker&logoColor=white" alt="Docker Compose" />
+  <img src="https://img.shields.io/badge/Swagger-OpenAPI-85EA2D?style=for-the-badge&logo=swagger&logoColor=black" alt="Swagger" />
+</p>
+
 > [!NOTE]
 > This codebase was fully produced by AI (**Gemini 3.8 flash medium + Antigravity 2.0**).
 
-A clean, lightweight, and idiomatic Go backend service for warehouse inventory management, catalog access filtering, and transactional ordering. Designed for API testing, interactive Swagger UI exploration, and frontend integration.
+---
+
+### 🎓 Educational Purpose & Interactive Testbench
+
+> **This application is crafted specifically for educational purposes as a realistic, feature-complete sandbox for REST API testing, test automation training, and QA exploration.**
+
+Whether you are learning modern API testing techniques, teaching automated testing, or building test suites, this testbench provides real-world scenarios ready out of the box:
+- 🔍 **Interactive Exploration:** Live Swagger UI for manual requests, schema discovery, and interactive Bearer authorization.
+- 🔐 **Authentication & RBAC:** Multi-role access control (`admin` vs. `user`) with segregated login routes and strict HTTP 403 enforcement.
+- 🎯 **Filter & Permission Rules:** Per-user whitelist filters (`allowed_categories`, `allowed_manufacturers`) to test access control edge cases.
+- ⚡ **Transactional Workflows:** Atomic purchases with balance deduction and inventory decrement under concurrency.
+- 🧪 **Ideal Automation Target:** Perfect target for practicing with **Postman**, **Newman**, **Playwright**, **REST Assured**, **pytest**, or **Cypress**.
 
 ---
 
