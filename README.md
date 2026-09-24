@@ -138,3 +138,12 @@ All tests verify Swagger endpoints, authentication separation, RBAC guards, cate
 ├── SPEC.md              # Detailed technical specification
 └── README.md            # Setup and user guide
 ```
+
+## License
+
+This project is licensed under the **PolyForm Noncommercial License 1.0.0**.
+
+* **Free for Noncommercial Use:** You are free to use, modify, and share this project for personal, educational, or other noncommercial purposes.
+* **Commercial Use:** Commercial use (including using this software within a commercial product, service, or company) requires a separate commercial license.
+
+For commercial licensing inquiries, please contact: `al.tregybov@gmail.com`
