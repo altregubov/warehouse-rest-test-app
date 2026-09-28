@@ -1881,7 +1881,7 @@ const docTemplate = `{
                         "type": "string"
                     },
                     "example": [
-                        "[\"laptop\"]"
+                        "laptop"
                     ]
                 },
                 "allowed_manufacturers": {
@@ -1890,7 +1890,7 @@ const docTemplate = `{
                         "type": "string"
                     },
                     "example": [
-                        "[\"Dell\"]"
+                        "Dell"
                     ]
                 },
                 "balance": {
@@ -2272,7 +2272,7 @@ const docTemplate = `{
                         "type": "string"
                     },
                     "example": [
-                        "[\"laptop\"]"
+                        "laptop"
                     ]
                 },
                 "allowed_manufacturers": {
@@ -2281,8 +2281,8 @@ const docTemplate = `{
                         "type": "string"
                     },
                     "example": [
-                        "[\"Apple\"",
-                        " \"Dell\"]"
+                        "Apple",
+                        "Dell"
                     ]
                 },
                 "catalog_access_enabled": {
@@ -2350,7 +2350,7 @@ const docTemplate = `{
                         "type": "string"
                     },
                     "example": [
-                        "[\"laptop\"]"
+                        "laptop"
                     ]
                 },
                 "allowed_manufacturers": {
@@ -2359,7 +2359,7 @@ const docTemplate = `{
                         "type": "string"
                     },
                     "example": [
-                        "[\"Dell\"]"
+                        "Dell"
                     ]
                 },
                 "balance": {

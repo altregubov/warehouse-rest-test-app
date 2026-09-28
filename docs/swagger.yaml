@@ -52,13 +52,13 @@ definitions:
         type: string
       allowed_categories:
         example:
-        - '["laptop"]'
+        - laptop
         items:
           type: string
         type: array
       allowed_manufacturers:
         example:
-        - '["Dell"]'
+        - Dell
         items:
           type: string
         type: array
@@ -346,14 +346,14 @@ definitions:
         type: string
       allowed_categories:
         example:
-        - '["laptop"]'
+        - laptop
         items:
           type: string
         type: array
       allowed_manufacturers:
         example:
-        - '["Apple"'
-        - ' "Dell"]'
+        - Apple
+        - Dell
         items:
           type: string
         type: array
@@ -398,13 +398,13 @@ definitions:
         type: string
       allowed_categories:
         example:
-        - '["laptop"]'
+        - laptop
         items:
           type: string
         type: array
       allowed_manufacturers:
         example:
-        - '["Dell"]'
+        - Dell
         items:
           type: string
         type: array

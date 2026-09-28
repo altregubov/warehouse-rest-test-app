@@ -1875,7 +1875,7 @@
                         "type": "string"
                     },
                     "example": [
-                        "[\"laptop\"]"
+                        "laptop"
                     ]
                 },
                 "allowed_manufacturers": {
@@ -1884,7 +1884,7 @@
                         "type": "string"
                     },
                     "example": [
-                        "[\"Dell\"]"
+                        "Dell"
                     ]
                 },
                 "balance": {
@@ -2266,7 +2266,7 @@
                         "type": "string"
                     },
                     "example": [
-                        "[\"laptop\"]"
+                        "laptop"
                     ]
                 },
                 "allowed_manufacturers": {
@@ -2275,8 +2275,8 @@
                         "type": "string"
                     },
                     "example": [
-                        "[\"Apple\"",
-                        " \"Dell\"]"
+                        "Apple",
+                        "Dell"
                     ]
                 },
                 "catalog_access_enabled": {
@@ -2344,7 +2344,7 @@
                         "type": "string"
                     },
                     "example": [
-                        "[\"laptop\"]"
+                        "laptop"
                     ]
                 },
                 "allowed_manufacturers": {
@@ -2353,7 +2353,7 @@
                         "type": "string"
                     },
                     "example": [
-                        "[\"Dell\"]"
+                        "Dell"
                     ]
                 },
                 "balance": {

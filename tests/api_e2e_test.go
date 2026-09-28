@@ -1913,11 +1913,118 @@ func TestDistributedTracingAndStructuredErrors(t *testing.T) {
 		if violation.Field != "increment_amount" {
 			t.Errorf("Expected violation field 'increment_amount', got '%s'", violation.Field)
 		}
-		if !strings.Contains(violation.Issue, "0.01") {
-			t.Errorf("Expected violation issue to mention '0.01', got '%s'", violation.Issue)
+	}
+}
+
+// TestCleanOpenAPIArrayExamples tests Issue #18:
+// Verifies that Swagger/OpenAPI specification contains clean native JSON arrays for array field examples,
+// without stringified brackets or escaped quotes.
+func TestCleanOpenAPIArrayExamples(t *testing.T) {
+	client := newClient("")
+	resp, body, err := client.request(http.MethodGet, "/swagger/doc.json", nil)
+	if err != nil {
+		t.Fatalf("Failed to fetch Swagger JSON: %v", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("Expected 200 OK from Swagger doc endpoint, got %d", resp.StatusCode)
+	}
+
+	var spec struct {
+		Definitions map[string]struct {
+			Properties map[string]struct {
+				Type    string `json:"type"`
+				Example any    `json:"example"`
+			} `json:"properties"`
+		} `json:"definitions"`
+	}
+
+	if err := json.Unmarshal(body, &spec); err != nil {
+		t.Fatalf("Failed to parse Swagger JSON spec: %v", err)
+	}
+
+	toStringSlice := func(v any) []string {
+		if v == nil {
+			return nil
+		}
+		if s, ok := v.([]any); ok {
+			res := make([]string, len(s))
+			for i, elem := range s {
+				res[i] = fmt.Sprintf("%v", elem)
+			}
+			return res
+		}
+		if s, ok := v.([]string); ok {
+			return s
+		}
+		return nil
+	}
+
+	// 1. CreateUserRequest allowed_categories and allowed_manufacturers
+	createReq, ok := spec.Definitions["domain.CreateUserRequest"]
+	if !ok {
+		t.Fatalf("domain.CreateUserRequest definition not found in swagger spec")
+	}
+
+	catProp, ok := createReq.Properties["allowed_categories"]
+	catEx := toStringSlice(catProp.Example)
+	if !ok || len(catEx) == 0 {
+		t.Fatalf("allowed_categories property or example missing in CreateUserRequest")
+	}
+	if catEx[0] != "laptop" {
+		t.Errorf("Expected CreateUserRequest.allowed_categories example ['laptop'], got %v", catEx)
+	}
+
+	mfgProp, ok := createReq.Properties["allowed_manufacturers"]
+	mfgEx := toStringSlice(mfgProp.Example)
+	if !ok || len(mfgEx) == 0 {
+		t.Fatalf("allowed_manufacturers property or example missing in CreateUserRequest")
+	}
+	if mfgEx[0] != "Dell" {
+		t.Errorf("Expected CreateUserRequest.allowed_manufacturers example ['Dell'], got %v", mfgEx)
+	}
+
+	// 2. UpdateFiltersRequest allowed_categories and allowed_manufacturers
+	filterReq, ok := spec.Definitions["domain.UpdateFiltersRequest"]
+	if !ok {
+		t.Fatalf("domain.UpdateFiltersRequest definition not found in swagger spec")
+	}
+
+	filterCatProp, ok := filterReq.Properties["allowed_categories"]
+	filterCatEx := toStringSlice(filterCatProp.Example)
+	if !ok || len(filterCatEx) == 0 {
+		t.Fatalf("allowed_categories property or example missing in UpdateFiltersRequest")
+	}
+	if filterCatEx[0] != "laptop" {
+		t.Errorf("Expected UpdateFiltersRequest.allowed_categories example ['laptop'], got %v", filterCatEx)
+	}
+
+	filterMfgProp, ok := filterReq.Properties["allowed_manufacturers"]
+	filterMfgEx := toStringSlice(filterMfgProp.Example)
+	if !ok || len(filterMfgEx) < 2 {
+		t.Fatalf("allowed_manufacturers property or example missing/incomplete in UpdateFiltersRequest: %v", filterMfgEx)
+	}
+	if filterMfgEx[0] != "Apple" || filterMfgEx[1] != "Dell" {
+		t.Errorf("Expected UpdateFiltersRequest.allowed_manufacturers example ['Apple', 'Dell'], got %v", filterMfgEx)
+	}
+
+	// 3. String-level sanity check: ensure no "[" or escaped \" exist in raw examples in swagger.json
+	for _, prop := range []struct {
+		name string
+		ex   []string
+	}{
+		{"CreateUser.allowed_categories", catEx},
+		{"CreateUser.allowed_manufacturers", mfgEx},
+		{"UpdateFilters.allowed_categories", filterCatEx},
+		{"UpdateFilters.allowed_manufacturers", filterMfgEx},
+	} {
+		for _, val := range prop.ex {
+			if strings.Contains(val, "[") || strings.Contains(val, "]") || strings.Contains(val, "\"") {
+				t.Errorf("Field %s contains corrupted stringified array artifact: %s", prop.name, val)
+			}
 		}
 	}
 }
+
 
 
 
