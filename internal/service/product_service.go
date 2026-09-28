@@ -11,7 +11,7 @@ import (
 )
 
 type ProductService interface {
-	ListUserProducts(ctx context.Context, userID uuid.UUID, category string) ([]domain.Product, error)
+	ListUserProducts(ctx context.Context, userID uuid.UUID, params domain.ProductFilterParams) ([]domain.Product, int, error)
 	ListAllProducts(ctx context.Context) ([]domain.Product, error)
 	CreateProduct(ctx context.Context, req *domain.CreateProductRequest) (*domain.Product, error)
 	UpdateStock(ctx context.Context, productID uuid.UUID, stockQuantity int) (*domain.Product, error)
@@ -29,13 +29,13 @@ func NewProductService(prodRepo repository.ProductRepository, userRepo repositor
 	}
 }
 
-func (s *productService) ListUserProducts(ctx context.Context, userID uuid.UUID, category string) ([]domain.Product, error) {
+func (s *productService) ListUserProducts(ctx context.Context, userID uuid.UUID, params domain.ProductFilterParams) ([]domain.Product, int, error) {
 	user, err := s.userRepo.GetByID(ctx, userID)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
-	return s.prodRepo.List(ctx, category, user.AllowedCategories, user.AllowedManufacturers, user.AccessLevel, user.CatalogAccessEnabled)
+	return s.prodRepo.ListPaginated(ctx, params, user.AllowedCategories, user.AllowedManufacturers, user.AccessLevel, user.CatalogAccessEnabled)
 }
 
 func (s *productService) ListAllProducts(ctx context.Context) ([]domain.Product, error) {

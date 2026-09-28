@@ -162,11 +162,32 @@ type UpdateOrderStatusRequest struct {
 	Status string `json:"status" binding:"required" example:"SHIPPED" enums:"CREATED,PROCESSING,SHIPPED,DELIVERED,CANCELLED"`
 }
 
+type PaginationMetadata struct {
+	TotalCount int `json:"total_count" binding:"required" example:"45" minimum:"0"`
+	Page       int `json:"page" binding:"required" example:"1" minimum:"1"`
+	PageSize   int `json:"page_size" binding:"required" example:"20" minimum:"1" maximum:"100"`
+	TotalPages int `json:"total_pages" binding:"required" example:"3" minimum:"0"`
+}
+
+type ProductFilterParams struct {
+	Category     string
+	Manufacturer string
+	SortBy       string
+	Order        string
+	Page         int
+	PageSize     int
+}
+
 // Envelope structures for Swagger documentation and JSON API
 
 type SuccessEnvelope struct {
-	Success bool `json:"success" binding:"required" example:"true"`
-	Data    any  `json:"data" binding:"required"`
+	Success    bool                `json:"success" binding:"required" example:"true"`
+	Data       any                 `json:"data" binding:"required"`
+	Pagination *PaginationMetadata `json:"pagination,omitempty"`
+	TotalCount *int                `json:"total_count,omitempty" example:"45"`
+	Page       *int                `json:"page,omitempty" example:"1"`
+	PageSize   *int                `json:"page_size,omitempty" example:"20"`
+	TotalPages *int                `json:"total_pages,omitempty" example:"3"`
 }
 
 type ErrorDetails struct {

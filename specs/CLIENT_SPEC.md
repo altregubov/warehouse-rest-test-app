@@ -141,13 +141,13 @@ erDiagram
 3. **Session Issuance:** A cryptographically signed session token is returned containing the user's role and identity claims.
 4. **Profile & Rule Retrieval:** The client fetches account metadata, including current balance, access level (`ALL`, `FILTERED`, `NONE`), catalog enablement flag, allowed categories, and permitted manufacturers.
 
-#### Journey 2: Catalog Discovery with Permission Filters
-1. **Catalog Query:** The client application requests the active warehouse inventory (optionally filtering by category).
+#### Journey 2: Catalog Discovery with Permission Filters, Sorting, & Pagination
+1. **Catalog Query:** The client application requests the active warehouse inventory, supplying optional filter parameters (`category`, `manufacturer`), sorting parameters (`sort_by`: `price`, `created_at`, `model`; `order`: `asc`, `desc`), and pagination controls (`page`: default `1`, `page_size`/`limit`: default `20`, max `100`).
 2. **Permission Intersection & Case-Insensitive Matching:** The engine inspects the client's access governance:
-   - **Zero-Access Restriction (`NONE` or Disabled):** If `access_level` is `NONE` or `catalog_access_enabled` is `false`, the client is prohibited from viewing items, returning an empty catalog (`[]`). Attempts to order trigger an immediate `422 Unprocessable Entity` with `FILTER_RESTRICTION`.
-   - **Full Catalog Access (`ALL`):** If `access_level` is `ALL`, all warehouse products are accessible without restriction.
+   - **Zero-Access Restriction (`NONE` or Disabled):** If `access_level` is `NONE` or `catalog_access_enabled` is `false`, the client is prohibited from viewing items, returning an empty catalog (`[]`) with `total_count: 0` and `total_pages: 0`. Attempts to order trigger an immediate `422 Unprocessable Entity` with `FILTER_RESTRICTION`.
+   - **Full Catalog Access (`ALL`):** If `access_level` is `ALL`, all warehouse products matching optional `category` or `manufacturer` filters are accessible without restriction.
    - **Filtered Catalog Access (`FILTERED`):** Items are filtered by comparing `allowed_categories` and `allowed_manufacturers` using case-insensitive normalization (`LOWER(TRIM(...))`), ensuring mixed-casing variations (e.g. `"apple"` vs `"Apple"`, `"laptop"` vs `"Laptop"`) match reliably without silent omissions.
-3. **Catalog Presentation:** The filtered inventory with current unit prices and available stock is presented to the client.
+3. **Catalog Presentation & Navigation:** The system sorts matching items deterministically, returns the requested page slice, and wraps results in a paginated envelope containing navigation metadata (`total_count`, `page`, `page_size`, `total_pages`).
 
 #### Journey 3: Transactional Order Placement (`[Core Entity]` Creation)
 1. **Order Submission:** The client submits a purchase intent specifying the desired `productId` and `quantity`. Clients may supply an optional `Idempotency-Key` header to guard against duplicate orders and double deductions caused by network timeouts and retries.

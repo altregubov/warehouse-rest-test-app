@@ -1499,7 +1499,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Browse warehouse items with optional category query filter and strict permission filtering",
+                "description": "Browse warehouse items with optional category/manufacturer filters, sorting, and pagination",
                 "consumes": [
                     "application/json"
                 ],
@@ -1516,11 +1516,55 @@ const docTemplate = `{
                         "description": "Filter by category (e.g. laptop, smartphone)",
                         "name": "category",
                         "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by manufacturer (e.g. Apple, Dell)",
+                        "name": "manufacturer",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "price",
+                            "created_at",
+                            "model"
+                        ],
+                        "type": "string",
+                        "description": "Sort field (price, created_at, model)",
+                        "name": "sort_by",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "asc",
+                            "desc"
+                        ],
+                        "type": "string",
+                        "description": "Sort order (asc, desc)",
+                        "name": "order",
+                        "in": "query"
+                    },
+                    {
+                        "minimum": 1,
+                        "type": "integer",
+                        "default": 1,
+                        "description": "Page number (default: 1, min: 1)",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "maximum": 100,
+                        "minimum": 1,
+                        "type": "integer",
+                        "default": 20,
+                        "description": "Page size (default: 20, min: 1, max: 100)",
+                        "name": "page_size",
+                        "in": "query"
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "List of allowed products",
+                        "description": "List of allowed products with pagination",
                         "schema": {
                             "allOf": [
                                 {
@@ -1538,6 +1582,12 @@ const docTemplate = `{
                                     }
                                 }
                             ]
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid pagination, sorting, or filter parameters",
+                        "schema": {
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
                         }
                     },
                     "401": {
@@ -1893,6 +1943,38 @@ const docTemplate = `{
                 }
             }
         },
+        "domain.PaginationMetadata": {
+            "type": "object",
+            "required": [
+                "page",
+                "page_size",
+                "total_count",
+                "total_pages"
+            ],
+            "properties": {
+                "page": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "example": 1
+                },
+                "page_size": {
+                    "type": "integer",
+                    "maximum": 100,
+                    "minimum": 1,
+                    "example": 20
+                },
+                "total_count": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "example": 45
+                },
+                "total_pages": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "example": 3
+                }
+            }
+        },
         "domain.Product": {
             "type": "object",
             "required": [
@@ -1966,9 +2048,28 @@ const docTemplate = `{
             ],
             "properties": {
                 "data": {},
+                "page": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "page_size": {
+                    "type": "integer",
+                    "example": 20
+                },
+                "pagination": {
+                    "$ref": "#/definitions/domain.PaginationMetadata"
+                },
                 "success": {
                     "type": "boolean",
                     "example": true
+                },
+                "total_count": {
+                    "type": "integer",
+                    "example": 45
+                },
+                "total_pages": {
+                    "type": "integer",
+                    "example": 3
                 }
             }
         },

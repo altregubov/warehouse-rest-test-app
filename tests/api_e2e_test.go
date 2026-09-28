@@ -1673,3 +1673,160 @@ func TestStatusCodesAlignment404And409(t *testing.T) {
 	}
 }
 
+func TestCatalogPaginationSortingAndFiltering(t *testing.T) {
+	// Login userA (unrestricted, ALL access)
+	tokenA, _ := login(t, "/api/user/login", "userA", "user123")
+	clientA := newClient(tokenA)
+
+	// 1. Default pagination & response envelope metadata
+	respDef, bodyDef, err := clientA.request(http.MethodGet, "/api/user/products", nil)
+	if err != nil || respDef.StatusCode != http.StatusOK {
+		t.Fatalf("Failed to fetch default products: %d", respDef.StatusCode)
+	}
+
+	var envDef struct {
+		Success    bool                       `json:"success"`
+		Data       []domain.Product           `json:"data"`
+		Pagination *domain.PaginationMetadata `json:"pagination"`
+		TotalCount int                        `json:"total_count"`
+		Page       int                        `json:"page"`
+		PageSize   int                        `json:"page_size"`
+		TotalPages int                        `json:"total_pages"`
+	}
+	if err := json.Unmarshal(bodyDef, &envDef); err != nil {
+		t.Fatalf("Failed to decode response: %v", err)
+	}
+
+	if envDef.Pagination == nil {
+		t.Fatalf("Expected pagination metadata in envelope")
+	}
+	if envDef.Pagination.Page != 1 || envDef.Pagination.PageSize != 20 {
+		t.Errorf("Expected page 1 and page_size 20, got page %d, size %d", envDef.Pagination.Page, envDef.Pagination.PageSize)
+	}
+	if envDef.Pagination.TotalCount < 5 {
+		t.Errorf("Expected at least 5 products, got %d", envDef.Pagination.TotalCount)
+	}
+
+	// 2. Custom page and page_size pagination (page=1&page_size=2 and page=2&page_size=2)
+	_, bodyP1, _ := clientA.request(http.MethodGet, "/api/user/products?page=1&page_size=2&sort_by=price&order=asc", nil)
+	var envP1 struct {
+		Data       []domain.Product          `json:"data"`
+		Pagination domain.PaginationMetadata `json:"pagination"`
+	}
+	_ = json.Unmarshal(bodyP1, &envP1)
+	if len(envP1.Data) != 2 {
+		t.Fatalf("Expected 2 items on page 1, got %d", len(envP1.Data))
+	}
+	if envP1.Pagination.Page != 1 || envP1.Pagination.PageSize != 2 {
+		t.Errorf("Unexpected pagination metadata on page 1: %+v", envP1.Pagination)
+	}
+
+	_, bodyP2, _ := clientA.request(http.MethodGet, "/api/user/products?page=2&page_size=2&sort_by=price&order=asc", nil)
+	var envP2 struct {
+		Data       []domain.Product          `json:"data"`
+		Pagination domain.PaginationMetadata `json:"pagination"`
+	}
+	_ = json.Unmarshal(bodyP2, &envP2)
+	if len(envP2.Data) != 2 {
+		t.Fatalf("Expected 2 items on page 2, got %d", len(envP2.Data))
+	}
+	if envP2.Pagination.Page != 2 || envP2.Pagination.PageSize != 2 {
+		t.Errorf("Unexpected pagination metadata on page 2: %+v", envP2.Pagination)
+	}
+
+	// Items on page 1 and page 2 must be disjoint
+	if envP1.Data[0].ID == envP2.Data[0].ID || envP1.Data[1].ID == envP2.Data[1].ID {
+		t.Errorf("Overlapping items between page 1 and page 2")
+	}
+
+	// 3. Sorting: Price ASC vs Price DESC
+	_, bodyPriceAsc, _ := clientA.request(http.MethodGet, "/api/user/products?sort_by=price&order=asc&page_size=100", nil)
+	var envPriceAsc struct {
+		Data []domain.Product `json:"data"`
+	}
+	_ = json.Unmarshal(bodyPriceAsc, &envPriceAsc)
+	for i := 1; i < len(envPriceAsc.Data); i++ {
+		if envPriceAsc.Data[i].Price < envPriceAsc.Data[i-1].Price {
+			t.Errorf("Products not in price ASC order: %f < %f", envPriceAsc.Data[i].Price, envPriceAsc.Data[i-1].Price)
+		}
+	}
+
+	_, bodyPriceDesc, _ := clientA.request(http.MethodGet, "/api/user/products?sort_by=price&order=desc&page_size=100", nil)
+	var envPriceDesc struct {
+		Data []domain.Product `json:"data"`
+	}
+	_ = json.Unmarshal(bodyPriceDesc, &envPriceDesc)
+	for i := 1; i < len(envPriceDesc.Data); i++ {
+		if envPriceDesc.Data[i].Price > envPriceDesc.Data[i-1].Price {
+			t.Errorf("Products not in price DESC order: %f > %f", envPriceDesc.Data[i].Price, envPriceDesc.Data[i-1].Price)
+		}
+	}
+
+	// 4. Sorting: Model ASC
+	_, bodyModelAsc, _ := clientA.request(http.MethodGet, "/api/user/products?sort_by=model&order=asc&page_size=100", nil)
+	var envModelAsc struct {
+		Data []domain.Product `json:"data"`
+	}
+	_ = json.Unmarshal(bodyModelAsc, &envModelAsc)
+	for i := 1; i < len(envModelAsc.Data); i++ {
+		if envModelAsc.Data[i].Model < envModelAsc.Data[i-1].Model {
+			t.Errorf("Products not in model ASC order: %s < %s", envModelAsc.Data[i].Model, envModelAsc.Data[i-1].Model)
+		}
+	}
+
+	// 5. Manufacturer filtering
+	_, bodyApple, _ := clientA.request(http.MethodGet, "/api/user/products?manufacturer=Apple", nil)
+	var envApple struct {
+		Data       []domain.Product          `json:"data"`
+		Pagination domain.PaginationMetadata `json:"pagination"`
+	}
+	_ = json.Unmarshal(bodyApple, &envApple)
+	if len(envApple.Data) == 0 {
+		t.Fatalf("Expected Apple products, got 0")
+	}
+	for _, p := range envApple.Data {
+		if !strings.EqualFold(p.Manufacturer, "Apple") {
+			t.Errorf("Expected manufacturer Apple, got %s", p.Manufacturer)
+		}
+	}
+
+	// 6. Combined category and manufacturer filtering
+	_, bodyCombined, _ := clientA.request(http.MethodGet, "/api/user/products?category=laptop&manufacturer=Apple", nil)
+	var envCombined struct {
+		Data []domain.Product `json:"data"`
+	}
+	_ = json.Unmarshal(bodyCombined, &envCombined)
+	for _, p := range envCombined.Data {
+		if !strings.EqualFold(p.Category, "laptop") || !strings.EqualFold(p.Manufacturer, "Apple") {
+			t.Errorf("Expected Apple laptop, got %s %s", p.Manufacturer, p.Category)
+		}
+	}
+
+	// 7. Validation boundary errors (400 Bad Request)
+	respInvPage, _, _ := clientA.request(http.MethodGet, "/api/user/products?page=0", nil)
+	if respInvPage.StatusCode != http.StatusBadRequest {
+		t.Errorf("Expected 400 for page=0, got %d", respInvPage.StatusCode)
+	}
+
+	respInvSize0, _, _ := clientA.request(http.MethodGet, "/api/user/products?page_size=0", nil)
+	if respInvSize0.StatusCode != http.StatusBadRequest {
+		t.Errorf("Expected 400 for page_size=0, got %d", respInvSize0.StatusCode)
+	}
+
+	respInvSize101, _, _ := clientA.request(http.MethodGet, "/api/user/products?page_size=101", nil)
+	if respInvSize101.StatusCode != http.StatusBadRequest {
+		t.Errorf("Expected 400 for page_size=101, got %d", respInvSize101.StatusCode)
+	}
+
+	respInvSort, _, _ := clientA.request(http.MethodGet, "/api/user/products?sort_by=unknown", nil)
+	if respInvSort.StatusCode != http.StatusBadRequest {
+		t.Errorf("Expected 400 for invalid sort_by, got %d", respInvSort.StatusCode)
+	}
+
+	respInvOrder, _, _ := clientA.request(http.MethodGet, "/api/user/products?order=diagonal", nil)
+	if respInvOrder.StatusCode != http.StatusBadRequest {
+		t.Errorf("Expected 400 for invalid order, got %d", respInvOrder.StatusCode)
+	}
+}
+
+

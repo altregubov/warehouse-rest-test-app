@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strconv"
+	"strings"
 
 	"github.com/altregubov/warehouse-rest-test-app/internal/domain"
 	"github.com/altregubov/warehouse-rest-test-app/internal/middleware"
@@ -61,13 +63,19 @@ func (h *UserHandler) GetProfile(w http.ResponseWriter, r *http.Request) {
 
 // ListProducts godoc
 // @Summary Browse warehouse catalog
-// @Description Browse warehouse items with optional category query filter and strict permission filtering
+// @Description Browse warehouse items with optional category/manufacturer filters, sorting, and pagination
 // @Tags User
 // @Accept json
 // @Produce json
 // @Security BearerAuth
 // @Param category query string false "Filter by category (e.g. laptop, smartphone)"
-// @Success 200 {object} domain.SuccessEnvelope{data=[]domain.Product} "List of allowed products"
+// @Param manufacturer query string false "Filter by manufacturer (e.g. Apple, Dell)"
+// @Param sort_by query string false "Sort field (price, created_at, model)" Enums(price, created_at, model)
+// @Param order query string false "Sort order (asc, desc)" Enums(asc, desc)
+// @Param page query int false "Page number (default: 1, min: 1)" default(1) minimum(1)
+// @Param page_size query int false "Page size (default: 20, min: 1, max: 100)" default(20) minimum(1) maximum(100)
+// @Success 200 {object} domain.SuccessEnvelope{data=[]domain.Product} "List of allowed products with pagination"
+// @Failure 400 {object} domain.ErrorEnvelope "Invalid pagination, sorting, or filter parameters"
 // @Failure 401 {object} domain.ErrorEnvelope "Unauthorized"
 // @Failure 403 {object} domain.ErrorEnvelope "Forbidden"
 // @Failure 404 {object} domain.ErrorEnvelope "User not found"
@@ -80,9 +88,56 @@ func (h *UserHandler) ListProducts(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	categoryParam := r.URL.Query().Get("category")
+	query := r.URL.Query()
+	categoryParam := query.Get("category")
+	manufacturerParam := query.Get("manufacturer")
 
-	products, err := h.productService.ListUserProducts(r.Context(), userID, categoryParam)
+	page := 1
+	if pageStr := query.Get("page"); pageStr != "" {
+		p, err := strconv.Atoi(pageStr)
+		if err != nil || p < 1 {
+			Error(w, http.StatusBadRequest, "INVALID_INPUT", "page must be an integer >= 1")
+			return
+		}
+		page = p
+	}
+
+	pageSize := 20
+	pageSizeStr := query.Get("page_size")
+	if pageSizeStr == "" {
+		pageSizeStr = query.Get("limit")
+	}
+	if pageSizeStr != "" {
+		ps, err := strconv.Atoi(pageSizeStr)
+		if err != nil || ps < 1 || ps > 100 {
+			Error(w, http.StatusBadRequest, "INVALID_INPUT", "page_size must be an integer between 1 and 100")
+			return
+		}
+		pageSize = ps
+	}
+
+	sortBy := strings.ToLower(strings.TrimSpace(query.Get("sort_by")))
+	if sortBy != "" && sortBy != "price" && sortBy != "created_at" && sortBy != "model" {
+		Error(w, http.StatusBadRequest, "INVALID_INPUT", "sort_by must be one of: price, created_at, model")
+		return
+	}
+
+	order := strings.ToLower(strings.TrimSpace(query.Get("order")))
+	if order != "" && order != "asc" && order != "desc" {
+		Error(w, http.StatusBadRequest, "INVALID_INPUT", "order must be asc or desc")
+		return
+	}
+
+	params := domain.ProductFilterParams{
+		Category:     categoryParam,
+		Manufacturer: manufacturerParam,
+		SortBy:       sortBy,
+		Order:        order,
+		Page:         page,
+		PageSize:     pageSize,
+	}
+
+	products, totalCount, err := h.productService.ListUserProducts(r.Context(), userID, params)
 	if err != nil {
 		if errors.Is(err, domain.ErrNotFound) {
 			Error(w, http.StatusNotFound, "NOT_FOUND", "User not found")
@@ -92,7 +147,7 @@ func (h *UserHandler) ListProducts(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	JSON(w, http.StatusOK, products)
+	JSONPaginated(w, http.StatusOK, products, page, pageSize, totalCount)
 }
 
 // CreateOrder godoc

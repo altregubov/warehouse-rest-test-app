@@ -196,6 +196,31 @@ definitions:
     - total_price
     - unit_price
     type: object
+  domain.PaginationMetadata:
+    properties:
+      page:
+        example: 1
+        minimum: 1
+        type: integer
+      page_size:
+        example: 20
+        maximum: 100
+        minimum: 1
+        type: integer
+      total_count:
+        example: 45
+        minimum: 0
+        type: integer
+      total_pages:
+        example: 3
+        minimum: 0
+        type: integer
+    required:
+    - page
+    - page_size
+    - total_count
+    - total_pages
+    type: object
   domain.Product:
     properties:
       category:
@@ -249,9 +274,23 @@ definitions:
   domain.SuccessEnvelope:
     properties:
       data: {}
+      page:
+        example: 1
+        type: integer
+      page_size:
+        example: 20
+        type: integer
+      pagination:
+        $ref: '#/definitions/domain.PaginationMetadata'
       success:
         example: true
         type: boolean
+      total_count:
+        example: 45
+        type: integer
+      total_pages:
+        example: 3
+        type: integer
     required:
     - data
     - success
@@ -1307,18 +1346,50 @@ paths:
     get:
       consumes:
       - application/json
-      description: Browse warehouse items with optional category query filter and
-        strict permission filtering
+      description: Browse warehouse items with optional category/manufacturer filters,
+        sorting, and pagination
       parameters:
       - description: Filter by category (e.g. laptop, smartphone)
         in: query
         name: category
         type: string
+      - description: Filter by manufacturer (e.g. Apple, Dell)
+        in: query
+        name: manufacturer
+        type: string
+      - description: Sort field (price, created_at, model)
+        enum:
+        - price
+        - created_at
+        - model
+        in: query
+        name: sort_by
+        type: string
+      - description: Sort order (asc, desc)
+        enum:
+        - asc
+        - desc
+        in: query
+        name: order
+        type: string
+      - default: 1
+        description: 'Page number (default: 1, min: 1)'
+        in: query
+        minimum: 1
+        name: page
+        type: integer
+      - default: 20
+        description: 'Page size (default: 20, min: 1, max: 100)'
+        in: query
+        maximum: 100
+        minimum: 1
+        name: page_size
+        type: integer
       produces:
       - application/json
       responses:
         "200":
-          description: List of allowed products
+          description: List of allowed products with pagination
           schema:
             allOf:
             - $ref: '#/definitions/domain.SuccessEnvelope'
@@ -1328,6 +1399,10 @@ paths:
                     $ref: '#/definitions/domain.Product'
                   type: array
               type: object
+        "400":
+          description: Invalid pagination, sorting, or filter parameters
+          schema:
+            $ref: '#/definitions/domain.ErrorEnvelope'
         "401":
           description: Unauthorized
           schema:

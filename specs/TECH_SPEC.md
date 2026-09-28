@@ -47,6 +47,20 @@ All API responses follow consistent JSON envelopes:
 ```
 *(Or array of items in `data` for list endpoints)*
 
+**Paginated Success Envelope (e.g. Catalog Browsing):**
+```json
+{
+  "success": true,
+  "data": [ ... ],
+  "pagination": {
+    "total_count": 45,
+    "page": 1,
+    "page_size": 20,
+    "total_pages": 3
+  }
+}
+```
+
 **Error Envelope:**
 ```json
 {
@@ -398,14 +412,47 @@ CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id);
    - Failure (500 Internal Server Error): Server error.
 
 2. `GET /api/user/products`
-   - Query Parameters: `category` (optional, string).
+   - **Query Parameters:**
+     - `page` (optional, integer, default: `1`, minimum: `1`): Target page number.
+     - `page_size` / `limit` (optional, integer, default: `20`, minimum: `1`, maximum: `100`): Items returned per page.
+     - `sort_by` (optional, string, enum: `price`, `created_at`, `model`, default: `created_at`): Sort field.
+     - `order` (optional, string, enum: `asc`, `desc`, default: `asc`): Sort direction.
+     - `category` (optional, string): Filter by product classification.
+     - `manufacturer` (optional, string): Filter by brand / manufacturer.
    - **Catalog Filter Evaluation Rules:**
-     1. If user's `access_level` is `NONE` or `catalog_access_enabled` is `false`, return empty list `[]`.
+     1. If user's `access_level` is `NONE` or `catalog_access_enabled` is `false`, return empty list `[]` (`total_count: 0`, `total_pages: 0`).
      2. If user's `access_level` is `FILTERED` and `allowed_categories` is non-empty, query matches case-insensitively using `LOWER(TRIM(...))`.
      3. If user's `access_level` is `FILTERED` and `allowed_manufacturers` is non-empty, query matches case-insensitively using `LOWER(TRIM(...))`.
      4. If `category` query param is provided, filter by that category case-insensitively within permitted bounds.
-     5. If user has full access (`access_level: ALL`), return all products matching optional category.
-   - Response (200 OK): Array of matching product items.
+     5. If `manufacturer` query param is provided, filter by that brand case-insensitively within permitted bounds.
+     6. If user has full access (`access_level: ALL`), return all products matching optional category and manufacturer.
+     7. Results are sorted deterministically by the requested field and order (with `id ASC` as tie-breaker).
+     8. Total matching count is calculated, and results are sliced by `LIMIT page_size OFFSET (page - 1) * page_size`.
+   - **Response (200 OK):**
+     ```json
+     {
+       "success": true,
+       "data": [
+         {
+           "id": "c0000000-0000-0000-0000-000000000001",
+           "category": "laptop",
+           "manufacturer": "Apple",
+           "model": "MacBook Pro 16 M3",
+           "price": 2499.00,
+           "stock_quantity": 15,
+           "created_at": "2026-09-23T20:00:00Z",
+           "updated_at": "2026-09-23T20:00:00Z"
+         }
+       ],
+       "pagination": {
+         "total_count": 1,
+         "page": 1,
+         "page_size": 20,
+         "total_pages": 1
+       }
+     }
+     ```
+   - Failure (400 Bad Request): Invalid pagination boundaries (`page < 1`, `page_size < 1` or `> 100`) or unsupported `sort_by`/`order` values (`INVALID_INPUT`).
    - Failure (401 Unauthorized): Missing or invalid token.
    - Failure (403 Forbidden): Forbidden.
    - Failure (404 Not Found): User account not found (`NOT_FOUND`).
