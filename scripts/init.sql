@@ -10,12 +10,17 @@ CREATE TABLE IF NOT EXISTS users (
     balance NUMERIC(12, 2) NOT NULL DEFAULT 0.00 CHECK (balance >= 0),
     allowed_categories TEXT[] DEFAULT '{}',
     allowed_manufacturers TEXT[] DEFAULT '{}',
+    access_level VARCHAR(20) NOT NULL DEFAULT 'ALL' CHECK (access_level IN ('ALL', 'FILTERED', 'NONE')),
+    catalog_access_enabled BOOLEAN NOT NULL DEFAULT true,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     deleted_at TIMESTAMP WITH TIME ZONE NULL
 );
 
 ALTER TABLE users ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP WITH TIME ZONE NULL;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS catalog_access_enabled BOOLEAN NOT NULL DEFAULT true;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS access_level VARCHAR(20) NOT NULL DEFAULT 'ALL';
+UPDATE users SET access_level = 'FILTERED' WHERE (array_length(allowed_categories, 1) > 0 OR array_length(allowed_manufacturers, 1) > 0) AND access_level = 'ALL';
 
 -- 2. Products Table
 CREATE TABLE IF NOT EXISTS products (
@@ -74,12 +79,12 @@ CREATE INDEX IF NOT EXISTS idx_idempotency_keys_expires_at ON idempotency_keys(e
 -- admin123: $2a$10$RUP6Lknor1aYWPyngT8WjOkiwFpkibEmguyv7e5gTbKae/hn5OAKW
 -- user123:  $2a$10$pp.NmQ27Jz1aeJiA2fPJTu79LQhY9v/Pxh02nSJvQ5k1cpq7BFAD2
 
-INSERT INTO users (id, username, password_hash, role, balance, allowed_categories, allowed_manufacturers)
+INSERT INTO users (id, username, password_hash, role, balance, allowed_categories, allowed_manufacturers, access_level, catalog_access_enabled)
 VALUES
-    ('a0000000-0000-0000-0000-000000000001', 'admin', '$2a$10$RUP6Lknor1aYWPyngT8WjOkiwFpkibEmguyv7e5gTbKae/hn5OAKW', 'admin', 0.00, '{}', '{}'),
-    ('b0000000-0000-0000-0000-000000000002', 'userA', '$2a$10$pp.NmQ27Jz1aeJiA2fPJTu79LQhY9v/Pxh02nSJvQ5k1cpq7BFAD2', 'user', 5000.00, '{}', '{}'),
-    ('b0000000-0000-0000-0000-000000000003', 'userB', '$2a$10$pp.NmQ27Jz1aeJiA2fPJTu79LQhY9v/Pxh02nSJvQ5k1cpq7BFAD2', 'user', 3000.00, '{"laptop"}', '{}'),
-    ('b0000000-0000-0000-0000-000000000004', 'userC', '$2a$10$pp.NmQ27Jz1aeJiA2fPJTu79LQhY9v/Pxh02nSJvQ5k1cpq7BFAD2', 'user', 4000.00, '{}', '{"Apple"}')
+    ('a0000000-0000-0000-0000-000000000001', 'admin', '$2a$10$RUP6Lknor1aYWPyngT8WjOkiwFpkibEmguyv7e5gTbKae/hn5OAKW', 'admin', 0.00, '{}', '{}', 'ALL', true),
+    ('b0000000-0000-0000-0000-000000000002', 'userA', '$2a$10$pp.NmQ27Jz1aeJiA2fPJTu79LQhY9v/Pxh02nSJvQ5k1cpq7BFAD2', 'user', 5000.00, '{}', '{}', 'ALL', true),
+    ('b0000000-0000-0000-0000-000000000003', 'userB', '$2a$10$pp.NmQ27Jz1aeJiA2fPJTu79LQhY9v/Pxh02nSJvQ5k1cpq7BFAD2', 'user', 3000.00, '{"laptop"}', '{}', 'FILTERED', true),
+    ('b0000000-0000-0000-0000-000000000004', 'userC', '$2a$10$pp.NmQ27Jz1aeJiA2fPJTu79LQhY9v/Pxh02nSJvQ5k1cpq7BFAD2', 'user', 4000.00, '{}', '{"Apple"}', 'FILTERED', true)
 ON CONFLICT (username) DO NOTHING;
 
 INSERT INTO products (id, category, manufacturer, model, price, stock_quantity)

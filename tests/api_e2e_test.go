@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -1398,5 +1399,148 @@ func TestHistoricalOrderSnapshotImmutability(t *testing.T) {
 	_ = json.Unmarshal(bodyStatus, &statusOrder)
 	if statusOrder.Data.ProductModel != "RetroBook 2024 Original" || statusOrder.Data.UnitPrice != 1200.00 {
 		t.Errorf("Status update snapshot mismatch: got model %s, price %f", statusOrder.Data.ProductModel, statusOrder.Data.UnitPrice)
+	}
+}
+
+func TestCatalogFilterCaseSensitivityAndAccessDenial(t *testing.T) {
+	tokenAdmin, _ := login(t, "/api/admin/login", "admin", "admin123")
+	adminClient := newClient(tokenAdmin)
+
+	testUsername := fmt.Sprintf("case_test_user_%d", time.Now().UnixNano())
+	testPassword := "password123"
+
+	// Create a test user with mixed-casing filters: lowercase "apple" and uppercase "LAPTOP"
+	createReq := domain.CreateUserRequest{
+		Username:             testUsername,
+		Password:             testPassword,
+		Role:                 "user",
+		Balance:              5000.00,
+		AllowedCategories:   []string{"LAPTOP"},
+		AllowedManufacturers: []string{"apple"},
+		AccessLevel:          "FILTERED",
+	}
+	respCreate, bodyCreate, _ := adminClient.request(http.MethodPost, "/api/admin/users", createReq)
+	if respCreate.StatusCode != http.StatusCreated {
+		t.Fatalf("Failed to create user: %s", string(bodyCreate))
+	}
+	var createdUser struct {
+		Data domain.UserSummary `json:"data"`
+	}
+	_ = json.Unmarshal(bodyCreate, &createdUser)
+	userID := createdUser.Data.ID
+
+	tokenCaseUser, _ := login(t, "/api/user/login", testUsername, testPassword)
+	caseClient := newClient(tokenCaseUser)
+
+	// 1. Verify case-insensitive catalog filtering:
+	// Allowed: "apple" (db has "Apple"), "LAPTOP" (db has "laptop").
+	// Must return Apple laptop (MacBook Pro), but NOT Dell laptop or Apple smartphone.
+	respProds, bodyProds, _ := caseClient.request(http.MethodGet, "/api/user/products", nil)
+	if respProds.StatusCode != http.StatusOK {
+		t.Fatalf("Failed to get products: %s", string(bodyProds))
+	}
+	var prodList struct {
+		Data []domain.Product `json:"data"`
+	}
+	_ = json.Unmarshal(bodyProds, &prodList)
+	if len(prodList.Data) == 0 {
+		t.Fatalf("Expected case-insensitive matching to return Apple laptops, got 0 items")
+	}
+	for _, p := range prodList.Data {
+		if !strings.EqualFold(p.Category, "laptop") || !strings.EqualFold(p.Manufacturer, "apple") {
+			t.Errorf("Product %s (%s, %s) does not match filters", p.Model, p.Category, p.Manufacturer)
+		}
+	}
+
+	// 2. Query with uppercase query param ?category=LAPTOP and lowercase ?category=laptop
+	_, bodyCatUpper, _ := caseClient.request(http.MethodGet, "/api/user/products?category=LAPTOP", nil)
+	var listUpper struct {
+		Data []domain.Product `json:"data"`
+	}
+	_ = json.Unmarshal(bodyCatUpper, &listUpper)
+	if len(listUpper.Data) == 0 {
+		t.Errorf("Expected products for ?category=LAPTOP, got 0")
+	}
+
+	// 3. User with filtered access places order for allowed Apple laptop -> 201 Created
+	// Ensure stock is available
+	appleLaptop := prodList.Data[0]
+	_, _, _ = adminClient.request(http.MethodPatch, fmt.Sprintf("/api/admin/products/%s/stock", appleLaptop.ID), domain.UpdateStockRequest{
+		StockQuantity: 10,
+	})
+	respOrder, bodyOrder, _ := caseClient.request(http.MethodPost, "/api/user/orders", domain.CreateOrderRequest{
+		ProductID: appleLaptop.ID,
+		Quantity:  1,
+	})
+	if respOrder.StatusCode != http.StatusCreated {
+		t.Errorf("Expected 201 for allowed product order, got %d: %s", respOrder.StatusCode, string(bodyOrder))
+	}
+
+	// 4. Configure user for ZERO catalog access (AccessLevel: NONE)
+	accessFalse := false
+	respZeroAccess, bodyZeroAccess, _ := adminClient.request(
+		http.MethodPut,
+		fmt.Sprintf("/api/admin/users/%s/filters", userID),
+		domain.UpdateFiltersRequest{
+			AllowedCategories:    []string{},
+			AllowedManufacturers:  []string{},
+			AccessLevel:          "NONE",
+			CatalogAccessEnabled: &accessFalse,
+		},
+	)
+	if respZeroAccess.StatusCode != http.StatusOK {
+		t.Fatalf("Failed to update filters to zero access: %s", string(bodyZeroAccess))
+	}
+	var zeroSummary struct {
+		Data domain.UserSummary `json:"data"`
+	}
+	_ = json.Unmarshal(bodyZeroAccess, &zeroSummary)
+	if zeroSummary.Data.AccessLevel != "NONE" || zeroSummary.Data.CatalogAccessEnabled != false {
+		t.Errorf("Expected access_level=NONE and catalog_access_enabled=false, got %s / %v", zeroSummary.Data.AccessLevel, zeroSummary.Data.CatalogAccessEnabled)
+	}
+
+	// Verify catalog exploration returns 0 products
+	_, bodyEmptyList, _ := caseClient.request(http.MethodGet, "/api/user/products", nil)
+	var emptyProds struct {
+		Data []domain.Product `json:"data"`
+	}
+	_ = json.Unmarshal(bodyEmptyList, &emptyProds)
+	if len(emptyProds.Data) != 0 {
+		t.Errorf("Expected 0 products for zero-access user, got %d", len(emptyProds.Data))
+	}
+
+	// Verify order attempt is rejected with 422 FILTER_RESTRICTION
+	respDeniedOrder, bodyDeniedOrder, _ := caseClient.request(http.MethodPost, "/api/user/orders", domain.CreateOrderRequest{
+		ProductID: appleLaptop.ID,
+		Quantity:  1,
+	})
+	if respDeniedOrder.StatusCode != 422 {
+		t.Errorf("Expected 422 FILTER_RESTRICTION for zero-access user order, got %d: %s", respDeniedOrder.StatusCode, string(bodyDeniedOrder))
+	}
+	var errDenied domain.ErrorEnvelope
+	_ = json.Unmarshal(bodyDeniedOrder, &errDenied)
+	if errDenied.Error.Code != "FILTER_RESTRICTION" {
+		t.Errorf("Expected code FILTER_RESTRICTION, got %s", errDenied.Error.Code)
+	}
+
+	// 5. Restore user to ALL access
+	accessTrue := true
+	_, _, _ = adminClient.request(
+		http.MethodPut,
+		fmt.Sprintf("/api/admin/users/%s/filters", userID),
+		domain.UpdateFiltersRequest{
+			AllowedCategories:    []string{},
+			AllowedManufacturers:  []string{},
+			AccessLevel:          "ALL",
+			CatalogAccessEnabled: &accessTrue,
+		},
+	)
+	_, bodyFullList, _ := caseClient.request(http.MethodGet, "/api/user/products", nil)
+	var fullProds struct {
+		Data []domain.Product `json:"data"`
+	}
+	_ = json.Unmarshal(bodyFullList, &fullProds)
+	if len(fullProds.Data) < 3 {
+		t.Errorf("Expected full catalog for restored user, got %d products", len(fullProds.Data))
 	}
 }

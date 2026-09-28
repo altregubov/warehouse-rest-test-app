@@ -14,7 +14,7 @@ import (
 
 type ProductRepository interface {
 	GetByID(ctx context.Context, id uuid.UUID) (*domain.Product, error)
-	List(ctx context.Context, filterCategory string, allowedCategories, allowedManufacturers []string) ([]domain.Product, error)
+	List(ctx context.Context, filterCategory string, allowedCategories, allowedManufacturers []string, accessLevel string, catalogAccessEnabled bool) ([]domain.Product, error)
 	Create(ctx context.Context, product *domain.Product) error
 	UpdateStock(ctx context.Context, id uuid.UUID, newStock int) (*domain.Product, error)
 }
@@ -56,11 +56,15 @@ func (r *sqlProductRepository) GetByID(ctx context.Context, id uuid.UUID) (*doma
 	return &p, nil
 }
 
-func (r *sqlProductRepository) List(ctx context.Context, filterCategory string, allowedCategories, allowedManufacturers []string) ([]domain.Product, error) {
+func (r *sqlProductRepository) List(ctx context.Context, filterCategory string, allowedCategories, allowedManufacturers []string, accessLevel string, catalogAccessEnabled bool) ([]domain.Product, error) {
+	if !catalogAccessEnabled || accessLevel == "NONE" {
+		return []domain.Product{}, nil
+	}
+
 	filterCategory = strings.TrimSpace(filterCategory)
 
 	// If user is restricted to specific categories, and requested a category not in their whitelist, return empty list
-	if len(allowedCategories) > 0 && filterCategory != "" {
+	if accessLevel == "FILTERED" && len(allowedCategories) > 0 && filterCategory != "" {
 		allowed := false
 		for _, cat := range allowedCategories {
 			if strings.EqualFold(cat, filterCategory) {
@@ -82,18 +86,26 @@ func (r *sqlProductRepository) List(ctx context.Context, filterCategory string, 
 	argIdx := 1
 
 	if filterCategory != "" {
-		query += fmt.Sprintf(" AND LOWER(category) = LOWER($%d)", argIdx)
+		query += fmt.Sprintf(" AND LOWER(TRIM(category)) = LOWER(TRIM($%d))", argIdx)
 		args = append(args, filterCategory)
 		argIdx++
-	} else if len(allowedCategories) > 0 {
-		query += fmt.Sprintf(" AND category = ANY($%d)", argIdx)
-		args = append(args, pq.Array(allowedCategories))
+	} else if accessLevel == "FILTERED" && len(allowedCategories) > 0 {
+		normCats := make([]string, len(allowedCategories))
+		for i, c := range allowedCategories {
+			normCats[i] = strings.ToLower(strings.TrimSpace(c))
+		}
+		query += fmt.Sprintf(" AND LOWER(TRIM(category)) = ANY($%d)", argIdx)
+		args = append(args, pq.Array(normCats))
 		argIdx++
 	}
 
-	if len(allowedManufacturers) > 0 {
-		query += fmt.Sprintf(" AND manufacturer = ANY($%d)", argIdx)
-		args = append(args, pq.Array(allowedManufacturers))
+	if accessLevel == "FILTERED" && len(allowedManufacturers) > 0 {
+		normMfgs := make([]string, len(allowedManufacturers))
+		for i, m := range allowedManufacturers {
+			normMfgs[i] = strings.ToLower(strings.TrimSpace(m))
+		}
+		query += fmt.Sprintf(" AND LOWER(TRIM(manufacturer)) = ANY($%d)", argIdx)
+		args = append(args, pq.Array(normMfgs))
 		argIdx++
 	}
 

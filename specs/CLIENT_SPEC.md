@@ -93,9 +93,11 @@ erDiagram
         string userId "Unique account reference"
         string username "Commercial account name"
         string role "System role: Admin or Client"
+        string accessLevel "Catalog access tier: ALL, FILTERED, or NONE"
+        boolean catalogAccessEnabled "Explicit toggle for catalog browsing permissions"
         decimal balance "Available purchasing credit"
-        list allowedCategories "Whitelisted product categories"
-        list allowedManufacturers "Whitelisted brand manufacturers"
+        list allowedCategories "Whitelisted product categories (evaluated case-insensitively)"
+        list allowedManufacturers "Whitelisted brand manufacturers (evaluated case-insensitively)"
         timestamp deletedAt "Deactivation timestamp (audit soft-delete)"
     }
 
@@ -122,7 +124,7 @@ erDiagram
 ```
 
 #### Core Business Entities
-- **`[User / Client]`**: Represents an authenticated organization or individual with an assigned operating balance and granular visibility filters.
+- **`[User / Client]`**: Represents an authenticated organization or individual with an assigned operating balance, access governance tier (`ALL`, `FILTERED`, `NONE`), and granular visibility filters.
 - **`[Product / Item]`**: Represents warehouse stock available for order placement, categorized by industry type, manufacturer brand, and unit cost.
 - **`[Core Entity: Order]`**: Represents the committed contract between a customer and the warehouse, capturing quantity, agreed price, immutable historical product model/price snapshots, and ownership transfer.
 - **`Financial Precision & Currency Settlement`**: All commercial calculations (balances, prices, transaction totals) are evaluated internally using integer cents to eliminate floating-point drift, guaranteeing exact-cent reconciliation across accounting ledgers while exposing standard dollar representations to client interfaces.
@@ -137,13 +139,14 @@ erDiagram
 1. **Credential Submission:** The client application submits partner credentials through the appropriate role channel (`Admin` or `User`).
 2. **Access Verification & Anti-Enumeration Protection:** The service confirms that credentials are valid and the user identity matches the target channel. If credentials fail, the account does not exist, or the role mismatches, the service yields an identical uniform `401 Unauthorized` response with constant-time verification, completely eliminating account enumeration and authentication oracle vectors.
 3. **Session Issuance:** A cryptographically signed session token is returned containing the user's role and identity claims.
-4. **Profile & Rule Retrieval:** The client fetches account metadata, including current balance, allowed categories, and permitted manufacturers.
+4. **Profile & Rule Retrieval:** The client fetches account metadata, including current balance, access level (`ALL`, `FILTERED`, `NONE`), catalog enablement flag, allowed categories, and permitted manufacturers.
 
 #### Journey 2: Catalog Discovery with Permission Filters
 1. **Catalog Query:** The client application requests the active warehouse inventory (optionally filtering by category).
-2. **Permission Intersection:** The engine inspects the client's whitelist:
-   - If no constraints are configured, all products are accessible.
-   - If specific categories or manufacturers are specified, items outside the permitted lists are removed from the result set.
+2. **Permission Intersection & Case-Insensitive Matching:** The engine inspects the client's access governance:
+   - **Zero-Access Restriction (`NONE` or Disabled):** If `access_level` is `NONE` or `catalog_access_enabled` is `false`, the client is prohibited from viewing items, returning an empty catalog (`[]`). Attempts to order trigger an immediate `422 Unprocessable Entity` with `FILTER_RESTRICTION`.
+   - **Full Catalog Access (`ALL`):** If `access_level` is `ALL`, all warehouse products are accessible without restriction.
+   - **Filtered Catalog Access (`FILTERED`):** Items are filtered by comparing `allowed_categories` and `allowed_manufacturers` using case-insensitive normalization (`LOWER(TRIM(...))`), ensuring mixed-casing variations (e.g. `"apple"` vs `"Apple"`, `"laptop"` vs `"Laptop"`) match reliably without silent omissions.
 3. **Catalog Presentation:** The filtered inventory with current unit prices and available stock is presented to the client.
 
 #### Journey 3: Transactional Order Placement (`[Core Entity]` Creation)
@@ -272,7 +275,7 @@ Integrators can design predictable handling around four standard commercial outc
 | Business Condition | Primary Trigger | System Behavior | Integrator Guidance |
 | :--- | :--- | :--- | :--- |
 | **Order Success** | Available balance ≥ total cost AND stock ≥ requested quantity AND product in whitelist. | Creates `[Core Entity: Order]`, debits customer balance, decrements stock atomically, and returns confirmation. | Display order receipt, refresh client balance badge, and prompt for dispatch tracking. |
-| **Catalog Access Restriction** | Customer attempts to purchase an item outside assigned `allowed_categories` or `allowed_manufacturers`. | Operation rejected immediately. No ledger locks acquired. | Notify customer of commercial contract restrictions; prompt them to contact their account administrator. |
+| **Catalog Access Restriction** | Customer attempts to purchase an item outside assigned whitelists or account has `access_level: NONE` / `catalog_access_enabled: false`. | Operation rejected immediately (422 Unprocessable Entity with error code `FILTER_RESTRICTION`). No ledger locks acquired. | Notify customer of commercial contract restrictions or account suspension; prompt them to contact their account administrator. |
 | **Insufficient Stock** | Requested quantity exceeds current warehouse inventory for the target SKU. | Operation rejected. Transaction rolled back with zero side effects. | Inform user of available inventory quantity; offer partial quantity or notify on restock. |
 | **Insufficient Funds** | Total order amount exceeds client's available balance. | Operation rejected. Transaction rolled back with zero side effects. | Prompt client to top up balance or request credit increase from system administrator. |
 | **Entity Not Found** | Referenced product SKU or user account does not exist or has been archived. | Operation rejected gracefully. | Refresh local catalog cache and verify product identifier validity. |

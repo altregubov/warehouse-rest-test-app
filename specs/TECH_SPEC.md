@@ -139,10 +139,14 @@ CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id);
 ```
 
 ### 3.2 Domain Model Invariants
-1. **User Catalog Filters:**
-   - `allowed_categories`: Text array. **If empty (`{}`) or null, all categories are permitted.**
-   - `allowed_manufacturers`: Text array. **If empty (`{}`) or null, all manufacturers are permitted.**
-   - If non-empty, user can ONLY view/purchase products matching one of the whitelisted values.
+1. **User Catalog Filters & Access Level Semantics:**
+   - **Case-Insensitive Normalization:** Category and manufacturer filtering operates strictly case-insensitively across ingestion (`CreateUser`, `UpdateFilters`) and query evaluation (`LOWER(TRIM(...))`), preventing silent mismatches between title-cased catalog entries and lowercase whitelist queries.
+   - **Access Level Enum & Denial Semantics:**
+     - `access_level`: Explicit enumerated values (`ALL`, `FILTERED`, `NONE`).
+     - `catalog_access_enabled`: Boolean flag indicating whether the user has catalog and order placement privileges.
+     - **`ALL`**: User has full catalog visibility across all categories and manufacturers.
+     - **`FILTERED`**: Visibility and order placement are strictly constrained to whitelisted `allowed_categories` and `allowed_manufacturers`.
+     - **`NONE`**: Explicit zero-access configuration. The user sees 0 catalog items (`[]`), and order attempts are immediately rejected with `422 Unprocessable Entity` (`FILTER_RESTRICTION`), enabling suspension or onboarding holds without deleting user accounts.
 2. **Product Extensibility:**
    - Category is an arbitrary, non-restricted string (e.g., `laptop`, `smartphone`, `monitor`, `tablet`, `accessory`). No hardcoded enums.
 3. **Atomic Balance & Inventory Constraints:**

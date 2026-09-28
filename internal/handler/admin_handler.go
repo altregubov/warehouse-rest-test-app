@@ -275,10 +275,14 @@ func (h *AdminHandler) UpdateFilters(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	updatedUser, err := h.userService.UpdateFilters(r.Context(), userID, req.AllowedCategories, req.AllowedManufacturers)
+	updatedUser, err := h.userService.UpdateFilters(r.Context(), userID, &req)
 	if err != nil {
 		if errors.Is(err, domain.ErrNotFound) {
 			Error(w, http.StatusNotFound, "NOT_FOUND", "User not found")
+			return
+		}
+		if errors.Is(err, domain.ErrInvalidInput) {
+			Error(w, http.StatusBadRequest, "INVALID_INPUT", err.Error())
 			return
 		}
 		Error(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to update filters")

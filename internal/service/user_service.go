@@ -19,7 +19,7 @@ type UserService interface {
 	UpdateBalance(ctx context.Context, userID uuid.UUID, amount float64) (*domain.UserSummary, error)
 	TopUpBalance(ctx context.Context, userID uuid.UUID, incrementAmount float64) (*domain.UserSummary, error)
 	SetBalance(ctx context.Context, userID uuid.UUID, newBalance float64) (*domain.UserSummary, error)
-	UpdateFilters(ctx context.Context, userID uuid.UUID, categories, manufacturers []string) (*domain.UserSummary, error)
+	UpdateFilters(ctx context.Context, userID uuid.UUID, req *domain.UpdateFiltersRequest) (*domain.UserSummary, error)
 	DeleteUser(ctx context.Context, id uuid.UUID) error
 }
 
@@ -69,6 +69,22 @@ func (s *userService) ListUsers(ctx context.Context, role string, page, pageSize
 	return summaries, total, nil
 }
 
+func normalizeStringSlice(items []string) []string {
+	if items == nil {
+		return []string{}
+	}
+	result := make([]string, 0, len(items))
+	seen := make(map[string]bool)
+	for _, item := range items {
+		norm := strings.ToLower(strings.TrimSpace(item))
+		if norm != "" && !seen[norm] {
+			seen[norm] = true
+			result = append(result, norm)
+		}
+	}
+	return result
+}
+
 func (s *userService) CreateUser(ctx context.Context, req *domain.CreateUserRequest) (*domain.UserSummary, error) {
 	username := strings.TrimSpace(req.Username)
 	if username == "" || len(req.Password) < 4 {
@@ -84,6 +100,33 @@ func (s *userService) CreateUser(ctx context.Context, req *domain.CreateUserRequ
 		return nil, fmt.Errorf("%w: balance cannot be negative", domain.ErrInvalidInput)
 	}
 
+	normCats := normalizeStringSlice(req.AllowedCategories)
+	normMfgs := normalizeStringSlice(req.AllowedManufacturers)
+
+	accessLevel := strings.ToUpper(strings.TrimSpace(req.AccessLevel))
+	catalogAccessEnabled := true
+	if req.CatalogAccessEnabled != nil {
+		catalogAccessEnabled = *req.CatalogAccessEnabled
+	}
+
+	if accessLevel != "" {
+		if accessLevel != "ALL" && accessLevel != "FILTERED" && accessLevel != "NONE" {
+			return nil, fmt.Errorf("%w: invalid access_level (must be ALL, FILTERED, or NONE)", domain.ErrInvalidInput)
+		}
+		if accessLevel == "NONE" {
+			catalogAccessEnabled = false
+		}
+	} else if req.CatalogAccessEnabled != nil && !*req.CatalogAccessEnabled {
+		accessLevel = "NONE"
+		catalogAccessEnabled = false
+	} else {
+		if len(normCats) > 0 || len(normMfgs) > 0 {
+			accessLevel = "FILTERED"
+		} else {
+			accessLevel = "ALL"
+		}
+	}
+
 	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
 		return nil, fmt.Errorf("failed to hash password: %w", err)
@@ -96,8 +139,10 @@ func (s *userService) CreateUser(ctx context.Context, req *domain.CreateUserRequ
 		PasswordHash:         string(hash),
 		Role:                 role,
 		Balance:              domain.CentsToDollars(balCents),
-		AllowedCategories:   req.AllowedCategories,
-		AllowedManufacturers: req.AllowedManufacturers,
+		AllowedCategories:   normCats,
+		AllowedManufacturers: normMfgs,
+		AccessLevel:          accessLevel,
+		CatalogAccessEnabled: catalogAccessEnabled,
 	}
 
 	if err := s.userRepo.Create(ctx, user); err != nil {
@@ -173,15 +218,35 @@ func (s *userService) SetBalance(ctx context.Context, userID uuid.UUID, newBalan
 	return toUserSummary(updatedUser), nil
 }
 
-func (s *userService) UpdateFilters(ctx context.Context, userID uuid.UUID, categories, manufacturers []string) (*domain.UserSummary, error) {
-	if categories == nil {
-		categories = []string{}
-	}
-	if manufacturers == nil {
-		manufacturers = []string{}
+func (s *userService) UpdateFilters(ctx context.Context, userID uuid.UUID, req *domain.UpdateFiltersRequest) (*domain.UserSummary, error) {
+	normCats := normalizeStringSlice(req.AllowedCategories)
+	normMfgs := normalizeStringSlice(req.AllowedManufacturers)
+
+	accessLevel := strings.ToUpper(strings.TrimSpace(req.AccessLevel))
+	catalogAccessEnabled := true
+	if req.CatalogAccessEnabled != nil {
+		catalogAccessEnabled = *req.CatalogAccessEnabled
 	}
 
-	updatedUser, err := s.userRepo.UpdateFilters(ctx, userID, categories, manufacturers)
+	if accessLevel != "" {
+		if accessLevel != "ALL" && accessLevel != "FILTERED" && accessLevel != "NONE" {
+			return nil, fmt.Errorf("%w: invalid access_level (must be ALL, FILTERED, or NONE)", domain.ErrInvalidInput)
+		}
+		if accessLevel == "NONE" {
+			catalogAccessEnabled = false
+		}
+	} else if req.CatalogAccessEnabled != nil && !*req.CatalogAccessEnabled {
+		accessLevel = "NONE"
+		catalogAccessEnabled = false
+	} else {
+		if len(normCats) > 0 || len(normMfgs) > 0 {
+			accessLevel = "FILTERED"
+		} else {
+			accessLevel = "ALL"
+		}
+	}
+
+	updatedUser, err := s.userRepo.UpdateFilters(ctx, userID, normCats, normMfgs, accessLevel, catalogAccessEnabled)
 	if err != nil {
 		return nil, err
 	}
@@ -205,6 +270,14 @@ func toUserSummary(u *domain.User) *domain.UserSummary {
 	if allowedManufacturers == nil {
 		allowedManufacturers = []string{}
 	}
+	accessLevel := u.AccessLevel
+	if accessLevel == "" {
+		if len(allowedCategories) > 0 || len(allowedManufacturers) > 0 {
+			accessLevel = "FILTERED"
+		} else {
+			accessLevel = "ALL"
+		}
+	}
 	return &domain.UserSummary{
 		ID:                   u.ID,
 		Username:             u.Username,
@@ -212,5 +285,7 @@ func toUserSummary(u *domain.User) *domain.UserSummary {
 		Balance:              u.Balance,
 		AllowedCategories:   allowedCategories,
 		AllowedManufacturers: allowedManufacturers,
+		AccessLevel:          accessLevel,
+		CatalogAccessEnabled: u.CatalogAccessEnabled,
 	}
 }

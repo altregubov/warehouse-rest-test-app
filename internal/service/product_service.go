@@ -35,11 +35,11 @@ func (s *productService) ListUserProducts(ctx context.Context, userID uuid.UUID,
 		return nil, err
 	}
 
-	return s.prodRepo.List(ctx, category, user.AllowedCategories, user.AllowedManufacturers)
+	return s.prodRepo.List(ctx, category, user.AllowedCategories, user.AllowedManufacturers, user.AccessLevel, user.CatalogAccessEnabled)
 }
 
 func (s *productService) ListAllProducts(ctx context.Context) ([]domain.Product, error) {
-	return s.prodRepo.List(ctx, "", nil, nil)
+	return s.prodRepo.List(ctx, "", nil, nil, "ALL", true)
 }
 
 func (s *productService) CreateProduct(ctx context.Context, req *domain.CreateProductRequest) (*domain.Product, error) {
