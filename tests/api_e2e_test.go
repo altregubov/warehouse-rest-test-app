@@ -118,10 +118,11 @@ func TestSegregatedAuthenticationAndRBAC(t *testing.T) {
 		t.Fatalf("Admin login failed, got status %d", status)
 	}
 
-	// 2. Regular user login on /api/admin/login -> 403 Forbidden
-	_, status = login(t, "/api/admin/login", "userA", "user123")
-	if status != http.StatusForbidden {
-		t.Errorf("Expected 403 when regular user logs into admin endpoint, got %d", status)
+	// 2. Regular user login on /api/admin/login -> 401 Unauthorized (unified response, no oracle)
+	c := newClient("")
+	respAdminFail, bodyAdminFail, _ := c.request(http.MethodPost, "/api/admin/login", domain.LoginRequest{Username: "userA", Password: "user123"})
+	if respAdminFail.StatusCode != http.StatusUnauthorized {
+		t.Errorf("Expected 401 when regular user logs into admin endpoint, got %d", respAdminFail.StatusCode)
 	}
 
 	// 3. User login on /api/user/login -> Success (200)
@@ -130,16 +131,41 @@ func TestSegregatedAuthenticationAndRBAC(t *testing.T) {
 		t.Fatalf("UserA login failed, got status %d", status)
 	}
 
-	// 4. Admin login on /api/user/login -> 403 Forbidden
-	_, status = login(t, "/api/user/login", "admin", "admin123")
-	if status != http.StatusForbidden {
-		t.Errorf("Expected 403 when admin logs into user endpoint, got %d", status)
+	// 4. Admin login on /api/user/login -> 401 Unauthorized (unified response, no oracle)
+	respUserFail, bodyUserFail, _ := c.request(http.MethodPost, "/api/user/login", domain.LoginRequest{Username: "admin", Password: "admin123"})
+	if respUserFail.StatusCode != http.StatusUnauthorized {
+		t.Errorf("Expected 401 when admin logs into user endpoint, got %d", respUserFail.StatusCode)
 	}
 
 	// 5. Invalid password -> 401 Unauthorized
-	_, status = login(t, "/api/user/login", "userA", "wrongpass")
-	if status != http.StatusUnauthorized {
-		t.Errorf("Expected 401 for wrong password, got %d", status)
+	respWrongPass, bodyWrongPass, _ := c.request(http.MethodPost, "/api/user/login", domain.LoginRequest{Username: "userA", Password: "wrongpass"})
+	if respWrongPass.StatusCode != http.StatusUnauthorized {
+		t.Errorf("Expected 401 for wrong password, got %d", respWrongPass.StatusCode)
+	}
+
+	// 6. Non-existent user -> 401 Unauthorized
+	respNonExistent, bodyNonExistent, _ := c.request(http.MethodPost, "/api/user/login", domain.LoginRequest{Username: "nobody_here", Password: "password123"})
+	if respNonExistent.StatusCode != http.StatusUnauthorized {
+		t.Errorf("Expected 401 for non-existent user, got %d", respNonExistent.StatusCode)
+	}
+
+	// 7. Verify all failure bodies match exactly: code INVALID_CREDENTIALS and message "Invalid username or password"
+	for name, b := range map[string][]byte{
+		"admin_login_wrong_role": bodyAdminFail,
+		"user_login_wrong_role":  bodyUserFail,
+		"wrong_password":         bodyWrongPass,
+		"non_existent_user":      bodyNonExistent,
+	} {
+		var errEnv domain.ErrorEnvelope
+		if err := json.Unmarshal(b, &errEnv); err != nil {
+			t.Errorf("%s: failed to unmarshal error envelope: %v", name, err)
+		}
+		if errEnv.Error.Code != "INVALID_CREDENTIALS" {
+			t.Errorf("%s: expected code INVALID_CREDENTIALS, got %s", name, errEnv.Error.Code)
+		}
+		if errEnv.Error.Message != "Invalid username or password" {
+			t.Errorf("%s: expected message 'Invalid username or password', got %s", name, errEnv.Error.Message)
+		}
 	}
 
 	// 6. User token attempting admin route -> 403 Forbidden

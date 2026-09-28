@@ -65,13 +65,7 @@ const docTemplate = `{
                         }
                     },
                     "401": {
-                        "description": "Invalid credentials",
-                        "schema": {
-                            "$ref": "#/definitions/domain.ErrorEnvelope"
-                        }
-                    },
-                    "403": {
-                        "description": "Forbidden: user is not an admin",
+                        "description": "Invalid username or password",
                         "schema": {
                             "$ref": "#/definitions/domain.ErrorEnvelope"
                         }
@@ -1142,13 +1136,7 @@ const docTemplate = `{
                         }
                     },
                     "401": {
-                        "description": "Invalid credentials",
-                        "schema": {
-                            "$ref": "#/definitions/domain.ErrorEnvelope"
-                        }
-                    },
-                    "403": {
-                        "description": "Forbidden: user is an admin attempting regular login",
+                        "description": "Invalid username or password",
                         "schema": {
                             "$ref": "#/definitions/domain.ErrorEnvelope"
                         }

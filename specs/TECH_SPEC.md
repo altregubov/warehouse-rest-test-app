@@ -131,15 +131,15 @@ CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id);
   - `exp`: Expiration timestamp
 - Header format: `Authorization: Bearer <token>`
 
-### 4.2 Segregated Login Endpoints
+### 4.2 Segregated Login Endpoints & Authentication Oracle Elimination
 1. `POST /api/admin/login`
    - Accepts: `{ "username": "...", "password": "..." }`
    - Verifies credentials and strictly enforces `role == 'admin'`.
-   - **Rejection:** Returns `403 Forbidden` (`{"success": false, "error": {"code": "FORBIDDEN", "message": "Admin credentials required"}}`) if authenticated user has role `user`.
+   - **Unified Failure Response:** Returns uniform `401 Unauthorized` (`{"success": false, "error": {"code": "INVALID_CREDENTIALS", "message": "Invalid username or password"}}`) on non-existent users, bad passwords, and role mismatches. Employs constant-time dummy bcrypt hashing to prevent timing side-channels and user enumeration.
 2. `POST /api/user/login`
    - Accepts: `{ "username": "...", "password": "..." }`
    - Verifies credentials and strictly enforces `role == 'user'`.
-   - **Rejection:** Returns `403 Forbidden` if user has role `admin`.
+   - **Unified Failure Response:** Returns uniform `401 Unauthorized` (`{"success": false, "error": {"code": "INVALID_CREDENTIALS", "message": "Invalid username or password"}}`) on non-existent users, bad passwords, and role mismatches.
 
 ### 4.3 Route RBAC Middleware
 - `/api/admin/*`: Restricted to valid JWTs with `role == 'admin'`.
@@ -158,10 +158,11 @@ CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id);
 - `POST /api/admin/login`
   - Body: `{ "username": "admin", "password": "admin123" }`
   - Response (200 OK): `{ "success": true, "data": { "token": "<jwt>", "user": { "id": "...", "username": "admin", "role": "admin" } } }`
-  - Response (401 Unauthorized / 403 Forbidden)
+  - Failure (401 Unauthorized): `{ "success": false, "error": {"code": "INVALID_CREDENTIALS", "message": "Invalid username or password"} }`
 - `POST /api/user/login`
   - Body: `{ "username": "userA", "password": "user123" }`
   - Response (200 OK): `{ "success": true, "data": { "token": "<jwt>", "user": { "id": "...", "username": "userA", "role": "user" } } }`
+  - Failure (401 Unauthorized): `{ "success": false, "error": {"code": "INVALID_CREDENTIALS", "message": "Invalid username or password"} }`
 
 ### 5.3 Admin Routes (`/api/admin/*`, Bearer Admin Token Required)
 

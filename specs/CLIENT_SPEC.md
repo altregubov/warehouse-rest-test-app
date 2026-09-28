@@ -132,7 +132,7 @@ erDiagram
 
 #### Journey 1: Commercial Authentication & Role Handshake
 1. **Credential Submission:** The client application submits partner credentials through the appropriate role channel (`Admin` or `User`).
-2. **Access Verification:** The service confirms that the user identity matches the target channel, preventing privilege escalation.
+2. **Access Verification & Anti-Enumeration Protection:** The service confirms that credentials are valid and the user identity matches the target channel. If credentials fail, the account does not exist, or the role mismatches, the service yields an identical uniform `401 Unauthorized` response with constant-time verification, completely eliminating account enumeration and authentication oracle vectors.
 3. **Session Issuance:** A cryptographically signed session token is returned containing the user's role and identity claims.
 4. **Profile & Rule Retrieval:** The client fetches account metadata, including current balance, allowed categories, and permitted manufacturers.
 

@@ -38,22 +38,24 @@ func NewAuthService(userRepo repository.UserRepository, jwtSecret string) AuthSe
 	}
 }
 
+const dummyPasswordHash = "$2a$10$RUP6Lknor1aYWPyngT8WjOkiwFpkibEmguyv7e5gTbKae/hn5OAKW"
+
 func (s *authService) Login(ctx context.Context, username, password, expectedRole string) (*domain.LoginResponse, error) {
 	user, err := s.userRepo.GetByUsername(ctx, username)
 	if err != nil {
 		if errors.Is(err, domain.ErrNotFound) {
+			// Perform dummy hash comparison to ensure constant-time execution and prevent user enumeration
+			_ = bcrypt.CompareHashAndPassword([]byte(dummyPasswordHash), []byte(password))
 			return nil, domain.ErrInvalidCredentials
 		}
 		return nil, err
 	}
 
-	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password)); err != nil {
+	// Always evaluate bcrypt hash comparison
+	pwdErr := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password))
+	// Unify wrong password and unauthorized role into identical ErrInvalidCredentials
+	if pwdErr != nil || user.Role != expectedRole {
 		return nil, domain.ErrInvalidCredentials
-	}
-
-	// Strictly verify that the user's role matches the required role of the login endpoint
-	if user.Role != expectedRole {
-		return nil, domain.ErrForbiddenRole
 	}
 
 	token, err := s.GenerateToken(user)
