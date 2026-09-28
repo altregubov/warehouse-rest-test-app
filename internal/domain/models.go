@@ -92,6 +92,14 @@ type UpdateBalanceRequest struct {
 	Amount float64 `json:"amount" example:"500.00"`
 }
 
+type TopUpBalanceRequest struct {
+	IncrementAmount float64 `json:"increment_amount" example:"500.00"`
+}
+
+type SetBalanceRequest struct {
+	NewBalance float64 `json:"new_balance" example:"5000.00"`
+}
+
 type UpdateFiltersRequest struct {
 	AllowedCategories   []string `json:"allowed_categories" example:"[\"laptop\"]"`
 	AllowedManufacturers []string `json:"allowed_manufacturers" example:"[\"Apple\", \"Dell\"]"`

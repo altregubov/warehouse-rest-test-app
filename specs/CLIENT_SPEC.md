@@ -30,7 +30,7 @@ The core value proposition of **[Project Name]** centers on three key capabiliti
 #### Realistic Business Use Cases
 1. **Catalog Exploration with Access Boundaries:** A corporate client logs into the portal to review products. The system dynamically tailors the catalog, hiding restricted lines and only presenting inventory the client is legally contracted to purchase.
 2. **Atomic Inventory Ordering:** A client orders multiple units of a high-demand item. The system verifies balance adequacy, confirms real-time stock availability, reserves the items, and settles payment in a single indivisible step.
-3. **Credit & Balance Adjustments:** Administrators top up a customer's purchasing quota upon receipt of off-platform payments or invoices, instantly reflecting the updated purchasing power in client applications.
+3. **Credit & Balance Adjustments:** Administrators dynamically adjust customer balances via dedicated operational actions: a relative top-up increment (`POST /api/admin/users/{id}/balance/top-up`, enforcing minimum increment of $0.01) upon invoice payment, or an absolute balance set (`PUT /api/admin/users/{id}/balance`, enforcing non-negative balance), immediately updating purchasing allowances.
 4. **Partner Automation & Test Sandbox:** Integrators connect automated regression suites or third-party enterprise resource planning (ERP) platforms to test order processing logic against live business scenarios.
 
 ---

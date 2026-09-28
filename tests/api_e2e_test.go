@@ -376,7 +376,7 @@ func TestAdminManagementEndpoints(t *testing.T) {
 	}
 	_ = json.Unmarshal(bodyCreateUser, &newUser)
 
-	// 4. Update user balance (+500)
+	// 4. Update user balance (+500 via legacy PATCH)
 	respBalance, bodyBalance, _ := adminClient.request(
 		http.MethodPatch,
 		fmt.Sprintf("/api/admin/users/%s/balance", newUser.Data.ID),
@@ -391,6 +391,60 @@ func TestAdminManagementEndpoints(t *testing.T) {
 	_ = json.Unmarshal(bodyBalance, &updatedUserBalance)
 	if updatedUserBalance.Data.Balance != 600.00 {
 		t.Errorf("Expected balance 600.00, got %f", updatedUserBalance.Data.Balance)
+	}
+
+	// 4a. Dedicated TopUpBalance POST /api/admin/users/{id}/balance/top-up (+250)
+	respTopUp, bodyTopUp, _ := adminClient.request(
+		http.MethodPost,
+		fmt.Sprintf("/api/admin/users/%s/balance/top-up", newUser.Data.ID),
+		domain.TopUpBalanceRequest{IncrementAmount: 250.00},
+	)
+	if respTopUp.StatusCode != http.StatusOK {
+		t.Fatalf("Expected 200 for dedicated balance top-up, got %d: %s", respTopUp.StatusCode, string(bodyTopUp))
+	}
+	var topUpResult struct {
+		Data domain.UserSummary `json:"data"`
+	}
+	_ = json.Unmarshal(bodyTopUp, &topUpResult)
+	if topUpResult.Data.Balance != 850.00 {
+		t.Errorf("Expected balance 850.00, got %f", topUpResult.Data.Balance)
+	}
+
+	// 4b. Invalid TopUpBalance (< 0.01) -> 422
+	respInvalidTopUp, _, _ := adminClient.request(
+		http.MethodPost,
+		fmt.Sprintf("/api/admin/users/%s/balance/top-up", newUser.Data.ID),
+		domain.TopUpBalanceRequest{IncrementAmount: 0.00},
+	)
+	if respInvalidTopUp.StatusCode != 422 {
+		t.Errorf("Expected 422 for invalid top-up amount, got %d", respInvalidTopUp.StatusCode)
+	}
+
+	// 4c. Dedicated SetBalance PUT /api/admin/users/{id}/balance (new_balance = 1500)
+	respSetBalance, bodySetBalance, _ := adminClient.request(
+		http.MethodPut,
+		fmt.Sprintf("/api/admin/users/%s/balance", newUser.Data.ID),
+		domain.SetBalanceRequest{NewBalance: 1500.00},
+	)
+	if respSetBalance.StatusCode != http.StatusOK {
+		t.Fatalf("Expected 200 for dedicated set balance, got %d: %s", respSetBalance.StatusCode, string(bodySetBalance))
+	}
+	var setResult struct {
+		Data domain.UserSummary `json:"data"`
+	}
+	_ = json.Unmarshal(bodySetBalance, &setResult)
+	if setResult.Data.Balance != 1500.00 {
+		t.Errorf("Expected balance 1500.00, got %f", setResult.Data.Balance)
+	}
+
+	// 4d. Invalid SetBalance (< 0) -> 422
+	respInvalidSet, _, _ := adminClient.request(
+		http.MethodPut,
+		fmt.Sprintf("/api/admin/users/%s/balance", newUser.Data.ID),
+		domain.SetBalanceRequest{NewBalance: -50.00},
+	)
+	if respInvalidSet.StatusCode != 422 {
+		t.Errorf("Expected 422 for negative balance set, got %d", respInvalidSet.StatusCode)
 	}
 
 	// 5. Update user filters

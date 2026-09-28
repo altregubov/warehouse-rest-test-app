@@ -178,10 +178,19 @@ CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id);
      ```
    - Response (201 Created): User details (excluding `password_hash`).
 
-2. `PATCH /api/admin/users/{id}/balance`
-   - Adjusts or tops up user balance.
-   - Body: `{ "amount": 500.00 }` (positive increment or new balance representation; standard implementation supports balance top-up / update).
-   - Response (200 OK): `{ "success": true, "data": { "id": "...", "username": "...", "balance": 5500.00 } }`
+2. Balance Management Operations
+   - **Top-Up Balance (Relative Increment):** `POST /api/admin/users/{id}/balance/top-up`
+     - Increases customer balance by a specified positive increment (`increment_amount >= 0.01`).
+     - Request: `{ "increment_amount": 500.00 }`
+     - Response (200 OK): `{ "success": true, "data": { "id": "...", "username": "...", "balance": 5500.00 } }`
+     - Validation (422 Unprocessable Entity): `{ "code": "INVALID_INPUT", "message": "increment_amount must be at least 0.01" }`
+   - **Set Absolute Balance:** `PUT /api/admin/users/{id}/balance`
+     - Sets customer balance to an absolute new amount (`new_balance >= 0.00`).
+     - Request: `{ "new_balance": 5000.00 }`
+     - Response (200 OK): `{ "success": true, "data": { "id": "...", "username": "...", "balance": 5000.00 } }`
+     - Validation (422 Unprocessable Entity): `{ "code": "INVALID_INPUT", "message": "balance cannot be negative" }`
+   - **Legacy Balance Adjustment:** `PATCH /api/admin/users/{id}/balance`
+     - Maintained for backward compatibility. Accepts `{ "amount": 500.00 }`.
 
 3. `PUT /api/admin/users/{id}/filters`
    - Configures catalog visibility rules for a user.

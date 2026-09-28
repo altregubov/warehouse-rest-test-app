@@ -15,6 +15,8 @@ type UserService interface {
 	GetProfile(ctx context.Context, userID uuid.UUID) (*domain.UserSummary, error)
 	CreateUser(ctx context.Context, req *domain.CreateUserRequest) (*domain.UserSummary, error)
 	UpdateBalance(ctx context.Context, userID uuid.UUID, amount float64) (*domain.UserSummary, error)
+	TopUpBalance(ctx context.Context, userID uuid.UUID, incrementAmount float64) (*domain.UserSummary, error)
+	SetBalance(ctx context.Context, userID uuid.UUID, newBalance float64) (*domain.UserSummary, error)
 	UpdateFilters(ctx context.Context, userID uuid.UUID, categories, manufacturers []string) (*domain.UserSummary, error)
 }
 
@@ -81,6 +83,43 @@ func (s *userService) UpdateBalance(ctx context.Context, userID uuid.UUID, amoun
 	newBalance := user.Balance + amount
 	if newBalance < 0 {
 		return nil, fmt.Errorf("%w: resulting balance cannot be negative", domain.ErrInvalidInput)
+	}
+
+	updatedUser, err := s.userRepo.UpdateBalance(ctx, userID, newBalance)
+	if err != nil {
+		return nil, err
+	}
+
+	return toUserSummary(updatedUser), nil
+}
+
+func (s *userService) TopUpBalance(ctx context.Context, userID uuid.UUID, incrementAmount float64) (*domain.UserSummary, error) {
+	if incrementAmount < 0.01 {
+		return nil, fmt.Errorf("%w: increment amount must be at least 0.01", domain.ErrInvalidInput)
+	}
+
+	user, err := s.userRepo.GetByID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	newBalance := user.Balance + incrementAmount
+	updatedUser, err := s.userRepo.UpdateBalance(ctx, userID, newBalance)
+	if err != nil {
+		return nil, err
+	}
+
+	return toUserSummary(updatedUser), nil
+}
+
+func (s *userService) SetBalance(ctx context.Context, userID uuid.UUID, newBalance float64) (*domain.UserSummary, error) {
+	if newBalance < 0 {
+		return nil, fmt.Errorf("%w: balance cannot be negative", domain.ErrInvalidInput)
+	}
+
+	_, err := s.userRepo.GetByID(ctx, userID)
+	if err != nil {
+		return nil, err
 	}
 
 	updatedUser, err := s.userRepo.UpdateBalance(ctx, userID, newBalance)

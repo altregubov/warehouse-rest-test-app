@@ -61,8 +61,138 @@ func (h *AdminHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 	JSON(w, http.StatusCreated, user)
 }
 
+// TopUpBalance godoc
+// @Summary Top up user balance by an increment
+// @Description Increases the user account balance by a specified increment amount (minimum 0.01)
+// @Tags Admin
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "User ID (UUID)"
+// @Param request body domain.TopUpBalanceRequest true "Balance top-up payload"
+// @Success 200 {object} domain.SuccessEnvelope{data=domain.UserSummary} "Balance topped up"
+// @Failure 400 {object} domain.ErrorEnvelope "Invalid input"
+// @Failure 401 {object} domain.ErrorEnvelope "Unauthorized"
+// @Failure 403 {object} domain.ErrorEnvelope "Forbidden"
+// @Failure 404 {object} domain.ErrorEnvelope "User not found"
+// @Failure 422 {object} domain.ErrorEnvelope "Unprocessable entity / validation failure"
+// @Router /api/admin/users/{id}/balance/top-up [post]
+func (h *AdminHandler) TopUpBalance(w http.ResponseWriter, r *http.Request) {
+	idStr := chi.URLParam(r, "id")
+	userID, err := uuid.Parse(idStr)
+	if err != nil {
+		Error(w, http.StatusBadRequest, "INVALID_ID", "Invalid user ID format (UUID expected)")
+		return
+	}
+
+	var req struct {
+		IncrementAmount *float64 `json:"increment_amount"`
+		Amount          *float64 `json:"amount"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		Error(w, http.StatusBadRequest, "INVALID_REQUEST", "Failed to parse JSON body")
+		return
+	}
+
+	amount := 0.0
+	if req.IncrementAmount != nil {
+		amount = *req.IncrementAmount
+	} else if req.Amount != nil {
+		amount = *req.Amount
+	} else {
+		Error(w, http.StatusBadRequest, "INVALID_INPUT", "increment_amount is required")
+		return
+	}
+
+	if amount < 0.01 {
+		Error(w, 422, "INVALID_INPUT", "increment_amount must be at least 0.01")
+		return
+	}
+
+	updatedUser, err := h.userService.TopUpBalance(r.Context(), userID, amount)
+	if err != nil {
+		if errors.Is(err, domain.ErrNotFound) {
+			Error(w, http.StatusNotFound, "NOT_FOUND", "User not found")
+			return
+		}
+		if errors.Is(err, domain.ErrInvalidInput) {
+			Error(w, 422, "INVALID_INPUT", err.Error())
+			return
+		}
+		Error(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to top up balance")
+		return
+	}
+
+	JSON(w, http.StatusOK, updatedUser)
+}
+
+// SetBalance godoc
+// @Summary Set absolute user balance
+// @Description Replaces the user account balance with a specified new balance (minimum 0.00)
+// @Tags Admin
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "User ID (UUID)"
+// @Param request body domain.SetBalanceRequest true "Absolute balance payload"
+// @Success 200 {object} domain.SuccessEnvelope{data=domain.UserSummary} "Balance set"
+// @Failure 400 {object} domain.ErrorEnvelope "Invalid input"
+// @Failure 401 {object} domain.ErrorEnvelope "Unauthorized"
+// @Failure 403 {object} domain.ErrorEnvelope "Forbidden"
+// @Failure 404 {object} domain.ErrorEnvelope "User not found"
+// @Failure 422 {object} domain.ErrorEnvelope "Unprocessable entity / validation failure"
+// @Router /api/admin/users/{id}/balance [put]
+func (h *AdminHandler) SetBalance(w http.ResponseWriter, r *http.Request) {
+	idStr := chi.URLParam(r, "id")
+	userID, err := uuid.Parse(idStr)
+	if err != nil {
+		Error(w, http.StatusBadRequest, "INVALID_ID", "Invalid user ID format (UUID expected)")
+		return
+	}
+
+	var req struct {
+		NewBalance *float64 `json:"new_balance"`
+		Amount     *float64 `json:"amount"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		Error(w, http.StatusBadRequest, "INVALID_REQUEST", "Failed to parse JSON body")
+		return
+	}
+
+	newBalance := 0.0
+	if req.NewBalance != nil {
+		newBalance = *req.NewBalance
+	} else if req.Amount != nil {
+		newBalance = *req.Amount
+	} else {
+		Error(w, http.StatusBadRequest, "INVALID_INPUT", "new_balance is required")
+		return
+	}
+
+	if newBalance < 0 {
+		Error(w, 422, "INVALID_INPUT", "new_balance cannot be negative")
+		return
+	}
+
+	updatedUser, err := h.userService.SetBalance(r.Context(), userID, newBalance)
+	if err != nil {
+		if errors.Is(err, domain.ErrNotFound) {
+			Error(w, http.StatusNotFound, "NOT_FOUND", "User not found")
+			return
+		}
+		if errors.Is(err, domain.ErrInvalidInput) {
+			Error(w, 422, "INVALID_INPUT", err.Error())
+			return
+		}
+		Error(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to set balance")
+		return
+	}
+
+	JSON(w, http.StatusOK, updatedUser)
+}
+
 // UpdateBalance godoc
-// @Summary Update or top up user balance
+// @Summary Update or top up user balance (Legacy)
 // @Description Adjust user account balance by a specified amount (e.g. +500.00)
 // @Tags Admin
 // @Accept json
