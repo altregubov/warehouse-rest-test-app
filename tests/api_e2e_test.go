@@ -460,3 +460,137 @@ func TestAdminManagementEndpoints(t *testing.T) {
 		t.Fatalf("Expected 200 for filter update, got %d: %s", respFilters.StatusCode, string(bodyFilters))
 	}
 }
+
+func TestResourceDiscoveryAndOrderLifecycle(t *testing.T) {
+	adminToken, _ := login(t, "/api/admin/login", "admin", "admin123")
+	adminClient := newClient(adminToken)
+
+	// Create a dedicated user for this lifecycle test
+	testUsername := fmt.Sprintf("lifecycle_%d", time.Now().UnixNano())
+	respCreate, bodyCreate, _ := adminClient.request(http.MethodPost, "/api/admin/users", domain.CreateUserRequest{
+		Username: testUsername,
+		Password: "password123",
+		Role:     domain.RoleUser,
+		Balance:  10000.00,
+	})
+	if respCreate.StatusCode != http.StatusCreated {
+		t.Fatalf("Expected 201 for test user creation, got %d: %s", respCreate.StatusCode, string(bodyCreate))
+	}
+	var createdUser struct {
+		Data domain.UserSummary `json:"data"`
+	}
+	_ = json.Unmarshal(bodyCreate, &createdUser)
+	targetUserID := createdUser.Data.ID
+
+	userToken, _ := login(t, "/api/user/login", testUsername, "password123")
+	userClient := newClient(userToken)
+
+	// 1. Admin lists users
+	respUsers, bodyUsers, _ := adminClient.request(http.MethodGet, "/api/admin/users?role=user", nil)
+	if respUsers.StatusCode != http.StatusOK {
+		t.Fatalf("Expected 200 for admin user list, got %d: %s", respUsers.StatusCode, string(bodyUsers))
+	}
+	var usersResult struct {
+		Data []domain.UserSummary `json:"data"`
+	}
+	_ = json.Unmarshal(bodyUsers, &usersResult)
+	if len(usersResult.Data) == 0 {
+		t.Fatalf("Expected non-empty users list")
+	}
+
+	// 2. Admin gets user by ID
+	respUser, bodyUser, _ := adminClient.request(http.MethodGet, fmt.Sprintf("/api/admin/users/%s", targetUserID), nil)
+	if respUser.StatusCode != http.StatusOK {
+		t.Fatalf("Expected 200 for admin get user by ID, got %d: %s", respUser.StatusCode, string(bodyUser))
+	}
+
+	// 3. Admin lists all products
+	respProds, bodyProds, _ := adminClient.request(http.MethodGet, "/api/admin/products", nil)
+	if respProds.StatusCode != http.StatusOK {
+		t.Fatalf("Expected 200 for admin products list, got %d: %s", respProds.StatusCode, string(bodyProds))
+	}
+	var prodsResult struct {
+		Data []domain.Product `json:"data"`
+	}
+	_ = json.Unmarshal(bodyProds, &prodsResult)
+	if len(prodsResult.Data) == 0 {
+		t.Fatalf("Expected non-empty products list")
+	}
+	firstProduct := prodsResult.Data[0]
+
+	// 4. User places an order
+	respOrder, bodyOrder, _ := userClient.request(http.MethodPost, "/api/user/orders", domain.CreateOrderRequest{
+		ProductID: firstProduct.ID,
+		Quantity:  1,
+	})
+	if respOrder.StatusCode != http.StatusCreated {
+		t.Fatalf("Expected 201 for order creation, got %d: %s", respOrder.StatusCode, string(bodyOrder))
+	}
+	var orderResult struct {
+		Data domain.OrderResponse `json:"data"`
+	}
+	_ = json.Unmarshal(bodyOrder, &orderResult)
+	if orderResult.Data.Status != "CREATED" {
+		t.Errorf("Expected order status 'CREATED', got %s", orderResult.Data.Status)
+	}
+	orderID := orderResult.Data.OrderID
+
+	// 5. User lists personal orders
+	respUserOrders, bodyUserOrders, _ := userClient.request(http.MethodGet, "/api/user/orders", nil)
+	if respUserOrders.StatusCode != http.StatusOK {
+		t.Fatalf("Expected 200 for user orders list, got %d: %s", respUserOrders.StatusCode, string(bodyUserOrders))
+	}
+	var userOrdersResult struct {
+		Data []domain.OrderResponse `json:"data"`
+	}
+	_ = json.Unmarshal(bodyUserOrders, &userOrdersResult)
+	found := false
+	for _, o := range userOrdersResult.Data {
+		if o.OrderID == orderID {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("Expected created order %s in user orders list", orderID)
+	}
+
+	// 6. User gets order by ID
+	respSingleOrder, bodySingleOrder, _ := userClient.request(http.MethodGet, fmt.Sprintf("/api/user/orders/%s", orderID), nil)
+	if respSingleOrder.StatusCode != http.StatusOK {
+		t.Fatalf("Expected 200 for user get order by ID, got %d: %s", respSingleOrder.StatusCode, string(bodySingleOrder))
+	}
+
+	// 7. Admin lists all orders
+	respAdminOrders, bodyAdminOrders, _ := adminClient.request(http.MethodGet, "/api/admin/orders", nil)
+	if respAdminOrders.StatusCode != http.StatusOK {
+		t.Fatalf("Expected 200 for admin orders list, got %d: %s", respAdminOrders.StatusCode, string(bodyAdminOrders))
+	}
+
+	// 8. Admin updates order status to SHIPPED
+	respStatus, bodyStatus, _ := adminClient.request(
+		http.MethodPatch,
+		fmt.Sprintf("/api/admin/orders/%s/status", orderID),
+		domain.UpdateOrderStatusRequest{Status: "SHIPPED"},
+	)
+	if respStatus.StatusCode != http.StatusOK {
+		t.Fatalf("Expected 200 for status update, got %d: %s", respStatus.StatusCode, string(bodyStatus))
+	}
+	var updatedStatusResult struct {
+		Data domain.OrderResponse `json:"data"`
+	}
+	_ = json.Unmarshal(bodyStatus, &updatedStatusResult)
+	if updatedStatusResult.Data.Status != "SHIPPED" {
+		t.Errorf("Expected status 'SHIPPED', got %s", updatedStatusResult.Data.Status)
+	}
+
+	// 9. Admin invalid status update -> 422
+	respInvalidStatus, _, _ := adminClient.request(
+		http.MethodPatch,
+		fmt.Sprintf("/api/admin/orders/%s/status", orderID),
+		domain.UpdateOrderStatusRequest{Status: "INVALID_STATUS"},
+	)
+	if respInvalidStatus.StatusCode != 422 {
+		t.Errorf("Expected 422 for invalid status transition, got %d", respInvalidStatus.StatusCode)
+	}
+}

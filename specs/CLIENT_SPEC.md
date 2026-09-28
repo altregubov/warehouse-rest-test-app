@@ -113,6 +113,7 @@ erDiagram
         string productId "Target warehouse product"
         integer quantity "Number of items acquired"
         decimal totalPrice "Settled transaction cost"
+        string status "Lifecycle status (CREATED, SHIPPED, etc.)"
         timestamp createdAt "Placement timestamp"
     }
 ```

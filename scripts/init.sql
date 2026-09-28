@@ -33,8 +33,11 @@ CREATE TABLE IF NOT EXISTS orders (
     product_id UUID NOT NULL REFERENCES products(id) ON DELETE RESTRICT,
     quantity INTEGER NOT NULL CHECK (quantity > 0),
     total_price NUMERIC(12, 2) NOT NULL CHECK (total_price >= 0),
+    status VARCHAR(50) NOT NULL DEFAULT 'CREATED',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
+
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS status VARCHAR(50) NOT NULL DEFAULT 'CREATED';
 
 CREATE INDEX IF NOT EXISTS idx_products_category ON products(category);
 CREATE INDEX IF NOT EXISTS idx_products_manufacturer ON products(manufacturer);

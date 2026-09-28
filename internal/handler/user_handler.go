@@ -8,6 +8,8 @@ import (
 	"github.com/altregubov/warehouse-rest-test-app/internal/domain"
 	"github.com/altregubov/warehouse-rest-test-app/internal/middleware"
 	"github.com/altregubov/warehouse-rest-test-app/internal/service"
+	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
 )
 
 type UserHandler struct {
@@ -144,4 +146,69 @@ func (h *UserHandler) CreateOrder(w http.ResponseWriter, r *http.Request) {
 	}
 
 	JSON(w, http.StatusCreated, orderResp)
+}
+
+// ListOrders godoc
+// @Summary List customer purchase history
+// @Description Returns all orders placed by the authenticated user
+// @Tags User
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} domain.SuccessEnvelope{data=[]domain.OrderResponse} "List of orders"
+// @Failure 401 {object} domain.ErrorEnvelope "Unauthorized"
+// @Router /api/user/orders [get]
+func (h *UserHandler) ListOrders(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.GetUserID(r.Context())
+	if !ok {
+		Error(w, http.StatusUnauthorized, "UNAUTHORIZED", "User identity not found in context")
+		return
+	}
+
+	orders, err := h.orderService.ListUserOrders(r.Context(), userID)
+	if err != nil {
+		Error(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to retrieve orders")
+		return
+	}
+
+	JSON(w, http.StatusOK, orders)
+}
+
+// GetOrder godoc
+// @Summary Get customer order details
+// @Description Returns details for a specific order placed by the authenticated user
+// @Tags User
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Order ID (UUID)"
+// @Success 200 {object} domain.SuccessEnvelope{data=domain.OrderResponse} "Order details"
+// @Failure 401 {object} domain.ErrorEnvelope "Unauthorized"
+// @Failure 404 {object} domain.ErrorEnvelope "Order not found"
+// @Router /api/user/orders/{id} [get]
+func (h *UserHandler) GetOrder(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.GetUserID(r.Context())
+	if !ok {
+		Error(w, http.StatusUnauthorized, "UNAUTHORIZED", "User identity not found in context")
+		return
+	}
+
+	idStr := chi.URLParam(r, "id")
+	orderID, err := uuid.Parse(idStr)
+	if err != nil {
+		Error(w, http.StatusBadRequest, "INVALID_ID", "Invalid order ID format")
+		return
+	}
+
+	order, err := h.orderService.GetOrderByID(r.Context(), orderID, userID, false)
+	if err != nil {
+		if errors.Is(err, domain.ErrNotFound) {
+			Error(w, http.StatusNotFound, "NOT_FOUND", "Order not found")
+			return
+		}
+		Error(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to retrieve order")
+		return
+	}
+
+	JSON(w, http.StatusOK, order)
 }

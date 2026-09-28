@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strconv"
 
 	"github.com/altregubov/warehouse-rest-test-app/internal/domain"
 	"github.com/altregubov/warehouse-rest-test-app/internal/service"
@@ -14,12 +15,14 @@ import (
 type AdminHandler struct {
 	userService    service.UserService
 	productService service.ProductService
+	orderService   service.OrderService
 }
 
-func NewAdminHandler(userService service.UserService, productService service.ProductService) *AdminHandler {
+func NewAdminHandler(userService service.UserService, productService service.ProductService, orderService service.OrderService) *AdminHandler {
 	return &AdminHandler{
 		userService:    userService,
 		productService: productService,
+		orderService:   orderService,
 	}
 }
 
@@ -356,4 +359,156 @@ func (h *AdminHandler) UpdateStock(w http.ResponseWriter, r *http.Request) {
 	}
 
 	JSON(w, http.StatusOK, product)
+}
+
+// ListUsers godoc
+// @Summary List users
+// @Description Query paginated list of users with optional role filtering
+// @Tags Admin
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param role query string false "Filter by role (admin or user)"
+// @Param page query int false "Page number (default 1)"
+// @Param page_size query int false "Items per page (default 20, max 100)"
+// @Success 200 {object} domain.SuccessEnvelope{data=[]domain.UserSummary} "List of users"
+// @Failure 401 {object} domain.ErrorEnvelope "Unauthorized"
+// @Failure 403 {object} domain.ErrorEnvelope "Forbidden"
+// @Router /api/admin/users [get]
+func (h *AdminHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
+	role := r.URL.Query().Get("role")
+	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
+	pageSize, _ := strconv.Atoi(r.URL.Query().Get("page_size"))
+
+	users, _, err := h.userService.ListUsers(r.Context(), role, page, pageSize)
+	if err != nil {
+		Error(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to list users")
+		return
+	}
+
+	JSON(w, http.StatusOK, users)
+}
+
+// GetUser godoc
+// @Summary Get user by ID
+// @Description Retrieve a specific user account by UUID
+// @Tags Admin
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "User ID (UUID)"
+// @Success 200 {object} domain.SuccessEnvelope{data=domain.UserSummary} "User details"
+// @Failure 400 {object} domain.ErrorEnvelope "Invalid ID"
+// @Failure 401 {object} domain.ErrorEnvelope "Unauthorized"
+// @Failure 403 {object} domain.ErrorEnvelope "Forbidden"
+// @Failure 404 {object} domain.ErrorEnvelope "User not found"
+// @Router /api/admin/users/{id} [get]
+func (h *AdminHandler) GetUser(w http.ResponseWriter, r *http.Request) {
+	idStr := chi.URLParam(r, "id")
+	userID, err := uuid.Parse(idStr)
+	if err != nil {
+		Error(w, http.StatusBadRequest, "INVALID_ID", "Invalid user ID format (UUID expected)")
+		return
+	}
+
+	user, err := h.userService.GetUserByID(r.Context(), userID)
+	if err != nil {
+		if errors.Is(err, domain.ErrNotFound) {
+			Error(w, http.StatusNotFound, "NOT_FOUND", "User not found")
+			return
+		}
+		Error(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to get user")
+		return
+	}
+
+	JSON(w, http.StatusOK, user)
+}
+
+// ListProducts godoc
+// @Summary List all warehouse products (Admin)
+// @Description Retrieve full unrestricted product inventory for administrators
+// @Tags Admin
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} domain.SuccessEnvelope{data=[]domain.Product} "List of all products"
+// @Failure 401 {object} domain.ErrorEnvelope "Unauthorized"
+// @Failure 403 {object} domain.ErrorEnvelope "Forbidden"
+// @Router /api/admin/products [get]
+func (h *AdminHandler) ListProducts(w http.ResponseWriter, r *http.Request) {
+	products, err := h.productService.ListAllProducts(r.Context())
+	if err != nil {
+		Error(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to list products")
+		return
+	}
+
+	JSON(w, http.StatusOK, products)
+}
+
+// ListOrders godoc
+// @Summary List all orders (Admin)
+// @Description Retrieve all orders across the system for administrative auditing and fulfillment
+// @Tags Admin
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} domain.SuccessEnvelope{data=[]domain.OrderResponse} "List of all orders"
+// @Failure 401 {object} domain.ErrorEnvelope "Unauthorized"
+// @Failure 403 {object} domain.ErrorEnvelope "Forbidden"
+// @Router /api/admin/orders [get]
+func (h *AdminHandler) ListOrders(w http.ResponseWriter, r *http.Request) {
+	orders, err := h.orderService.ListAllOrders(r.Context())
+	if err != nil {
+		Error(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to list orders")
+		return
+	}
+
+	JSON(w, http.StatusOK, orders)
+}
+
+// UpdateOrderStatus godoc
+// @Summary Update order fulfillment status
+// @Description Update the fulfillment status of an order (e.g. PROCESSING, SHIPPED, DELIVERED, CANCELLED)
+// @Tags Admin
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Order ID (UUID)"
+// @Param request body domain.UpdateOrderStatusRequest true "Order status payload"
+// @Success 200 {object} domain.SuccessEnvelope{data=domain.OrderResponse} "Order status updated"
+// @Failure 400 {object} domain.ErrorEnvelope "Invalid input"
+// @Failure 401 {object} domain.ErrorEnvelope "Unauthorized"
+// @Failure 403 {object} domain.ErrorEnvelope "Forbidden"
+// @Failure 404 {object} domain.ErrorEnvelope "Order not found"
+// @Failure 422 {object} domain.ErrorEnvelope "Invalid status transition"
+// @Router /api/admin/orders/{id}/status [patch]
+func (h *AdminHandler) UpdateOrderStatus(w http.ResponseWriter, r *http.Request) {
+	idStr := chi.URLParam(r, "id")
+	orderID, err := uuid.Parse(idStr)
+	if err != nil {
+		Error(w, http.StatusBadRequest, "INVALID_ID", "Invalid order ID format (UUID expected)")
+		return
+	}
+
+	var req domain.UpdateOrderStatusRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		Error(w, http.StatusBadRequest, "INVALID_REQUEST", "Failed to parse JSON body")
+		return
+	}
+
+	order, err := h.orderService.UpdateOrderStatus(r.Context(), orderID, req.Status)
+	if err != nil {
+		if errors.Is(err, domain.ErrNotFound) {
+			Error(w, http.StatusNotFound, "NOT_FOUND", "Order not found")
+			return
+		}
+		if errors.Is(err, domain.ErrInvalidInput) {
+			Error(w, 422, "INVALID_STATUS", err.Error())
+			return
+		}
+		Error(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to update order status")
+		return
+	}
+
+	JSON(w, http.StatusOK, order)
 }

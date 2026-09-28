@@ -100,6 +100,7 @@ CREATE TABLE IF NOT EXISTS orders (
     product_id UUID NOT NULL REFERENCES products(id) ON DELETE RESTRICT,
     quantity INTEGER NOT NULL CHECK (quantity > 0),
     total_price NUMERIC(12, 2) NOT NULL CHECK (total_price >= 0),
+    status VARCHAR(50) NOT NULL DEFAULT 'CREATED',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -223,6 +224,27 @@ CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id);
    - Body: `{ "stock_quantity": 50 }`
    - Response (200 OK): Updated product inventory details.
 
+6. `GET /api/admin/users`
+   - Returns paginated list of users with optional role filtering (`?role=admin|user&page=1&page_size=20`).
+   - Response (200 OK): Array of `UserSummary` objects.
+
+7. `GET /api/admin/users/{id}`
+   - Returns details of a specific user account.
+   - Response (200 OK): `UserSummary` object.
+
+8. `GET /api/admin/products`
+   - Returns full, unrestricted product catalog for administrative inspection.
+   - Response (200 OK): Array of `Product` objects.
+
+9. `GET /api/admin/orders`
+   - Returns all orders across the system for administrative auditing and fulfillment tracking.
+   - Response (200 OK): Array of `OrderResponse` objects (including status and timestamps).
+
+10. `PATCH /api/admin/orders/{id}/status`
+    - Updates order fulfillment lifecycle status.
+    - Body: `{ "status": "SHIPPED" }` (Valid: `CREATED`, `PROCESSING`, `SHIPPED`, `DELIVERED`, `CANCELLED`).
+    - Response (200 OK): Updated `OrderResponse` object.
+
 ### 5.4 User Routes (`/api/user/*`, Bearer User Token Required)
 
 1. `GET /api/user/profile`
@@ -287,6 +309,15 @@ CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id);
        }
      }
      ```
+
+4. `GET /api/user/orders`
+   - Returns all historical orders placed by the authenticated customer.
+   - Response (200 OK): Array of `OrderResponse` objects.
+
+5. `GET /api/user/orders/{id}`
+   - Returns details for a specific order belonging to the authenticated customer.
+   - Response (200 OK): `OrderResponse` object.
+   - Failure: `404 Not Found` if order does not exist or belongs to another user.
 
 ---
 

@@ -12,6 +12,7 @@ import (
 
 type ProductService interface {
 	ListUserProducts(ctx context.Context, userID uuid.UUID, category string) ([]domain.Product, error)
+	ListAllProducts(ctx context.Context) ([]domain.Product, error)
 	CreateProduct(ctx context.Context, req *domain.CreateProductRequest) (*domain.Product, error)
 	UpdateStock(ctx context.Context, productID uuid.UUID, stockQuantity int) (*domain.Product, error)
 }
@@ -35,6 +36,10 @@ func (s *productService) ListUserProducts(ctx context.Context, userID uuid.UUID,
 	}
 
 	return s.prodRepo.List(ctx, category, user.AllowedCategories, user.AllowedManufacturers)
+}
+
+func (s *productService) ListAllProducts(ctx context.Context) ([]domain.Product, error) {
+	return s.prodRepo.List(ctx, "", nil, nil)
 }
 
 func (s *productService) CreateProduct(ctx context.Context, req *domain.CreateProductRequest) (*domain.Product, error) {

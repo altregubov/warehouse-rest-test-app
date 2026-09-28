@@ -13,6 +13,8 @@ import (
 
 type UserService interface {
 	GetProfile(ctx context.Context, userID uuid.UUID) (*domain.UserSummary, error)
+	GetUserByID(ctx context.Context, userID uuid.UUID) (*domain.UserSummary, error)
+	ListUsers(ctx context.Context, role string, page, pageSize int) ([]*domain.UserSummary, int, error)
 	CreateUser(ctx context.Context, req *domain.CreateUserRequest) (*domain.UserSummary, error)
 	UpdateBalance(ctx context.Context, userID uuid.UUID, amount float64) (*domain.UserSummary, error)
 	TopUpBalance(ctx context.Context, userID uuid.UUID, incrementAmount float64) (*domain.UserSummary, error)
@@ -35,6 +37,35 @@ func (s *userService) GetProfile(ctx context.Context, userID uuid.UUID) (*domain
 	}
 
 	return toUserSummary(user), nil
+}
+
+func (s *userService) GetUserByID(ctx context.Context, userID uuid.UUID) (*domain.UserSummary, error) {
+	user, err := s.userRepo.GetByID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	return toUserSummary(user), nil
+}
+
+func (s *userService) ListUsers(ctx context.Context, role string, page, pageSize int) ([]*domain.UserSummary, int, error) {
+	if page < 1 {
+		page = 1
+	}
+	if pageSize < 1 || pageSize > 100 {
+		pageSize = 20
+	}
+	offset := (page - 1) * pageSize
+
+	users, total, err := s.userRepo.List(ctx, role, pageSize, offset)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	summaries := make([]*domain.UserSummary, len(users))
+	for i, u := range users {
+		summaries[i] = toUserSummary(u)
+	}
+	return summaries, total, nil
 }
 
 func (s *userService) CreateUser(ctx context.Context, req *domain.CreateUserRequest) (*domain.UserSummary, error) {

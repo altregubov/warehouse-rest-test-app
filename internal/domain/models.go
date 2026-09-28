@@ -55,6 +55,7 @@ type Order struct {
 	ProductID  uuid.UUID `json:"product_id"`
 	Quantity   int       `json:"quantity"`
 	TotalPrice float64   `json:"total_price"`
+	Status     string    `json:"status"`
 	CreatedAt  time.Time `json:"created_at"`
 }
 
@@ -124,13 +125,19 @@ type CreateOrderRequest struct {
 
 type OrderResponse struct {
 	OrderID          uuid.UUID `json:"order_id"`
+	UserID           uuid.UUID `json:"user_id,omitempty"`
 	ProductID        uuid.UUID `json:"product_id"`
 	ProductModel     string    `json:"product_model"`
 	Quantity         int       `json:"quantity"`
 	UnitPrice        float64   `json:"unit_price"`
 	TotalPrice       float64   `json:"total_price"`
-	RemainingBalance float64   `json:"remaining_balance"`
+	Status           string    `json:"status"`
+	RemainingBalance float64   `json:"remaining_balance,omitempty"`
 	CreatedAt        time.Time `json:"created_at"`
+}
+
+type UpdateOrderStatusRequest struct {
+	Status string `json:"status" example:"SHIPPED"`
 }
 
 // Envelope structures for Swagger documentation and JSON API

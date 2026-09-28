@@ -15,6 +15,7 @@ type UserRepository interface {
 	GetByID(ctx context.Context, id uuid.UUID) (*domain.User, error)
 	GetByUsername(ctx context.Context, username string) (*domain.User, error)
 	Create(ctx context.Context, user *domain.User) error
+	List(ctx context.Context, role string, limit, offset int) ([]*domain.User, int, error)
 	UpdateBalance(ctx context.Context, id uuid.UUID, newBalance float64) (*domain.User, error)
 	UpdateFilters(ctx context.Context, id uuid.UUID, categories, manufacturers []string) (*domain.User, error)
 }
@@ -237,4 +238,62 @@ func (r *sqlUserRepository) UpdateFilters(ctx context.Context, id uuid.UUID, cat
 	}
 
 	return &u, nil
+}
+
+func (r *sqlUserRepository) List(ctx context.Context, role string, limit, offset int) ([]*domain.User, int, error) {
+	baseQuery := "FROM users WHERE 1=1"
+	var args []any
+	argIdx := 1
+	if role != "" {
+		baseQuery += fmt.Sprintf(" AND role = $%d", argIdx)
+		args = append(args, role)
+		argIdx++
+	}
+
+	var totalCount int
+	countQuery := "SELECT COUNT(*) " + baseQuery
+	if err := r.db.QueryRowContext(ctx, countQuery, args...).Scan(&totalCount); err != nil {
+		return nil, 0, fmt.Errorf("failed to count users: %w", err)
+	}
+
+	selectQuery := "SELECT id, username, password_hash, role, balance, allowed_categories, allowed_manufacturers, created_at, updated_at " + baseQuery + " ORDER BY created_at ASC"
+	if limit > 0 {
+		selectQuery += fmt.Sprintf(" LIMIT $%d OFFSET $%d", argIdx, argIdx+1)
+		args = append(args, limit, offset)
+	}
+
+	rows, err := r.db.QueryContext(ctx, selectQuery, args...)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to list users: %w", err)
+	}
+	defer rows.Close()
+
+	users := make([]*domain.User, 0)
+	for rows.Next() {
+		var u domain.User
+		var allowedCategories, allowedManufacturers pq.StringArray
+		if err := rows.Scan(
+			&u.ID,
+			&u.Username,
+			&u.PasswordHash,
+			&u.Role,
+			&u.Balance,
+			&allowedCategories,
+			&allowedManufacturers,
+			&u.CreatedAt,
+			&u.UpdatedAt,
+		); err != nil {
+			return nil, 0, fmt.Errorf("failed to scan user: %w", err)
+		}
+		u.AllowedCategories = []string(allowedCategories)
+		if u.AllowedCategories == nil {
+			u.AllowedCategories = []string{}
+		}
+		u.AllowedManufacturers = []string(allowedManufacturers)
+		if u.AllowedManufacturers == nil {
+			u.AllowedManufacturers = []string{}
+		}
+		users = append(users, &u)
+	}
+	return users, totalCount, nil
 }
