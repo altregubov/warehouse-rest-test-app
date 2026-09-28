@@ -34,8 +34,9 @@ type User struct {
 	Balance              float64   `json:"balance"`
 	AllowedCategories   []string  `json:"allowed_categories"`
 	AllowedManufacturers []string  `json:"allowed_manufacturers"`
-	CreatedAt            time.Time `json:"created_at"`
-	UpdatedAt            time.Time `json:"updated_at"`
+	CreatedAt            time.Time  `json:"created_at"`
+	UpdatedAt            time.Time  `json:"updated_at"`
+	DeletedAt            *time.Time `json:"deleted_at,omitempty"`
 }
 
 type Product struct {

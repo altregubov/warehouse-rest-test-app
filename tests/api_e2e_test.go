@@ -2,6 +2,7 @@ package tests
 
 import (
 	"bytes"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -10,6 +11,7 @@ import (
 	"time"
 
 	"github.com/altregubov/warehouse-rest-test-app/internal/domain"
+	_ "github.com/lib/pq"
 )
 
 const baseURL = "http://localhost:8080"
@@ -592,5 +594,101 @@ func TestResourceDiscoveryAndOrderLifecycle(t *testing.T) {
 	)
 	if respInvalidStatus.StatusCode != 422 {
 		t.Errorf("Expected 422 for invalid status transition, got %d", respInvalidStatus.StatusCode)
+	}
+}
+
+func TestSoftDeleteAndRestrictCascade(t *testing.T) {
+	adminToken, _ := login(t, "/api/admin/login", "admin", "admin123")
+	adminClient := newClient(adminToken)
+
+	// 1. Create a user
+	username := fmt.Sprintf("audit_user_%d", time.Now().UnixNano())
+	respCreate, bodyCreate, _ := adminClient.request(http.MethodPost, "/api/admin/users", domain.CreateUserRequest{
+		Username: username,
+		Password: "password123",
+		Role:     domain.RoleUser,
+		Balance:  5000.00,
+	})
+	if respCreate.StatusCode != http.StatusCreated {
+		t.Fatalf("Failed to create audit user: %s", string(bodyCreate))
+	}
+	var createdUser struct {
+		Data domain.UserSummary `json:"data"`
+	}
+	_ = json.Unmarshal(bodyCreate, &createdUser)
+	userID := createdUser.Data.ID
+
+	// 2. User places order
+	userToken, _ := login(t, "/api/user/login", username, "password123")
+	userClient := newClient(userToken)
+
+	_, bodyProds, _ := userClient.request(http.MethodGet, "/api/user/products", nil)
+	var prods struct {
+		Data []domain.Product `json:"data"`
+	}
+	_ = json.Unmarshal(bodyProds, &prods)
+	if len(prods.Data) == 0 {
+		t.Fatalf("No products available")
+	}
+
+	respOrder, bodyOrder, _ := userClient.request(http.MethodPost, "/api/user/orders", domain.CreateOrderRequest{
+		ProductID: prods.Data[0].ID,
+		Quantity:  1,
+	})
+	if respOrder.StatusCode != http.StatusCreated {
+		t.Fatalf("Failed to create order: %s", string(bodyOrder))
+	}
+	var orderResult struct {
+		Data domain.OrderResponse `json:"data"`
+	}
+	_ = json.Unmarshal(bodyOrder, &orderResult)
+	orderID := orderResult.Data.OrderID
+
+	// 3. Verify direct SQL DELETE on users fails with foreign key violation (ON DELETE RESTRICT)
+	db, err := sql.Open("postgres", "postgres://postgres:postgres@localhost:5432/warehouse_db?sslmode=disable")
+	if err == nil {
+		defer db.Close()
+		_, err = db.Exec("DELETE FROM users WHERE id = $1", userID)
+		if err == nil {
+			t.Errorf("Expected foreign key violation error on DELETE FROM users, but got nil")
+		}
+	}
+
+	// 4. Admin soft-deletes user via API
+	respDelete, bodyDelete, _ := adminClient.request(http.MethodDelete, fmt.Sprintf("/api/admin/users/%s", userID), nil)
+	if respDelete.StatusCode != http.StatusOK {
+		t.Fatalf("Expected 200 for soft delete, got %d: %s", respDelete.StatusCode, string(bodyDelete))
+	}
+
+	// 5. Verify user cannot log in
+	_, statusLogin := login(t, "/api/user/login", username, "password123")
+	if statusLogin != http.StatusUnauthorized {
+		t.Errorf("Expected 401 for deactivated user login, got %d", statusLogin)
+	}
+
+	// 6. Verify user is not found in admin GetUser
+	respGet, _, _ := adminClient.request(http.MethodGet, fmt.Sprintf("/api/admin/users/%s", userID), nil)
+	if respGet.StatusCode != http.StatusNotFound {
+		t.Errorf("Expected 404 for soft-deleted user, got %d", respGet.StatusCode)
+	}
+
+	// 7. Verify order still exists and is queryable in admin orders list
+	respOrders, bodyOrders, _ := adminClient.request(http.MethodGet, "/api/admin/orders", nil)
+	if respOrders.StatusCode != http.StatusOK {
+		t.Fatalf("Expected 200 for admin orders list, got %d: %s", respOrders.StatusCode, string(bodyOrders))
+	}
+	var allOrders struct {
+		Data []domain.OrderResponse `json:"data"`
+	}
+	_ = json.Unmarshal(bodyOrders, &allOrders)
+	orderFound := false
+	for _, o := range allOrders.Data {
+		if o.OrderID == orderID {
+			orderFound = true
+			break
+		}
+	}
+	if !orderFound {
+		t.Errorf("Order %s was lost after user soft deletion; expected to remain for auditability", orderID)
 	}
 }

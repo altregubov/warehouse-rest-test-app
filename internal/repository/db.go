@@ -42,8 +42,11 @@ func EnsureSchemaAndSeed(db *sql.DB) error {
 		allowed_categories TEXT[] DEFAULT '{}',
 		allowed_manufacturers TEXT[] DEFAULT '{}',
 		created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-		updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+		updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+		deleted_at TIMESTAMP WITH TIME ZONE NULL
 	);
+
+	ALTER TABLE users ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP WITH TIME ZONE NULL;
 
 	CREATE TABLE IF NOT EXISTS products (
 		id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -58,7 +61,7 @@ func EnsureSchemaAndSeed(db *sql.DB) error {
 
 	CREATE TABLE IF NOT EXISTS orders (
 		id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-		user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+		user_id UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
 		product_id UUID NOT NULL REFERENCES products(id) ON DELETE RESTRICT,
 		quantity INTEGER NOT NULL CHECK (quantity > 0),
 		total_price NUMERIC(12, 2) NOT NULL CHECK (total_price >= 0),
@@ -67,10 +70,13 @@ func EnsureSchemaAndSeed(db *sql.DB) error {
 	);
 
 	ALTER TABLE orders ADD COLUMN IF NOT EXISTS status VARCHAR(50) NOT NULL DEFAULT 'CREATED';
+	ALTER TABLE orders DROP CONSTRAINT IF EXISTS orders_user_id_fkey;
+	ALTER TABLE orders ADD CONSTRAINT orders_user_id_fkey FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE RESTRICT;
 
 	CREATE INDEX IF NOT EXISTS idx_products_category ON products(category);
 	CREATE INDEX IF NOT EXISTS idx_products_manufacturer ON products(manufacturer);
 	CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id);
+	CREATE INDEX IF NOT EXISTS idx_users_deleted_at ON users(deleted_at);
 
 	-- Seed default users
 	INSERT INTO users (id, username, password_hash, role, balance, allowed_categories, allowed_manufacturers)

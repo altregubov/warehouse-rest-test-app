@@ -46,7 +46,7 @@ func (r *sqlOrderRepository) CreateOrderTx(ctx context.Context, userID, productI
 	userQuery := `
 		SELECT id, username, balance, allowed_categories, allowed_manufacturers
 		FROM users
-		WHERE id = $1
+		WHERE id = $1 AND deleted_at IS NULL
 		FOR UPDATE
 	`
 	err = tx.QueryRowContext(ctx, userQuery, userID).Scan(

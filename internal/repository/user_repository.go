@@ -18,6 +18,7 @@ type UserRepository interface {
 	List(ctx context.Context, role string, limit, offset int) ([]*domain.User, int, error)
 	UpdateBalance(ctx context.Context, id uuid.UUID, newBalance float64) (*domain.User, error)
 	UpdateFilters(ctx context.Context, id uuid.UUID, categories, manufacturers []string) (*domain.User, error)
+	SoftDelete(ctx context.Context, id uuid.UUID) error
 }
 
 type sqlUserRepository struct {
@@ -32,7 +33,7 @@ func (r *sqlUserRepository) GetByID(ctx context.Context, id uuid.UUID) (*domain.
 	query := `
 		SELECT id, username, password_hash, role, balance, allowed_categories, allowed_manufacturers, created_at, updated_at
 		FROM users
-		WHERE id = $1
+		WHERE id = $1 AND deleted_at IS NULL
 	`
 	row := r.db.QueryRowContext(ctx, query, id)
 
@@ -73,7 +74,7 @@ func (r *sqlUserRepository) GetByUsername(ctx context.Context, username string) 
 	query := `
 		SELECT id, username, password_hash, role, balance, allowed_categories, allowed_manufacturers, created_at, updated_at
 		FROM users
-		WHERE username = $1
+		WHERE username = $1 AND deleted_at IS NULL
 	`
 	row := r.db.QueryRowContext(ctx, query, username)
 
@@ -153,7 +154,7 @@ func (r *sqlUserRepository) UpdateBalance(ctx context.Context, id uuid.UUID, new
 	query := `
 		UPDATE users
 		SET balance = $1, updated_at = CURRENT_TIMESTAMP
-		WHERE id = $2
+		WHERE id = $2 AND deleted_at IS NULL
 		RETURNING id, username, password_hash, role, balance, allowed_categories, allowed_manufacturers, created_at, updated_at
 	`
 	row := r.db.QueryRowContext(ctx, query, newBalance, id)
@@ -202,7 +203,7 @@ func (r *sqlUserRepository) UpdateFilters(ctx context.Context, id uuid.UUID, cat
 	query := `
 		UPDATE users
 		SET allowed_categories = $1, allowed_manufacturers = $2, updated_at = CURRENT_TIMESTAMP
-		WHERE id = $3
+		WHERE id = $3 AND deleted_at IS NULL
 		RETURNING id, username, password_hash, role, balance, allowed_categories, allowed_manufacturers, created_at, updated_at
 	`
 	row := r.db.QueryRowContext(ctx, query, pq.Array(categories), pq.Array(manufacturers), id)
@@ -241,7 +242,7 @@ func (r *sqlUserRepository) UpdateFilters(ctx context.Context, id uuid.UUID, cat
 }
 
 func (r *sqlUserRepository) List(ctx context.Context, role string, limit, offset int) ([]*domain.User, int, error) {
-	baseQuery := "FROM users WHERE 1=1"
+	baseQuery := "FROM users WHERE deleted_at IS NULL"
 	var args []any
 	argIdx := 1
 	if role != "" {
@@ -296,4 +297,20 @@ func (r *sqlUserRepository) List(ctx context.Context, role string, limit, offset
 		users = append(users, &u)
 	}
 	return users, totalCount, nil
+}
+
+func (r *sqlUserRepository) SoftDelete(ctx context.Context, id uuid.UUID) error {
+	query := `UPDATE users SET deleted_at = CURRENT_TIMESTAMP WHERE id = $1 AND deleted_at IS NULL`
+	res, err := r.db.ExecContext(ctx, query, id)
+	if err != nil {
+		return fmt.Errorf("failed to soft delete user: %w", err)
+	}
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rows == 0 {
+		return domain.ErrNotFound
+	}
+	return nil
 }

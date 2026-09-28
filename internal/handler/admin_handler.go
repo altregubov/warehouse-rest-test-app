@@ -424,6 +424,40 @@ func (h *AdminHandler) GetUser(w http.ResponseWriter, r *http.Request) {
 	JSON(w, http.StatusOK, user)
 }
 
+// DeleteUser godoc
+// @Summary Soft-delete a user account
+// @Description Marks user as deactivated/deleted while preserving immutable historical order records
+// @Tags Admin
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "User ID (UUID)"
+// @Success 200 {object} domain.SuccessEnvelope{data=string} "User deactivated successfully"
+// @Failure 400 {object} domain.ErrorEnvelope "Invalid ID"
+// @Failure 401 {object} domain.ErrorEnvelope "Unauthorized"
+// @Failure 403 {object} domain.ErrorEnvelope "Forbidden"
+// @Failure 404 {object} domain.ErrorEnvelope "User not found"
+// @Router /api/admin/users/{id} [delete]
+func (h *AdminHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
+	idStr := chi.URLParam(r, "id")
+	userID, err := uuid.Parse(idStr)
+	if err != nil {
+		Error(w, http.StatusBadRequest, "INVALID_ID", "Invalid user ID format (UUID expected)")
+		return
+	}
+
+	if err := h.userService.DeleteUser(r.Context(), userID); err != nil {
+		if errors.Is(err, domain.ErrNotFound) {
+			Error(w, http.StatusNotFound, "NOT_FOUND", "User not found")
+			return
+		}
+		Error(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to delete user")
+		return
+	}
+
+	JSON(w, http.StatusOK, map[string]string{"message": "User deactivated successfully"})
+}
+
 // ListProducts godoc
 // @Summary List all warehouse products (Admin)
 // @Description Retrieve full unrestricted product inventory for administrators

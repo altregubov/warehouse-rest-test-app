@@ -96,6 +96,7 @@ erDiagram
         decimal balance "Available purchasing credit"
         list allowedCategories "Whitelisted product categories"
         list allowedManufacturers "Whitelisted brand manufacturers"
+        timestamp deletedAt "Deactivation timestamp (audit soft-delete)"
     }
 
     PRODUCT {

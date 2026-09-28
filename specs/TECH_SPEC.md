@@ -78,7 +78,8 @@ CREATE TABLE IF NOT EXISTS users (
     allowed_categories TEXT[] DEFAULT '{}',
     allowed_manufacturers TEXT[] DEFAULT '{}',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    deleted_at TIMESTAMP WITH TIME ZONE NULL
 );
 
 -- Products Table
@@ -244,6 +245,10 @@ CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id);
     - Updates order fulfillment lifecycle status.
     - Body: `{ "status": "SHIPPED" }` (Valid: `CREATED`, `PROCESSING`, `SHIPPED`, `DELIVERED`, `CANCELLED`).
     - Response (200 OK): Updated `OrderResponse` object.
+
+11. `DELETE /api/admin/users/{id}`
+    - Soft-deactivates user account (`deleted_at = CURRENT_TIMESTAMP`) while permanently preserving immutable order records and financial audit trails (`ON DELETE RESTRICT`).
+    - Response (200 OK): Success message.
 
 ### 5.4 User Routes (`/api/user/*`, Bearer User Token Required)
 

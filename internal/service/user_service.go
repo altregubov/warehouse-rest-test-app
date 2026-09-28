@@ -20,6 +20,7 @@ type UserService interface {
 	TopUpBalance(ctx context.Context, userID uuid.UUID, incrementAmount float64) (*domain.UserSummary, error)
 	SetBalance(ctx context.Context, userID uuid.UUID, newBalance float64) (*domain.UserSummary, error)
 	UpdateFilters(ctx context.Context, userID uuid.UUID, categories, manufacturers []string) (*domain.UserSummary, error)
+	DeleteUser(ctx context.Context, id uuid.UUID) error
 }
 
 type userService struct {
@@ -175,6 +176,10 @@ func (s *userService) UpdateFilters(ctx context.Context, userID uuid.UUID, categ
 	}
 
 	return toUserSummary(updatedUser), nil
+}
+
+func (s *userService) DeleteUser(ctx context.Context, id uuid.UUID) error {
+	return s.userRepo.SoftDelete(ctx, id)
 }
 
 func toUserSummary(u *domain.User) *domain.UserSummary {
