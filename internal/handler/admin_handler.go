@@ -40,6 +40,7 @@ func NewAdminHandler(userService service.UserService, productService service.Pro
 // @Failure 403 {object} domain.ErrorEnvelope "Forbidden"
 // @Failure 409 {object} domain.ErrorEnvelope "Username already exists"
 // @Failure 500 {object} domain.ErrorEnvelope "Internal server error"
+// @Failure 503 {object} domain.ErrorEnvelope "Service unavailable"
 // @Router /api/admin/users [post]
 func (h *AdminHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 	var req domain.CreateUserRequest
@@ -83,6 +84,7 @@ func (h *AdminHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 // @Failure 409 {object} domain.ErrorEnvelope "Idempotency conflict or concurrent request in flight"
 // @Failure 422 {object} domain.ErrorEnvelope "Unprocessable entity / validation failure"
 // @Failure 500 {object} domain.ErrorEnvelope "Internal server error"
+// @Failure 503 {object} domain.ErrorEnvelope "Service unavailable"
 // @Router /api/admin/users/{id}/balance/top-up [post]
 func (h *AdminHandler) TopUpBalance(w http.ResponseWriter, r *http.Request) {
 	idStr := chi.URLParam(r, "id")
@@ -112,7 +114,9 @@ func (h *AdminHandler) TopUpBalance(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if amount < 0.01 {
-		Error(w, 422, "INVALID_INPUT", "increment_amount must be at least 0.01")
+		ErrorWithDetails(w, 422, "INVALID_INPUT", "increment_amount must be at least 0.01", []domain.FieldViolation{
+			{Field: "increment_amount", Issue: "must be at least 0.01"},
+		})
 		return
 	}
 
@@ -151,6 +155,7 @@ func (h *AdminHandler) TopUpBalance(w http.ResponseWriter, r *http.Request) {
 // @Failure 409 {object} domain.ErrorEnvelope "Idempotency conflict or concurrent request in flight"
 // @Failure 422 {object} domain.ErrorEnvelope "Unprocessable entity / validation failure"
 // @Failure 500 {object} domain.ErrorEnvelope "Internal server error"
+// @Failure 503 {object} domain.ErrorEnvelope "Service unavailable"
 // @Router /api/admin/users/{id}/balance [put]
 func (h *AdminHandler) SetBalance(w http.ResponseWriter, r *http.Request) {
 	idStr := chi.URLParam(r, "id")
@@ -219,6 +224,7 @@ func (h *AdminHandler) SetBalance(w http.ResponseWriter, r *http.Request) {
 // @Failure 409 {object} domain.ErrorEnvelope "Idempotency conflict or concurrent request in flight"
 // @Failure 422 {object} domain.ErrorEnvelope "Unprocessable entity / validation failure"
 // @Failure 500 {object} domain.ErrorEnvelope "Internal server error"
+// @Failure 503 {object} domain.ErrorEnvelope "Service unavailable"
 // @Router /api/admin/users/{id}/balance [patch]
 func (h *AdminHandler) UpdateBalance(w http.ResponseWriter, r *http.Request) {
 	idStr := chi.URLParam(r, "id")
@@ -266,6 +272,7 @@ func (h *AdminHandler) UpdateBalance(w http.ResponseWriter, r *http.Request) {
 // @Failure 403 {object} domain.ErrorEnvelope "Forbidden"
 // @Failure 404 {object} domain.ErrorEnvelope "User not found"
 // @Failure 500 {object} domain.ErrorEnvelope "Internal server error"
+// @Failure 503 {object} domain.ErrorEnvelope "Service unavailable"
 // @Router /api/admin/users/{id}/filters [put]
 func (h *AdminHandler) UpdateFilters(w http.ResponseWriter, r *http.Request) {
 	idStr := chi.URLParam(r, "id")
@@ -311,6 +318,7 @@ func (h *AdminHandler) UpdateFilters(w http.ResponseWriter, r *http.Request) {
 // @Failure 401 {object} domain.ErrorEnvelope "Unauthorized"
 // @Failure 403 {object} domain.ErrorEnvelope "Forbidden"
 // @Failure 500 {object} domain.ErrorEnvelope "Internal server error"
+// @Failure 503 {object} domain.ErrorEnvelope "Service unavailable"
 // @Router /api/admin/products [post]
 func (h *AdminHandler) CreateProduct(w http.ResponseWriter, r *http.Request) {
 	var req domain.CreateProductRequest
@@ -347,6 +355,7 @@ func (h *AdminHandler) CreateProduct(w http.ResponseWriter, r *http.Request) {
 // @Failure 403 {object} domain.ErrorEnvelope "Forbidden"
 // @Failure 404 {object} domain.ErrorEnvelope "Product not found"
 // @Failure 500 {object} domain.ErrorEnvelope "Internal server error"
+// @Failure 503 {object} domain.ErrorEnvelope "Service unavailable"
 // @Router /api/admin/products/{id}/stock [patch]
 func (h *AdminHandler) UpdateStock(w http.ResponseWriter, r *http.Request) {
 	idStr := chi.URLParam(r, "id")
@@ -394,6 +403,7 @@ func (h *AdminHandler) UpdateStock(w http.ResponseWriter, r *http.Request) {
 // @Failure 401 {object} domain.ErrorEnvelope "Unauthorized"
 // @Failure 403 {object} domain.ErrorEnvelope "Forbidden"
 // @Failure 500 {object} domain.ErrorEnvelope "Internal server error"
+// @Failure 503 {object} domain.ErrorEnvelope "Service unavailable"
 // @Router /api/admin/users [get]
 func (h *AdminHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
 	role := r.URL.Query().Get("role")
@@ -423,6 +433,7 @@ func (h *AdminHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
 // @Failure 403 {object} domain.ErrorEnvelope "Forbidden"
 // @Failure 404 {object} domain.ErrorEnvelope "User not found"
 // @Failure 500 {object} domain.ErrorEnvelope "Internal server error"
+// @Failure 503 {object} domain.ErrorEnvelope "Service unavailable"
 // @Router /api/admin/users/{id} [get]
 func (h *AdminHandler) GetUser(w http.ResponseWriter, r *http.Request) {
 	idStr := chi.URLParam(r, "id")
@@ -459,6 +470,7 @@ func (h *AdminHandler) GetUser(w http.ResponseWriter, r *http.Request) {
 // @Failure 403 {object} domain.ErrorEnvelope "Forbidden"
 // @Failure 404 {object} domain.ErrorEnvelope "User not found"
 // @Failure 500 {object} domain.ErrorEnvelope "Internal server error"
+// @Failure 503 {object} domain.ErrorEnvelope "Service unavailable"
 // @Router /api/admin/users/{id} [delete]
 func (h *AdminHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 	idStr := chi.URLParam(r, "id")
@@ -491,6 +503,7 @@ func (h *AdminHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 // @Failure 401 {object} domain.ErrorEnvelope "Unauthorized"
 // @Failure 403 {object} domain.ErrorEnvelope "Forbidden"
 // @Failure 500 {object} domain.ErrorEnvelope "Internal server error"
+// @Failure 503 {object} domain.ErrorEnvelope "Service unavailable"
 // @Router /api/admin/products [get]
 func (h *AdminHandler) ListProducts(w http.ResponseWriter, r *http.Request) {
 	products, err := h.productService.ListAllProducts(r.Context())
@@ -513,6 +526,7 @@ func (h *AdminHandler) ListProducts(w http.ResponseWriter, r *http.Request) {
 // @Failure 401 {object} domain.ErrorEnvelope "Unauthorized"
 // @Failure 403 {object} domain.ErrorEnvelope "Forbidden"
 // @Failure 500 {object} domain.ErrorEnvelope "Internal server error"
+// @Failure 503 {object} domain.ErrorEnvelope "Service unavailable"
 // @Router /api/admin/orders [get]
 func (h *AdminHandler) ListOrders(w http.ResponseWriter, r *http.Request) {
 	orders, err := h.orderService.ListAllOrders(r.Context())
@@ -540,6 +554,7 @@ func (h *AdminHandler) ListOrders(w http.ResponseWriter, r *http.Request) {
 // @Failure 404 {object} domain.ErrorEnvelope "Order not found"
 // @Failure 422 {object} domain.ErrorEnvelope "Invalid status transition"
 // @Failure 500 {object} domain.ErrorEnvelope "Internal server error"
+// @Failure 503 {object} domain.ErrorEnvelope "Service unavailable"
 // @Router /api/admin/orders/{id}/status [patch]
 func (h *AdminHandler) UpdateOrderStatus(w http.ResponseWriter, r *http.Request) {
 	idStr := chi.URLParam(r, "id")

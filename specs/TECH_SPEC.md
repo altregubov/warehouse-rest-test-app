@@ -35,14 +35,15 @@ The project follows a standard modular layered architecture ensuring clean separ
 └── README.md            # Setup, execution instructions, test credentials
 ```
 
-### 2.3 Response Envelope & Error Format
-All API responses follow consistent JSON envelopes:
+### 2.3 Response Envelope & Distributed Request Tracing
+All API responses follow consistent JSON envelopes and carry an end-to-end distributed tracing correlation ID (`requestId` and HTTP response header `X-Request-ID`):
 
 **Success Envelope:**
 ```json
 {
   "success": true,
-  "data": { ... }
+  "data": { ... },
+  "requestId": "c56a4180-65aa-42ec-a945-5fd21dec0538"
 }
 ```
 *(Or array of items in `data` for list endpoints)*
@@ -57,21 +58,32 @@ All API responses follow consistent JSON envelopes:
     "page": 1,
     "page_size": 20,
     "total_pages": 3
-  }
+  },
+  "requestId": "c56a4180-65aa-42ec-a945-5fd21dec0538"
 }
 ```
 
-**Error Envelope:**
+**Error Envelope with Structured Field Violations:**
 ```json
 {
   "success": false,
   "error": {
-    "code": "INSUFFICIENT_FUNDS",
-    "message": "Account balance is insufficient for this purchase",
-    "details": null
-  }
+    "code": "INVALID_INPUT",
+    "message": "Validation failed",
+    "details": [
+      {
+        "field": "increment_amount",
+        "issue": "must be at least 0.01"
+      }
+    ]
+  },
+  "requestId": "c56a4180-65aa-42ec-a945-5fd21dec0538"
 }
 ```
+
+### 2.4 Operational Observability & Logging
+- **Distributed Request Tracing**: The `Tracing` middleware inspects the incoming `X-Request-ID` header. If absent, a cryptographically secure UUID v4 is automatically generated. The ID is stored in the request context, propagated to outbound headers via `X-Request-ID`, and automatically injected into both `SuccessEnvelope` and `ErrorEnvelope` payloads.
+- **Structured JSON Logging**: Every HTTP request emits an operational JSON log record with fields `timestamp`, `level` (`INFO`, `WARN`, `ERROR`), `requestId`, `method`, `path`, `status`, `latency_ms`, and `client_ip`.
 
 ### 2.5 Standardized Error Taxonomy & Status Code Mapping
 The platform adheres to strict HTTP semantic status code conventions across all endpoints:
@@ -91,6 +103,7 @@ The platform adheres to strict HTTP semantic status code conventions across all 
   - `INVALID_STATUS`: Disallowed order status lifecycle transition.
   - `INVALID_INPUT`: Domain boundary validation breach (e.g. `increment_amount < 0.01` or `new_balance < 0.00`).
 - **`500 Internal Server Error`**: Unexpected database errors, unhandled panic recovery, or persistence failures (`INTERNAL_ERROR`).
+- **`503 Service Unavailable`**: Infrastructure outages, database connectivity loss, maintenance mode, or temporary upstream dependency degradation (`SERVICE_UNAVAILABLE`).
 
 ### 2.6 OpenAPI Schema Validation & Model Constraints
 To ensure client SDK predictability and prevent unhandled database violations:

@@ -70,9 +70,9 @@ func main() {
 	r := chi.NewRouter()
 
 	// Global Middlewares
-	r.Use(chimiddleware.RequestID)
+	r.Use(middleware.Tracing())
 	r.Use(chimiddleware.RealIP)
-	r.Use(chimiddleware.Logger)
+	r.Use(middleware.StructuredLogger())
 	r.Use(chimiddleware.Recoverer)
 	r.Use(middleware.CORS())
 

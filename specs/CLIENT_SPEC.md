@@ -282,6 +282,8 @@ Integrators can design predictable error handling and recovery workflows around 
 | **Resource / State Conflict** | Registration with duplicate username, concurrent in-flight idempotency request, or conflicting payload under same key. | `409 Conflict` (`USERNAME_TAKEN`, `IDEMPOTENCY_CONFLICT`) | Operation aborted without double mutation or duplicate account creation. | Prompt user to choose an alternative username, or retry idempotency key after in-flight request finishes. |
 | **Input Validation / Malformed Request** | Missing mandatory field, invalid UUID format, or boundary violation (e.g. quantity < 1). | `400 Bad Request` (`INVALID_INPUT`, `INVALID_REQUEST`, `INVALID_ID`) | Request rejected before touching database or acquiring locks. | Correct request format or payload boundaries prior to resubmission. |
 | **Authentication & Authorization Failure** | Missing/invalid Bearer JWT or attempting administrative operations with customer credentials. | `401 Unauthorized` / `403 Forbidden` (`UNAUTHORIZED`, `FORBIDDEN`) | Request rejected at security boundary. | Re-authenticate client via appropriate login endpoint or check role privileges. |
+| **Internal Server Error** | Unexpected unhandled panic, runtime exception, or unexpected database query failure. | `500 Internal Server Error` (`INTERNAL_ERROR`) | Transaction safely aborted. Error logged with correlation ID. | Retry with exponential backoff and report persistent errors with `requestId`. |
+| **Service Unavailable** | Scheduled maintenance downtime, container initialization, or upstream database connectivity disruption. | `503 Service Unavailable` (`SERVICE_UNAVAILABLE`) | Request rejected prior to processing to preserve data integrity. | Honor `Retry-After` guidance or execute automated retry loop. |
 
 ---
 
@@ -293,7 +295,16 @@ Client applications and automated SDK generators rely on strict, machine-readabl
 - **Enumerated Types**: Role assignments are strictly constrained to `admin` or `user`. Order fulfillment transitions follow standard states (`CREATED`, `PROCESSING`, `SHIPPED`, `DELIVERED`, `CANCELLED`).
 - **Domain Boundaries**: Order quantities must be at least 1 unit; product stock quantities, unit prices, and account balances must be non-negative ($\ge 0$). User account creation requires minimum string lengths (username $\ge 1$, password $\ge 4$).
 
-Violations of input formats or domain boundaries trigger immediate `400 Bad Request` responses prior to downstream processing.
+Violations of input formats or domain boundaries trigger immediate `400 Bad Request` or `422 Unprocessable Entity` responses containing typed field violation details prior to downstream processing.
+
+---
+
+### 2.6 Distributed Request Tracing & Structured Error Observability
+
+To accelerate end-to-end troubleshooting across integrated client applications and distributed microservices:
+- **Correlation Header (`X-Request-ID`)**: Clients may supply a unique tracing ID via the `X-Request-ID` HTTP header. If omitted, the API gateway automatically generates an RFC 4122 UUID v4.
+- **Response Propagation**: The correlation ID is echoed in the `X-Request-ID` response header and encapsulated directly within every response payload as top-level `requestId`.
+- **Structured Error Details**: Schema and domain validation errors provide an array of machine-readable field violation objects under `error.details` (e.g., `{"field": "increment_amount", "issue": "must be at least 0.01"}`), enabling automated form highlighting and localized client error presentation.
 
 ---
 

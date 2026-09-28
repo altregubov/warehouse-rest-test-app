@@ -188,15 +188,22 @@ type SuccessEnvelope struct {
 	Page       *int                `json:"page,omitempty" example:"1"`
 	PageSize   *int                `json:"page_size,omitempty" example:"20"`
 	TotalPages *int                `json:"total_pages,omitempty" example:"3"`
+	RequestID  string              `json:"requestId,omitempty" example:"c56a4180-65aa-42ec-a945-5fd21dec0538"`
+}
+
+type FieldViolation struct {
+	Field string `json:"field" binding:"required" example:"quantity"`
+	Issue string `json:"issue" binding:"required" example:"quantity must be greater than 0"`
 }
 
 type ErrorDetails struct {
-	Code    string `json:"code" binding:"required" example:"BAD_REQUEST"`
-	Message string `json:"message" binding:"required" example:"Detailed error description"`
-	Details any    `json:"details,omitempty"`
+	Code    string           `json:"code" binding:"required" example:"BAD_REQUEST"`
+	Message string           `json:"message" binding:"required" example:"Detailed error description"`
+	Details []FieldViolation `json:"details,omitempty"`
 }
 
 type ErrorEnvelope struct {
-	Success bool         `json:"success" binding:"required" example:"false"`
-	Error   ErrorDetails `json:"error" binding:"required"`
+	Success   bool         `json:"success" binding:"required" example:"false"`
+	Error     ErrorDetails `json:"error" binding:"required"`
+	RequestID string       `json:"requestId,omitempty" example:"c56a4180-65aa-42ec-a945-5fd21dec0538"`
 }

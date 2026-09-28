@@ -1829,4 +1829,95 @@ func TestCatalogPaginationSortingAndFiltering(t *testing.T) {
 	}
 }
 
+// TestDistributedTracingAndStructuredErrors tests Issue #17:
+// 1. Automatic generation and echoing of X-Request-ID in header and JSON envelope requestId
+// 2. Custom X-Request-ID preservation
+// 3. Typed ErrorDetails.details containing FieldViolation objects ({field, issue})
+func TestDistributedTracingAndStructuredErrors(t *testing.T) {
+	client := newClient("")
+
+	// 1. Without client X-Request-ID: API generates UUID, returns in header and body
+	resp, body, err := client.request(http.MethodPost, "/api/user/login", map[string]string{
+		"username": "user1",
+		"password": "wrongpassword",
+	})
+	if err != nil {
+		t.Fatalf("Login request failed: %v", err)
+	}
+
+	headerReqID := resp.Header.Get("X-Request-ID")
+	if headerReqID == "" {
+		t.Errorf("Expected X-Request-ID header in response, got empty")
+	}
+	if _, err := uuid.Parse(headerReqID); err != nil {
+		t.Errorf("Expected valid UUID in X-Request-ID header, got %s: %v", headerReqID, err)
+	}
+
+	var errEnv domain.ErrorEnvelope
+	if err := json.Unmarshal(body, &errEnv); err != nil {
+		t.Fatalf("Failed to parse error envelope: %v", err)
+	}
+	if errEnv.RequestID != headerReqID {
+		t.Errorf("Expected envelope requestId %s to match header %s", errEnv.RequestID, headerReqID)
+	}
+
+	// 2. With custom client X-Request-ID
+	customReqID := "custom-trace-uuid-12345"
+	respCustom, bodyCustom, err := client.requestWithHeaders(http.MethodPost, "/api/user/login", map[string]string{
+		"username": "user1",
+		"password": "wrongpassword",
+	}, map[string]string{
+		"X-Request-ID": customReqID,
+	})
+	if err != nil {
+		t.Fatalf("Custom request failed: %v", err)
+	}
+
+	if respCustom.Header.Get("X-Request-ID") != customReqID {
+		t.Errorf("Expected custom X-Request-ID %s, got %s", customReqID, respCustom.Header.Get("X-Request-ID"))
+	}
+	var errEnvCustom domain.ErrorEnvelope
+	if err := json.Unmarshal(bodyCustom, &errEnvCustom); err != nil {
+		t.Fatalf("Failed to parse custom error envelope: %v", err)
+	}
+	if errEnvCustom.RequestID != customReqID {
+		t.Errorf("Expected envelope requestId %s to match custom %s", errEnvCustom.RequestID, customReqID)
+	}
+
+	// 3. Admin login and verify structured FieldViolations in 422 response
+	adminToken, code := login(t, "/api/admin/login", "admin", "admin123")
+	if code != http.StatusOK {
+		t.Fatalf("Admin login failed with status %d", code)
+	}
+	adminClient := newClient(adminToken)
+
+	userUUID := uuid.New().String()
+	resp422, body422, err := adminClient.request(http.MethodPost, fmt.Sprintf("/api/admin/users/%s/balance/top-up", userUUID), map[string]float64{
+		"increment_amount": 0.005,
+	})
+	if err != nil {
+		t.Fatalf("Top up request failed: %v", err)
+	}
+	if resp422.StatusCode != 422 {
+		t.Fatalf("Expected 422 Unprocessable Entity, got %d. Body: %s", resp422.StatusCode, string(body422))
+	}
+
+	var valErrEnv domain.ErrorEnvelope
+	if err := json.Unmarshal(body422, &valErrEnv); err != nil {
+		t.Fatalf("Failed to unmarshal 422 response: %v", err)
+	}
+	if len(valErrEnv.Error.Details) == 0 {
+		t.Errorf("Expected structured details in 422 error, got empty")
+	} else {
+		violation := valErrEnv.Error.Details[0]
+		if violation.Field != "increment_amount" {
+			t.Errorf("Expected violation field 'increment_amount', got '%s'", violation.Field)
+		}
+		if !strings.Contains(violation.Issue, "0.01") {
+			t.Errorf("Expected violation issue to mention '0.01', got '%s'", violation.Issue)
+		}
+	}
+}
+
+
 

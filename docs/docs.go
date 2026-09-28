@@ -75,6 +75,12 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/domain.ErrorEnvelope"
                         }
+                    },
+                    "503": {
+                        "description": "Service unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
+                        }
                     }
                 }
             }
@@ -133,6 +139,12 @@ const docTemplate = `{
                     },
                     "500": {
                         "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
+                        }
+                    },
+                    "503": {
+                        "description": "Service unavailable",
                         "schema": {
                             "$ref": "#/definitions/domain.ErrorEnvelope"
                         }
@@ -231,6 +243,12 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/domain.ErrorEnvelope"
                         }
+                    },
+                    "503": {
+                        "description": "Service unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
+                        }
                     }
                 }
             }
@@ -289,6 +307,12 @@ const docTemplate = `{
                     },
                     "500": {
                         "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
+                        }
+                    },
+                    "503": {
+                        "description": "Service unavailable",
                         "schema": {
                             "$ref": "#/definitions/domain.ErrorEnvelope"
                         }
@@ -362,6 +386,12 @@ const docTemplate = `{
                     },
                     "500": {
                         "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
+                        }
+                    },
+                    "503": {
+                        "description": "Service unavailable",
                         "schema": {
                             "$ref": "#/definitions/domain.ErrorEnvelope"
                         }
@@ -454,6 +484,12 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/domain.ErrorEnvelope"
                         }
+                    },
+                    "503": {
+                        "description": "Service unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
+                        }
                     }
                 }
             }
@@ -541,6 +577,12 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/domain.ErrorEnvelope"
                         }
+                    },
+                    "503": {
+                        "description": "Service unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
+                        }
                     }
                 }
             },
@@ -617,6 +659,12 @@ const docTemplate = `{
                     },
                     "500": {
                         "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
+                        }
+                    },
+                    "503": {
+                        "description": "Service unavailable",
                         "schema": {
                             "$ref": "#/definitions/domain.ErrorEnvelope"
                         }
@@ -700,6 +748,12 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/domain.ErrorEnvelope"
                         }
+                    },
+                    "503": {
+                        "description": "Service unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
+                        }
                     }
                 }
             },
@@ -775,6 +829,12 @@ const docTemplate = `{
                     },
                     "500": {
                         "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
+                        }
+                    },
+                    "503": {
+                        "description": "Service unavailable",
                         "schema": {
                             "$ref": "#/definitions/domain.ErrorEnvelope"
                         }
@@ -885,6 +945,12 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/domain.ErrorEnvelope"
                         }
+                    },
+                    "503": {
+                        "description": "Service unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
+                        }
                     }
                 }
             },
@@ -987,6 +1053,12 @@ const docTemplate = `{
                     },
                     "500": {
                         "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
+                        }
+                    },
+                    "503": {
+                        "description": "Service unavailable",
                         "schema": {
                             "$ref": "#/definitions/domain.ErrorEnvelope"
                         }
@@ -1097,6 +1169,12 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/domain.ErrorEnvelope"
                         }
+                    },
+                    "503": {
+                        "description": "Service unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
+                        }
                     }
                 }
             }
@@ -1186,6 +1264,12 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/domain.ErrorEnvelope"
                         }
+                    },
+                    "503": {
+                        "description": "Service unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
+                        }
                     }
                 }
             }
@@ -1250,6 +1334,12 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/domain.ErrorEnvelope"
                         }
+                    },
+                    "503": {
+                        "description": "Service unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
+                        }
                     }
                 }
             }
@@ -1308,6 +1398,12 @@ const docTemplate = `{
                     },
                     "500": {
                         "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
+                        }
+                    },
+                    "503": {
+                        "description": "Service unavailable",
                         "schema": {
                             "$ref": "#/definitions/domain.ErrorEnvelope"
                         }
@@ -1408,6 +1504,12 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/domain.ErrorEnvelope"
                         }
+                    },
+                    "503": {
+                        "description": "Service unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
+                        }
                     }
                 }
             }
@@ -1485,6 +1587,12 @@ const docTemplate = `{
                     },
                     "500": {
                         "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
+                        }
+                    },
+                    "503": {
+                        "description": "Service unavailable",
                         "schema": {
                             "$ref": "#/definitions/domain.ErrorEnvelope"
                         }
@@ -1613,6 +1721,12 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/domain.ErrorEnvelope"
                         }
+                    },
+                    "503": {
+                        "description": "Service unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
+                        }
                     }
                 }
             }
@@ -1674,6 +1788,12 @@ const docTemplate = `{
                     },
                     "500": {
                         "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
+                        }
+                    },
+                    "503": {
+                        "description": "Service unavailable",
                         "schema": {
                             "$ref": "#/definitions/domain.ErrorEnvelope"
                         }
@@ -1814,7 +1934,12 @@ const docTemplate = `{
                     "type": "string",
                     "example": "BAD_REQUEST"
                 },
-                "details": {},
+                "details": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/domain.FieldViolation"
+                    }
+                },
                 "message": {
                     "type": "string",
                     "example": "Detailed error description"
@@ -1831,9 +1956,30 @@ const docTemplate = `{
                 "error": {
                     "$ref": "#/definitions/domain.ErrorDetails"
                 },
+                "requestId": {
+                    "type": "string",
+                    "example": "c56a4180-65aa-42ec-a945-5fd21dec0538"
+                },
                 "success": {
                     "type": "boolean",
                     "example": false
+                }
+            }
+        },
+        "domain.FieldViolation": {
+            "type": "object",
+            "required": [
+                "field",
+                "issue"
+            ],
+            "properties": {
+                "field": {
+                    "type": "string",
+                    "example": "quantity"
+                },
+                "issue": {
+                    "type": "string",
+                    "example": "quantity must be greater than 0"
                 }
             }
         },
@@ -2058,6 +2204,10 @@ const docTemplate = `{
                 },
                 "pagination": {
                     "$ref": "#/definitions/domain.PaginationMetadata"
+                },
+                "requestId": {
+                    "type": "string",
+                    "example": "c56a4180-65aa-42ec-a945-5fd21dec0538"
                 },
                 "success": {
                     "type": "boolean",

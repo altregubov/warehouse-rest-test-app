@@ -8,11 +8,13 @@ import (
 )
 
 func JSON(w http.ResponseWriter, status int, data any) {
+	reqID := w.Header().Get("X-Request-ID")
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(domain.SuccessEnvelope{
-		Success: true,
-		Data:    data,
+		Success:   true,
+		Data:      data,
+		RequestID: reqID,
 	})
 }
 
@@ -27,6 +29,7 @@ func JSONPaginated(w http.ResponseWriter, status int, data any, page, pageSize, 
 		PageSize:   pageSize,
 		TotalPages: totalPages,
 	}
+	reqID := w.Header().Get("X-Request-ID")
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(domain.SuccessEnvelope{
@@ -37,10 +40,12 @@ func JSONPaginated(w http.ResponseWriter, status int, data any, page, pageSize, 
 		Page:       &page,
 		PageSize:   &pageSize,
 		TotalPages: &totalPages,
+		RequestID:  reqID,
 	})
 }
 
-func Error(w http.ResponseWriter, status int, code, message string) {
+func ErrorWithDetails(w http.ResponseWriter, status int, code, message string, details []domain.FieldViolation) {
+	reqID := w.Header().Get("X-Request-ID")
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(domain.ErrorEnvelope{
@@ -48,6 +53,12 @@ func Error(w http.ResponseWriter, status int, code, message string) {
 		Error: domain.ErrorDetails{
 			Code:    code,
 			Message: message,
+			Details: details,
 		},
+		RequestID: reqID,
 	})
+}
+
+func Error(w http.ResponseWriter, status int, code, message string) {
+	ErrorWithDetails(w, status, code, message, nil)
 }

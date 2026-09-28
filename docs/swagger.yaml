@@ -95,7 +95,10 @@ definitions:
       code:
         example: BAD_REQUEST
         type: string
-      details: {}
+      details:
+        items:
+          $ref: '#/definitions/domain.FieldViolation'
+        type: array
       message:
         example: Detailed error description
         type: string
@@ -107,12 +110,27 @@ definitions:
     properties:
       error:
         $ref: '#/definitions/domain.ErrorDetails'
+      requestId:
+        example: c56a4180-65aa-42ec-a945-5fd21dec0538
+        type: string
       success:
         example: false
         type: boolean
     required:
     - error
     - success
+    type: object
+  domain.FieldViolation:
+    properties:
+      field:
+        example: quantity
+        type: string
+      issue:
+        example: quantity must be greater than 0
+        type: string
+    required:
+    - field
+    - issue
     type: object
   domain.LoginRequest:
     properties:
@@ -282,6 +300,9 @@ definitions:
         type: integer
       pagination:
         $ref: '#/definitions/domain.PaginationMetadata'
+      requestId:
+        example: c56a4180-65aa-42ec-a945-5fd21dec0538
+        type: string
       success:
         example: true
         type: boolean
@@ -462,6 +483,10 @@ paths:
           description: Internal server error
           schema:
             $ref: '#/definitions/domain.ErrorEnvelope'
+        "503":
+          description: Service unavailable
+          schema:
+            $ref: '#/definitions/domain.ErrorEnvelope'
       summary: Admin authentication
       tags:
       - Auth
@@ -495,6 +520,10 @@ paths:
             $ref: '#/definitions/domain.ErrorEnvelope'
         "500":
           description: Internal server error
+          schema:
+            $ref: '#/definitions/domain.ErrorEnvelope'
+        "503":
+          description: Service unavailable
           schema:
             $ref: '#/definitions/domain.ErrorEnvelope'
       security:
@@ -557,6 +586,10 @@ paths:
           description: Internal server error
           schema:
             $ref: '#/definitions/domain.ErrorEnvelope'
+        "503":
+          description: Service unavailable
+          schema:
+            $ref: '#/definitions/domain.ErrorEnvelope'
       security:
       - BearerAuth: []
       summary: Update order fulfillment status
@@ -591,6 +624,10 @@ paths:
             $ref: '#/definitions/domain.ErrorEnvelope'
         "500":
           description: Internal server error
+          schema:
+            $ref: '#/definitions/domain.ErrorEnvelope'
+        "503":
+          description: Service unavailable
           schema:
             $ref: '#/definitions/domain.ErrorEnvelope'
       security:
@@ -636,6 +673,10 @@ paths:
             $ref: '#/definitions/domain.ErrorEnvelope'
         "500":
           description: Internal server error
+          schema:
+            $ref: '#/definitions/domain.ErrorEnvelope'
+        "503":
+          description: Service unavailable
           schema:
             $ref: '#/definitions/domain.ErrorEnvelope'
       security:
@@ -693,6 +734,10 @@ paths:
           description: Internal server error
           schema:
             $ref: '#/definitions/domain.ErrorEnvelope'
+        "503":
+          description: Service unavailable
+          schema:
+            $ref: '#/definitions/domain.ErrorEnvelope'
       security:
       - BearerAuth: []
       summary: Update product stock quantity
@@ -746,6 +791,10 @@ paths:
           description: Internal server error
           schema:
             $ref: '#/definitions/domain.ErrorEnvelope'
+        "503":
+          description: Service unavailable
+          schema:
+            $ref: '#/definitions/domain.ErrorEnvelope'
       security:
       - BearerAuth: []
       summary: List users
@@ -792,6 +841,10 @@ paths:
             $ref: '#/definitions/domain.ErrorEnvelope'
         "500":
           description: Internal server error
+          schema:
+            $ref: '#/definitions/domain.ErrorEnvelope'
+        "503":
+          description: Service unavailable
           schema:
             $ref: '#/definitions/domain.ErrorEnvelope'
       security:
@@ -844,6 +897,10 @@ paths:
           description: Internal server error
           schema:
             $ref: '#/definitions/domain.ErrorEnvelope'
+        "503":
+          description: Service unavailable
+          schema:
+            $ref: '#/definitions/domain.ErrorEnvelope'
       security:
       - BearerAuth: []
       summary: Soft-delete a user account
@@ -890,6 +947,10 @@ paths:
             $ref: '#/definitions/domain.ErrorEnvelope'
         "500":
           description: Internal server error
+          schema:
+            $ref: '#/definitions/domain.ErrorEnvelope'
+        "503":
+          description: Service unavailable
           schema:
             $ref: '#/definitions/domain.ErrorEnvelope'
       security:
@@ -959,6 +1020,10 @@ paths:
           description: Internal server error
           schema:
             $ref: '#/definitions/domain.ErrorEnvelope'
+        "503":
+          description: Service unavailable
+          schema:
+            $ref: '#/definitions/domain.ErrorEnvelope'
       security:
       - BearerAuth: []
       summary: Update or top up user balance (Legacy)
@@ -1024,6 +1089,10 @@ paths:
             $ref: '#/definitions/domain.ErrorEnvelope'
         "500":
           description: Internal server error
+          schema:
+            $ref: '#/definitions/domain.ErrorEnvelope'
+        "503":
+          description: Service unavailable
           schema:
             $ref: '#/definitions/domain.ErrorEnvelope'
       security:
@@ -1094,6 +1163,10 @@ paths:
           description: Internal server error
           schema:
             $ref: '#/definitions/domain.ErrorEnvelope'
+        "503":
+          description: Service unavailable
+          schema:
+            $ref: '#/definitions/domain.ErrorEnvelope'
       security:
       - BearerAuth: []
       summary: Top up user balance by an increment
@@ -1150,6 +1223,10 @@ paths:
           description: Internal server error
           schema:
             $ref: '#/definitions/domain.ErrorEnvelope'
+        "503":
+          description: Service unavailable
+          schema:
+            $ref: '#/definitions/domain.ErrorEnvelope'
       security:
       - BearerAuth: []
       summary: Configure catalog access filters for a user
@@ -1191,6 +1268,10 @@ paths:
           description: Internal server error
           schema:
             $ref: '#/definitions/domain.ErrorEnvelope'
+        "503":
+          description: Service unavailable
+          schema:
+            $ref: '#/definitions/domain.ErrorEnvelope'
       summary: User authentication
       tags:
       - Auth
@@ -1223,6 +1304,10 @@ paths:
             $ref: '#/definitions/domain.ErrorEnvelope'
         "500":
           description: Internal server error
+          schema:
+            $ref: '#/definitions/domain.ErrorEnvelope'
+        "503":
+          description: Service unavailable
           schema:
             $ref: '#/definitions/domain.ErrorEnvelope'
       security:
@@ -1287,6 +1372,10 @@ paths:
           description: Internal server error
           schema:
             $ref: '#/definitions/domain.ErrorEnvelope'
+        "503":
+          description: Service unavailable
+          schema:
+            $ref: '#/definitions/domain.ErrorEnvelope'
       security:
       - BearerAuth: []
       summary: Purchase product from warehouse
@@ -1335,6 +1424,10 @@ paths:
             $ref: '#/definitions/domain.ErrorEnvelope'
         "500":
           description: Internal server error
+          schema:
+            $ref: '#/definitions/domain.ErrorEnvelope'
+        "503":
+          description: Service unavailable
           schema:
             $ref: '#/definitions/domain.ErrorEnvelope'
       security:
@@ -1419,6 +1512,10 @@ paths:
           description: Internal server error
           schema:
             $ref: '#/definitions/domain.ErrorEnvelope'
+        "503":
+          description: Service unavailable
+          schema:
+            $ref: '#/definitions/domain.ErrorEnvelope'
       security:
       - BearerAuth: []
       summary: Browse warehouse catalog
@@ -1456,6 +1553,10 @@ paths:
             $ref: '#/definitions/domain.ErrorEnvelope'
         "500":
           description: Internal server error
+          schema:
+            $ref: '#/definitions/domain.ErrorEnvelope'
+        "503":
+          description: Service unavailable
           schema:
             $ref: '#/definitions/domain.ErrorEnvelope'
       security:

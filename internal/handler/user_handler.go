@@ -40,6 +40,7 @@ func NewUserHandler(userService service.UserService, productService service.Prod
 // @Failure 403 {object} domain.ErrorEnvelope "Forbidden"
 // @Failure 404 {object} domain.ErrorEnvelope "User not found"
 // @Failure 500 {object} domain.ErrorEnvelope "Internal server error"
+// @Failure 503 {object} domain.ErrorEnvelope "Service unavailable"
 // @Router /api/user/profile [get]
 func (h *UserHandler) GetProfile(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.GetUserID(r.Context())
@@ -80,6 +81,7 @@ func (h *UserHandler) GetProfile(w http.ResponseWriter, r *http.Request) {
 // @Failure 403 {object} domain.ErrorEnvelope "Forbidden"
 // @Failure 404 {object} domain.ErrorEnvelope "User not found"
 // @Failure 500 {object} domain.ErrorEnvelope "Internal server error"
+// @Failure 503 {object} domain.ErrorEnvelope "Service unavailable"
 // @Router /api/user/products [get]
 func (h *UserHandler) ListProducts(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.GetUserID(r.Context())
@@ -167,6 +169,7 @@ func (h *UserHandler) ListProducts(w http.ResponseWriter, r *http.Request) {
 // @Failure 409 {object} domain.ErrorEnvelope "Idempotency conflict or concurrent request in flight"
 // @Failure 422 {object} domain.ErrorEnvelope "Domain business rule violation (INSUFFICIENT_FUNDS, INSUFFICIENT_STOCK, FILTER_RESTRICTION)"
 // @Failure 500 {object} domain.ErrorEnvelope "Internal server error"
+// @Failure 503 {object} domain.ErrorEnvelope "Service unavailable"
 // @Router /api/user/orders [post]
 func (h *UserHandler) CreateOrder(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.GetUserID(r.Context())
@@ -226,6 +229,7 @@ func (h *UserHandler) CreateOrder(w http.ResponseWriter, r *http.Request) {
 // @Failure 401 {object} domain.ErrorEnvelope "Unauthorized"
 // @Failure 403 {object} domain.ErrorEnvelope "Forbidden"
 // @Failure 500 {object} domain.ErrorEnvelope "Internal server error"
+// @Failure 503 {object} domain.ErrorEnvelope "Service unavailable"
 // @Router /api/user/orders [get]
 func (h *UserHandler) ListOrders(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.GetUserID(r.Context())
@@ -257,6 +261,7 @@ func (h *UserHandler) ListOrders(w http.ResponseWriter, r *http.Request) {
 // @Failure 403 {object} domain.ErrorEnvelope "Forbidden"
 // @Failure 404 {object} domain.ErrorEnvelope "Order not found"
 // @Failure 500 {object} domain.ErrorEnvelope "Internal server error"
+// @Failure 503 {object} domain.ErrorEnvelope "Service unavailable"
 // @Router /api/user/orders/{id} [get]
 func (h *UserHandler) GetOrder(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.GetUserID(r.Context())
