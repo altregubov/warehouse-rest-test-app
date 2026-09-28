@@ -89,12 +89,13 @@ func (s *userService) CreateUser(ctx context.Context, req *domain.CreateUserRequ
 		return nil, fmt.Errorf("failed to hash password: %w", err)
 	}
 
+	balCents := domain.DollarsToCents(req.Balance)
 	user := &domain.User{
 		ID:                   uuid.New(),
 		Username:             username,
 		PasswordHash:         string(hash),
 		Role:                 role,
-		Balance:              req.Balance,
+		Balance:              domain.CentsToDollars(balCents),
 		AllowedCategories:   req.AllowedCategories,
 		AllowedManufacturers: req.AllowedManufacturers,
 	}
@@ -112,11 +113,14 @@ func (s *userService) UpdateBalance(ctx context.Context, userID uuid.UUID, amoun
 		return nil, err
 	}
 
-	newBalance := user.Balance + amount
-	if newBalance < 0 {
+	currBalCents := domain.DollarsToCents(user.Balance)
+	amtCents := domain.DollarsToCents(amount)
+	newBalCents := currBalCents + amtCents
+	if newBalCents < 0 {
 		return nil, fmt.Errorf("%w: resulting balance cannot be negative", domain.ErrInvalidInput)
 	}
 
+	newBalance := domain.CentsToDollars(newBalCents)
 	updatedUser, err := s.userRepo.UpdateBalance(ctx, userID, newBalance)
 	if err != nil {
 		return nil, err
@@ -135,7 +139,11 @@ func (s *userService) TopUpBalance(ctx context.Context, userID uuid.UUID, increm
 		return nil, err
 	}
 
-	newBalance := user.Balance + incrementAmount
+	currBalCents := domain.DollarsToCents(user.Balance)
+	incCents := domain.DollarsToCents(incrementAmount)
+	newBalCents := currBalCents + incCents
+
+	newBalance := domain.CentsToDollars(newBalCents)
 	updatedUser, err := s.userRepo.UpdateBalance(ctx, userID, newBalance)
 	if err != nil {
 		return nil, err
@@ -154,7 +162,10 @@ func (s *userService) SetBalance(ctx context.Context, userID uuid.UUID, newBalan
 		return nil, err
 	}
 
-	updatedUser, err := s.userRepo.UpdateBalance(ctx, userID, newBalance)
+	newBalCents := domain.DollarsToCents(newBalance)
+	roundedBalance := domain.CentsToDollars(newBalCents)
+
+	updatedUser, err := s.userRepo.UpdateBalance(ctx, userID, roundedBalance)
 	if err != nil {
 		return nil, err
 	}

@@ -1486,6 +1486,7 @@
                 },
                 "price": {
                     "type": "number",
+                    "format": "double",
                     "example": 1099
                 },
                 "stock_quantity": {
@@ -1517,6 +1518,7 @@
                 },
                 "balance": {
                     "type": "number",
+                    "format": "double",
                     "example": 1000
                 },
                 "password": {
@@ -1602,16 +1604,22 @@
                     "type": "integer"
                 },
                 "remaining_balance": {
-                    "type": "number"
+                    "type": "number",
+                    "format": "double",
+                    "example": 500
                 },
                 "status": {
                     "type": "string"
                 },
                 "total_price": {
-                    "type": "number"
+                    "type": "number",
+                    "format": "double",
+                    "example": 4998
                 },
                 "unit_price": {
-                    "type": "number"
+                    "type": "number",
+                    "format": "double",
+                    "example": 2499
                 },
                 "user_id": {
                     "type": "string"
@@ -1652,6 +1660,7 @@
             "properties": {
                 "new_balance": {
                     "type": "number",
+                    "format": "double",
                     "example": 5000
                 }
             }
@@ -1671,6 +1680,7 @@
             "properties": {
                 "increment_amount": {
                     "type": "number",
+                    "format": "double",
                     "example": 500
                 }
             }
@@ -1680,6 +1690,7 @@
             "properties": {
                 "amount": {
                     "type": "number",
+                    "format": "double",
                     "example": 500
                 }
             }
@@ -1742,7 +1753,9 @@
                     }
                 },
                 "balance": {
-                    "type": "number"
+                    "type": "number",
+                    "format": "double",
+                    "example": 1000
                 },
                 "id": {
                     "type": "string"

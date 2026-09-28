@@ -22,6 +22,7 @@ definitions:
         type: string
       price:
         example: 1099
+        format: double
         type: number
       stock_quantity:
         example: 10
@@ -43,6 +44,7 @@ definitions:
         type: array
       balance:
         example: 1000
+        format: double
         type: number
       password:
         example: secret123
@@ -101,12 +103,18 @@ definitions:
       quantity:
         type: integer
       remaining_balance:
+        example: 500
+        format: double
         type: number
       status:
         type: string
       total_price:
+        example: 4998
+        format: double
         type: number
       unit_price:
+        example: 2499
+        format: double
         type: number
       user_id:
         type: string
@@ -134,6 +142,7 @@ definitions:
     properties:
       new_balance:
         example: 5000
+        format: double
         type: number
     type: object
   domain.SuccessEnvelope:
@@ -147,12 +156,14 @@ definitions:
     properties:
       increment_amount:
         example: 500
+        format: double
         type: number
     type: object
   domain.UpdateBalanceRequest:
     properties:
       amount:
         example: 500
+        format: double
         type: number
     type: object
   domain.UpdateFiltersRequest:
@@ -194,6 +205,8 @@ definitions:
           type: string
         type: array
       balance:
+        example: 1000
+        format: double
         type: number
       id:
         type: string

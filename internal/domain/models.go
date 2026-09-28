@@ -2,6 +2,7 @@ package domain
 
 import (
 	"errors"
+	"math"
 	"time"
 
 	"github.com/google/uuid"
@@ -67,11 +68,21 @@ type LoginRequest struct {
 	Password string `json:"password" example:"admin123"`
 }
 
+// DollarsToCents converts dollar amount to integer cents, rounding to avoid floating-point drift
+func DollarsToCents(dollars float64) int64 {
+	return int64(math.Round(dollars * 100))
+}
+
+// CentsToDollars converts integer cents back to float64 dollars
+func CentsToDollars(cents int64) float64 {
+	return float64(cents) / 100.0
+}
+
 type UserSummary struct {
 	ID                   uuid.UUID `json:"id"`
 	Username             string    `json:"username"`
 	Role                 string    `json:"role"`
-	Balance              float64   `json:"balance"`
+	Balance              float64   `json:"balance" example:"1000.00" format:"double"`
 	AllowedCategories   []string  `json:"allowed_categories"`
 	AllowedManufacturers []string  `json:"allowed_manufacturers"`
 }
@@ -85,21 +96,21 @@ type CreateUserRequest struct {
 	Username             string   `json:"username" example:"john_doe"`
 	Password             string   `json:"password" example:"secret123"`
 	Role                 string   `json:"role" example:"user"`
-	Balance              float64  `json:"balance" example:"1000.00"`
+	Balance              float64  `json:"balance" example:"1000.00" format:"double"`
 	AllowedCategories   []string `json:"allowed_categories" example:"[\"laptop\"]"`
 	AllowedManufacturers []string `json:"allowed_manufacturers" example:"[\"Dell\"]"`
 }
 
 type UpdateBalanceRequest struct {
-	Amount float64 `json:"amount" example:"500.00"`
+	Amount float64 `json:"amount" example:"500.00" format:"double"`
 }
 
 type TopUpBalanceRequest struct {
-	IncrementAmount float64 `json:"increment_amount" example:"500.00"`
+	IncrementAmount float64 `json:"increment_amount" example:"500.00" format:"double"`
 }
 
 type SetBalanceRequest struct {
-	NewBalance float64 `json:"new_balance" example:"5000.00"`
+	NewBalance float64 `json:"new_balance" example:"5000.00" format:"double"`
 }
 
 type UpdateFiltersRequest struct {
@@ -111,7 +122,7 @@ type CreateProductRequest struct {
 	Category      string  `json:"category" example:"laptop"`
 	Manufacturer  string  `json:"manufacturer" example:"Apple"`
 	Model         string  `json:"model" example:"MacBook Air M3"`
-	Price         float64 `json:"price" example:"1099.00"`
+	Price         float64 `json:"price" example:"1099.00" format:"double"`
 	StockQuantity int     `json:"stock_quantity" example:"10"`
 }
 
@@ -130,10 +141,10 @@ type OrderResponse struct {
 	ProductID        uuid.UUID `json:"product_id"`
 	ProductModel     string    `json:"product_model"`
 	Quantity         int       `json:"quantity"`
-	UnitPrice        float64   `json:"unit_price"`
-	TotalPrice       float64   `json:"total_price"`
+	UnitPrice        float64   `json:"unit_price" example:"2499.00" format:"double"`
+	TotalPrice       float64   `json:"total_price" example:"4998.00" format:"double"`
 	Status           string    `json:"status"`
-	RemainingBalance float64   `json:"remaining_balance,omitempty"`
+	RemainingBalance float64   `json:"remaining_balance,omitempty" example:"500.00" format:"double"`
 	CreatedAt        time.Time `json:"created_at"`
 }
 

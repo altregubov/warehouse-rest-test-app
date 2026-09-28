@@ -129,6 +129,10 @@ CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id);
    - Category is an arbitrary, non-restricted string (e.g., `laptop`, `smartphone`, `monitor`, `tablet`, `accessory`). No hardcoded enums.
 3. **Atomic Balance & Inventory Constraints:**
    - Balances and stock quantities must never be negative.
+4. **Monetary Representation & Precision Guardrails:**
+   - **Internal Calculation:** All financial computations (balance adjustments, checkout debiting, line-item totals) are executed strictly in integer cents (`int64`, minor currency units) using `DollarsToCents` and `CentsToDollars` conversions, eliminating binary floating-point rounding errors and off-by-one-cent ledger drift.
+   - **API Transport:** The REST API accepts and serializes monetary fields in dollars (`format: "double"`, 2 decimal digits) for client convenience and backward compatibility.
+   - **Database Persistence:** Persisted in PostgreSQL as `NUMERIC(12, 2)` to ensure strict exact-decimal ledger integrity.
 
 ---
 

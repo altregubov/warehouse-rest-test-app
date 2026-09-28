@@ -123,6 +123,7 @@ erDiagram
 - **`[User / Client]`**: Represents an authenticated organization or individual with an assigned operating balance and granular visibility filters.
 - **`[Product / Item]`**: Represents warehouse stock available for order placement, categorized by industry type, manufacturer brand, and unit cost.
 - **`[Core Entity: Order]`**: Represents the committed contract between a customer and the warehouse, capturing quantity, agreed price, and ownership transfer.
+- **`Financial Precision & Currency Settlement`**: All commercial calculations (balances, prices, transaction totals) are evaluated internally using integer cents to eliminate floating-point drift, guaranteeing exact-cent reconciliation across accounting ledgers while exposing standard dollar representations to client interfaces.
 
 ---
 

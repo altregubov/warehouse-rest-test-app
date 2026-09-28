@@ -1028,3 +1028,97 @@ func TestIdempotencyKeySupport(t *testing.T) {
 		t.Errorf("Expected balance to remain 950.00 after replayed top-up, got %.2f", topUp2.Data.Balance)
 	}
 }
+
+func TestMonetaryPrecisionAndReconciliation(t *testing.T) {
+	adminToken, _ := login(t, "/api/admin/login", "admin", "admin123")
+	adminClient := newClient(adminToken)
+
+	// Create user with starting balance of exactly $0.30
+	username := fmt.Sprintf("money_user_%d", time.Now().UnixNano())
+	respCreate, bodyCreate, _ := adminClient.request(http.MethodPost, "/api/admin/users", domain.CreateUserRequest{
+		Username: username,
+		Password: "password123",
+		Role:     domain.RoleUser,
+		Balance:  0.30,
+	})
+	if respCreate.StatusCode != http.StatusCreated {
+		t.Fatalf("Failed to create test user: %s", string(bodyCreate))
+	}
+	var createdUser struct {
+		Data domain.UserSummary `json:"data"`
+	}
+	_ = json.Unmarshal(bodyCreate, &createdUser)
+	userID := createdUser.Data.ID
+
+	// Create product priced at $0.10
+	respProd, bodyProd, _ := adminClient.request(http.MethodPost, "/api/admin/products", domain.CreateProductRequest{
+		Category:      "hardware",
+		Manufacturer:  "PrecisionCorp",
+		Model:         fmt.Sprintf("MicroPart_%d", time.Now().UnixNano()),
+		Price:         0.10,
+		StockQuantity: 10,
+	})
+	if respProd.StatusCode != http.StatusCreated {
+		t.Fatalf("Failed to create micro-part product: %s", string(bodyProd))
+	}
+	var createdProd struct {
+		Data domain.Product `json:"data"`
+	}
+	_ = json.Unmarshal(bodyProd, &createdProd)
+	productID := createdProd.Data.ID
+
+	userToken, _ := login(t, "/api/user/login", username, "password123")
+	userClient := newClient(userToken)
+
+	// Buy 3 items ($0.10 * 3 = $0.30)
+	// In naive float64, 0.10 * 3 = 0.30000000000000004, causing failure if compared with 0.30
+	respOrder, bodyOrder, err := userClient.request(http.MethodPost, "/api/user/orders", domain.CreateOrderRequest{
+		ProductID: productID,
+		Quantity:  3,
+	})
+	if err != nil {
+		t.Fatalf("Order request failed: %v", err)
+	}
+	if respOrder.StatusCode != http.StatusCreated {
+		t.Fatalf("Expected 201 Created for 3x $0.10 order with $0.30 balance, got %d: %s", respOrder.StatusCode, string(bodyOrder))
+	}
+
+	var orderResp struct {
+		Data domain.OrderResponse `json:"data"`
+	}
+	_ = json.Unmarshal(bodyOrder, &orderResp)
+	if orderResp.Data.TotalPrice != 0.30 {
+		t.Errorf("Expected TotalPrice 0.30, got %.4f", orderResp.Data.TotalPrice)
+	}
+	if orderResp.Data.RemainingBalance != 0.00 {
+		t.Errorf("Expected RemainingBalance 0.00, got %.4f", orderResp.Data.RemainingBalance)
+	}
+
+	// Verify profile balance in database is exactly 0.00 without floating point drift
+	_, bodyProf, _ := userClient.request(http.MethodGet, "/api/user/profile", nil)
+	var prof struct {
+		Data domain.UserSummary `json:"data"`
+	}
+	_ = json.Unmarshal(bodyProf, &prof)
+	if prof.Data.Balance != 0.00 {
+		t.Errorf("Expected user balance 0.00, got %.4f", prof.Data.Balance)
+	}
+
+	// Fractional top-ups: add 0.10 then 0.20 -> exactly 0.30
+	adminClient.request(http.MethodPost, fmt.Sprintf("/api/admin/users/%s/balance/top-up", userID), domain.TopUpBalanceRequest{
+		IncrementAmount: 0.10,
+	})
+	respTopUp, bodyTopUp, _ := adminClient.request(http.MethodPost, fmt.Sprintf("/api/admin/users/%s/balance/top-up", userID), domain.TopUpBalanceRequest{
+		IncrementAmount: 0.20,
+	})
+	if respTopUp.StatusCode != http.StatusOK {
+		t.Fatalf("Failed top-up: %s", string(bodyTopUp))
+	}
+	var topUpRes struct {
+		Data domain.UserSummary `json:"data"`
+	}
+	_ = json.Unmarshal(bodyTopUp, &topUpRes)
+	if topUpRes.Data.Balance != 0.30 {
+		t.Errorf("Expected balance 0.30 after 0.10 + 0.20 additions, got %.4f", topUpRes.Data.Balance)
+	}
+}

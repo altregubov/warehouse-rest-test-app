@@ -1492,6 +1492,7 @@ const docTemplate = `{
                 },
                 "price": {
                     "type": "number",
+                    "format": "double",
                     "example": 1099
                 },
                 "stock_quantity": {
@@ -1523,6 +1524,7 @@ const docTemplate = `{
                 },
                 "balance": {
                     "type": "number",
+                    "format": "double",
                     "example": 1000
                 },
                 "password": {
@@ -1608,16 +1610,22 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "remaining_balance": {
-                    "type": "number"
+                    "type": "number",
+                    "format": "double",
+                    "example": 500
                 },
                 "status": {
                     "type": "string"
                 },
                 "total_price": {
-                    "type": "number"
+                    "type": "number",
+                    "format": "double",
+                    "example": 4998
                 },
                 "unit_price": {
-                    "type": "number"
+                    "type": "number",
+                    "format": "double",
+                    "example": 2499
                 },
                 "user_id": {
                     "type": "string"
@@ -1658,6 +1666,7 @@ const docTemplate = `{
             "properties": {
                 "new_balance": {
                     "type": "number",
+                    "format": "double",
                     "example": 5000
                 }
             }
@@ -1677,6 +1686,7 @@ const docTemplate = `{
             "properties": {
                 "increment_amount": {
                     "type": "number",
+                    "format": "double",
                     "example": 500
                 }
             }
@@ -1686,6 +1696,7 @@ const docTemplate = `{
             "properties": {
                 "amount": {
                     "type": "number",
+                    "format": "double",
                     "example": 500
                 }
             }
@@ -1748,7 +1759,9 @@ const docTemplate = `{
                     }
                 },
                 "balance": {
-                    "type": "number"
+                    "type": "number",
+                    "format": "double",
+                    "example": 1000
                 },
                 "id": {
                     "type": "string"

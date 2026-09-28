@@ -120,9 +120,12 @@ func (r *sqlOrderRepository) CreateOrderTx(ctx context.Context, userID, productI
 		return nil, domain.ErrInsufficientStock
 	}
 
-	// 5. Calculate total cost and verify balance
-	totalCost := product.Price * float64(quantity)
-	if user.Balance < totalCost {
+	// 5. Calculate total cost and verify balance using integer cents to eliminate floating-point drift
+	unitPriceCents := domain.DollarsToCents(product.Price)
+	totalCostCents := unitPriceCents * int64(quantity)
+	userBalanceCents := domain.DollarsToCents(user.Balance)
+
+	if userBalanceCents < totalCostCents {
 		return nil, domain.ErrInsufficientBalance
 	}
 
@@ -133,8 +136,12 @@ func (r *sqlOrderRepository) CreateOrderTx(ctx context.Context, userID, productI
 		return nil, fmt.Errorf("failed to update product stock: %w", err)
 	}
 
-	// 7. Deduct balance
-	newBalance := user.Balance - totalCost
+	// 7. Deduct balance in exact cents
+	newBalanceCents := userBalanceCents - totalCostCents
+	newBalance := domain.CentsToDollars(newBalanceCents)
+	totalCost := domain.CentsToDollars(totalCostCents)
+	unitPrice := domain.CentsToDollars(unitPriceCents)
+
 	_, err = tx.ExecContext(ctx, "UPDATE users SET balance = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2", newBalance, user.ID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update user balance: %w", err)
@@ -162,7 +169,7 @@ func (r *sqlOrderRepository) CreateOrderTx(ctx context.Context, userID, productI
 		ProductID:        product.ID,
 		ProductModel:     product.Model,
 		Quantity:         quantity,
-		UnitPrice:        product.Price,
+		UnitPrice:        unitPrice,
 		TotalPrice:       totalCost,
 		Status:           "CREATED",
 		RemainingBalance: newBalance,
