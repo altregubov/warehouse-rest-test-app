@@ -609,7 +609,22 @@ func TestResourceDiscoveryAndOrderLifecycle(t *testing.T) {
 	if len(prodsResult.Data) == 0 {
 		t.Fatalf("Expected non-empty products list")
 	}
-	firstProduct := prodsResult.Data[0]
+	var targetProduct domain.Product
+	hasStock := false
+	for _, p := range prodsResult.Data {
+		if p.StockQuantity > 0 {
+			targetProduct = p
+			hasStock = true
+			break
+		}
+	}
+	if !hasStock {
+		targetProduct = prodsResult.Data[0]
+		_, _, _ = adminClient.request(http.MethodPatch, fmt.Sprintf("/api/admin/products/%s/stock", targetProduct.ID), domain.UpdateStockRequest{
+			StockQuantity: 10,
+		})
+	}
+	firstProduct := targetProduct
 
 	// 4. User places an order
 	respOrder, bodyOrder, _ := userClient.request(http.MethodPost, "/api/user/orders", domain.CreateOrderRequest{
@@ -722,8 +737,24 @@ func TestSoftDeleteAndRestrictCascade(t *testing.T) {
 		t.Fatalf("No products available")
 	}
 
+	var targetProd domain.Product
+	found := false
+	for _, p := range prods.Data {
+		if p.StockQuantity > 0 {
+			targetProd = p
+			found = true
+			break
+		}
+	}
+	if !found {
+		targetProd = prods.Data[0]
+		_, _, _ = adminClient.request(http.MethodPatch, fmt.Sprintf("/api/admin/products/%s/stock", targetProd.ID), domain.UpdateStockRequest{
+			StockQuantity: 10,
+		})
+	}
+
 	respOrder, bodyOrder, _ := userClient.request(http.MethodPost, "/api/user/orders", domain.CreateOrderRequest{
-		ProductID: prods.Data[0].ID,
+		ProductID: targetProd.ID,
 		Quantity:  1,
 	})
 	if respOrder.StatusCode != http.StatusCreated {
@@ -1227,5 +1258,145 @@ func TestSchemaValidationAndOpenAPIContracts(t *testing.T) {
 		if len(def.Required) == 0 {
 			t.Errorf("Definition %s has empty 'required' array", defName)
 		}
+	}
+}
+
+func TestHistoricalOrderSnapshotImmutability(t *testing.T) {
+	db, err := sql.Open("postgres", "postgres://postgres:postgres@localhost:5432/warehouse_db?sslmode=disable")
+	if err != nil {
+		t.Fatalf("Failed to connect to db: %v", err)
+	}
+	defer db.Close()
+
+	tokenAdmin, _ := login(t, "/api/admin/login", "admin", "admin123")
+	adminClient := newClient(tokenAdmin)
+
+	tokenUser, _ := login(t, "/api/user/login", "userA", "user123")
+	userClient := newClient(tokenUser)
+
+	// Create a brand new distinct product
+	prodReq := domain.CreateProductRequest{
+		Category:      "laptop",
+		Manufacturer:  "HistoricalCorp",
+		Model:         "RetroBook 2024 Original",
+		Price:         1200.00,
+		StockQuantity: 10,
+	}
+	respProd, bodyProd, _ := adminClient.request(http.MethodPost, "/api/admin/products", prodReq)
+	if respProd.StatusCode != http.StatusCreated {
+		t.Fatalf("Failed to create product: %s", string(bodyProd))
+	}
+	var createdProd struct {
+		Data domain.Product `json:"data"`
+	}
+	_ = json.Unmarshal(bodyProd, &createdProd)
+	prodID := createdProd.Data.ID
+
+	// Top up userA balance
+	_, bodyProf, _ := userClient.request(http.MethodGet, "/api/user/profile", nil)
+	var profA struct {
+		Data domain.UserSummary `json:"data"`
+	}
+	_ = json.Unmarshal(bodyProf, &profA)
+	_, _, _ = adminClient.request(http.MethodPut, fmt.Sprintf("/api/admin/users/%s/balance", profA.Data.ID), domain.SetBalanceRequest{
+		NewBalance: 10000.00,
+	})
+
+	// Place order for 2 units
+	respOrder, bodyOrder, _ := userClient.request(http.MethodPost, "/api/user/orders", domain.CreateOrderRequest{
+		ProductID: prodID,
+		Quantity:  2,
+	})
+	if respOrder.StatusCode != http.StatusCreated {
+		t.Fatalf("Failed to place order: %s", string(bodyOrder))
+	}
+	var placedOrder struct {
+		Data domain.OrderResponse `json:"data"`
+	}
+	_ = json.Unmarshal(bodyOrder, &placedOrder)
+	orderID := placedOrder.Data.OrderID
+
+	if placedOrder.Data.ProductModel != "RetroBook 2024 Original" {
+		t.Errorf("Expected model RetroBook 2024 Original, got %s", placedOrder.Data.ProductModel)
+	}
+	if placedOrder.Data.UnitPrice != 1200.00 {
+		t.Errorf("Expected unit price 1200.00, got %f", placedOrder.Data.UnitPrice)
+	}
+
+	// Directly mutate the product's model and price in the database
+	_, err = db.Exec("UPDATE products SET model = 'RetroBook 2026 Altered', price = 3500.00 WHERE id = $1", prodID)
+	if err != nil {
+		t.Fatalf("Failed to update product in database: %v", err)
+	}
+
+	// 1. Verify GET /api/user/orders/{id} returns historical snapshots
+	respGet, bodyGet, _ := userClient.request(http.MethodGet, fmt.Sprintf("/api/user/orders/%s", orderID), nil)
+	if respGet.StatusCode != http.StatusOK {
+		t.Fatalf("Failed to get order: %s", string(bodyGet))
+	}
+	var getOrder struct {
+		Data domain.OrderResponse `json:"data"`
+	}
+	_ = json.Unmarshal(bodyGet, &getOrder)
+	if getOrder.Data.ProductModel != "RetroBook 2024 Original" {
+		t.Errorf("GET /api/user/orders/{id}: expected model RetroBook 2024 Original, got %s", getOrder.Data.ProductModel)
+	}
+	if getOrder.Data.UnitPrice != 1200.00 {
+		t.Errorf("GET /api/user/orders/{id}: expected unit price 1200.00, got %f", getOrder.Data.UnitPrice)
+	}
+
+	// 2. Verify GET /api/user/orders returns historical snapshots
+	_, bodyList, _ := userClient.request(http.MethodGet, "/api/user/orders", nil)
+	var listOrders struct {
+		Data []domain.OrderResponse `json:"data"`
+	}
+	_ = json.Unmarshal(bodyList, &listOrders)
+	var foundUserOrder *domain.OrderResponse
+	for _, o := range listOrders.Data {
+		if o.OrderID == orderID {
+			foundUserOrder = &o
+			break
+		}
+	}
+	if foundUserOrder == nil {
+		t.Fatalf("Order not found in user orders list")
+	}
+	if foundUserOrder.ProductModel != "RetroBook 2024 Original" || foundUserOrder.UnitPrice != 1200.00 {
+		t.Errorf("User orders list snapshot mismatch: got model %s, price %f", foundUserOrder.ProductModel, foundUserOrder.UnitPrice)
+	}
+
+	// 3. Verify GET /api/admin/orders returns historical snapshots
+	_, bodyAdminList, _ := adminClient.request(http.MethodGet, "/api/admin/orders", nil)
+	var adminOrders struct {
+		Data []domain.OrderResponse `json:"data"`
+	}
+	_ = json.Unmarshal(bodyAdminList, &adminOrders)
+	var foundAdminOrder *domain.OrderResponse
+	for _, o := range adminOrders.Data {
+		if o.OrderID == orderID {
+			foundAdminOrder = &o
+			break
+		}
+	}
+	if foundAdminOrder == nil {
+		t.Fatalf("Order not found in admin orders list")
+	}
+	if foundAdminOrder.ProductModel != "RetroBook 2024 Original" || foundAdminOrder.UnitPrice != 1200.00 {
+		t.Errorf("Admin orders list snapshot mismatch: got model %s, price %f", foundAdminOrder.ProductModel, foundAdminOrder.UnitPrice)
+	}
+
+	// 4. Verify PATCH /api/admin/orders/{id}/status preserves historical snapshots
+	respStatus, bodyStatus, _ := adminClient.request(http.MethodPatch, fmt.Sprintf("/api/admin/orders/%s/status", orderID), domain.UpdateOrderStatusRequest{
+		Status: "SHIPPED",
+	})
+	if respStatus.StatusCode != http.StatusOK {
+		t.Fatalf("Failed to update order status: %s", string(bodyStatus))
+	}
+	var statusOrder struct {
+		Data domain.OrderResponse `json:"data"`
+	}
+	_ = json.Unmarshal(bodyStatus, &statusOrder)
+	if statusOrder.Data.ProductModel != "RetroBook 2024 Original" || statusOrder.Data.UnitPrice != 1200.00 {
+		t.Errorf("Status update snapshot mismatch: got model %s, price %f", statusOrder.Data.ProductModel, statusOrder.Data.UnitPrice)
 	}
 }

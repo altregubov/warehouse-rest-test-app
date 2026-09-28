@@ -123,8 +123,10 @@ CREATE TABLE IF NOT EXISTS products (
 -- Orders Table
 CREATE TABLE IF NOT EXISTS orders (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
     product_id UUID NOT NULL REFERENCES products(id) ON DELETE RESTRICT,
+    product_model VARCHAR(150) NOT NULL,
+    unit_price NUMERIC(12, 2) NOT NULL CHECK (unit_price >= 0),
     quantity INTEGER NOT NULL CHECK (quantity > 0),
     total_price NUMERIC(12, 2) NOT NULL CHECK (total_price >= 0),
     status VARCHAR(50) NOT NULL DEFAULT 'CREATED',
@@ -140,6 +142,7 @@ CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id);
 1. **User Catalog Filters:**
    - `allowed_categories`: Text array. **If empty (`{}`) or null, all categories are permitted.**
    - `allowed_manufacturers`: Text array. **If empty (`{}`) or null, all manufacturers are permitted.**
+   - If non-empty, user can ONLY view/purchase products matching one of the whitelisted values.
 2. **Product Extensibility:**
    - Category is an arbitrary, non-restricted string (e.g., `laptop`, `smartphone`, `monitor`, `tablet`, `accessory`). No hardcoded enums.
 3. **Atomic Balance & Inventory Constraints:**
@@ -148,6 +151,9 @@ CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id);
    - **Internal Calculation:** All financial computations (balance adjustments, checkout debiting, line-item totals) are executed strictly in integer cents (`int64`, minor currency units) using `DollarsToCents` and `CentsToDollars` conversions, eliminating binary floating-point rounding errors and off-by-one-cent ledger drift.
    - **API Transport:** The REST API accepts and serializes monetary fields in dollars (`format: "double"`, 2 decimal digits) for client convenience and backward compatibility.
    - **Database Persistence:** Persisted in PostgreSQL as `NUMERIC(12, 2)` to ensure strict exact-decimal ledger integrity.
+5. **Historical Snapshot Immutability:**
+   - When an order is placed, the product's current model and unit price are permanently snapshotted into `orders.product_model` and `orders.unit_price`.
+   - Subsequent modifications to product prices or catalog descriptions do not alter historical orders, ensuring immutable receipts for financial audits.
 
 ---
 

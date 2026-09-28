@@ -151,10 +151,10 @@ func (r *sqlOrderRepository) CreateOrderTx(ctx context.Context, userID, productI
 	orderID := uuid.New()
 	createdAt := time.Now().UTC()
 	orderQuery := `
-		INSERT INTO orders (id, user_id, product_id, quantity, total_price, status, created_at)
-		VALUES ($1, $2, $3, $4, $5, 'CREATED', $6)
+		INSERT INTO orders (id, user_id, product_id, product_model, unit_price, quantity, total_price, status, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, 'CREATED', $8)
 	`
-	_, err = tx.ExecContext(ctx, orderQuery, orderID, user.ID, product.ID, quantity, totalCost, createdAt)
+	_, err = tx.ExecContext(ctx, orderQuery, orderID, user.ID, product.ID, product.Model, unitPrice, quantity, totalCost, createdAt)
 	if err != nil {
 		return nil, fmt.Errorf("failed to insert order: %w", err)
 	}
@@ -179,9 +179,8 @@ func (r *sqlOrderRepository) CreateOrderTx(ctx context.Context, userID, productI
 
 func (r *sqlOrderRepository) ListByUserID(ctx context.Context, userID uuid.UUID) ([]*domain.OrderResponse, error) {
 	query := `
-		SELECT o.id, o.user_id, o.product_id, p.model, o.quantity, p.price, o.total_price, o.status, o.created_at
+		SELECT o.id, o.user_id, o.product_id, o.product_model, o.quantity, o.unit_price, o.total_price, o.status, o.created_at
 		FROM orders o
-		JOIN products p ON o.product_id = p.id
 		WHERE o.user_id = $1
 		ORDER BY o.created_at DESC
 	`
@@ -214,9 +213,8 @@ func (r *sqlOrderRepository) ListByUserID(ctx context.Context, userID uuid.UUID)
 
 func (r *sqlOrderRepository) GetByID(ctx context.Context, orderID uuid.UUID) (*domain.OrderResponse, error) {
 	query := `
-		SELECT o.id, o.user_id, o.product_id, p.model, o.quantity, p.price, o.total_price, o.status, o.created_at
+		SELECT o.id, o.user_id, o.product_id, o.product_model, o.quantity, o.unit_price, o.total_price, o.status, o.created_at
 		FROM orders o
-		JOIN products p ON o.product_id = p.id
 		WHERE o.id = $1
 	`
 	var o domain.OrderResponse
@@ -242,9 +240,8 @@ func (r *sqlOrderRepository) GetByID(ctx context.Context, orderID uuid.UUID) (*d
 
 func (r *sqlOrderRepository) ListAll(ctx context.Context) ([]*domain.OrderResponse, error) {
 	query := `
-		SELECT o.id, o.user_id, o.product_id, p.model, o.quantity, p.price, o.total_price, o.status, o.created_at
+		SELECT o.id, o.user_id, o.product_id, o.product_model, o.quantity, o.unit_price, o.total_price, o.status, o.created_at
 		FROM orders o
-		JOIN products p ON o.product_id = p.id
 		ORDER BY o.created_at DESC
 	`
 	rows, err := r.db.QueryContext(ctx, query)
@@ -279,13 +276,15 @@ func (r *sqlOrderRepository) UpdateStatus(ctx context.Context, orderID uuid.UUID
 		UPDATE orders
 		SET status = $1
 		WHERE id = $2
-		RETURNING id, user_id, product_id, quantity, total_price, status, created_at
+		RETURNING id, user_id, product_id, product_model, unit_price, quantity, total_price, status, created_at
 	`
 	var o domain.OrderResponse
 	err := r.db.QueryRowContext(ctx, query, status, orderID).Scan(
 		&o.OrderID,
 		&o.UserID,
 		&o.ProductID,
+		&o.ProductModel,
+		&o.UnitPrice,
 		&o.Quantity,
 		&o.TotalPrice,
 		&o.Status,
@@ -297,9 +296,6 @@ func (r *sqlOrderRepository) UpdateStatus(ctx context.Context, orderID uuid.UUID
 		}
 		return nil, fmt.Errorf("failed to update order status: %w", err)
 	}
-
-	// Fetch product model and unit price for complete response
-	_ = r.db.QueryRowContext(ctx, "SELECT model, price FROM products WHERE id = $1", o.ProductID).Scan(&o.ProductModel, &o.UnitPrice)
 
 	return &o, nil
 }

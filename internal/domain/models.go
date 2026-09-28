@@ -52,13 +52,15 @@ type Product struct {
 }
 
 type Order struct {
-	ID         uuid.UUID `json:"id" binding:"required" format:"uuid"`
-	UserID     uuid.UUID `json:"user_id" binding:"required" format:"uuid"`
-	ProductID  uuid.UUID `json:"product_id" binding:"required" format:"uuid"`
-	Quantity   int       `json:"quantity" binding:"required" minimum:"1"`
-	TotalPrice float64   `json:"total_price" binding:"required" format:"double" minimum:"0"`
-	Status     string    `json:"status" binding:"required" enums:"CREATED,PROCESSING,SHIPPED,DELIVERED,CANCELLED"`
-	CreatedAt  time.Time `json:"created_at" binding:"required" format:"date-time"`
+	ID           uuid.UUID `json:"id" binding:"required" format:"uuid"`
+	UserID       uuid.UUID `json:"user_id" binding:"required" format:"uuid"`
+	ProductID    uuid.UUID `json:"product_id" binding:"required" format:"uuid"`
+	ProductModel string    `json:"product_model" binding:"required"`
+	UnitPrice    float64   `json:"unit_price" binding:"required" format:"double" minimum:"0"`
+	Quantity     int       `json:"quantity" binding:"required" minimum:"1"`
+	TotalPrice   float64   `json:"total_price" binding:"required" format:"double" minimum:"0"`
+	Status       string    `json:"status" binding:"required" enums:"CREATED,PROCESSING,SHIPPED,DELIVERED,CANCELLED"`
+	CreatedAt    time.Time `json:"created_at" binding:"required" format:"date-time"`
 }
 
 // DTOs

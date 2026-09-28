@@ -63,6 +63,8 @@ func EnsureSchemaAndSeed(db *sql.DB) error {
 		id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
 		user_id UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
 		product_id UUID NOT NULL REFERENCES products(id) ON DELETE RESTRICT,
+		product_model VARCHAR(150) NOT NULL,
+		unit_price NUMERIC(12, 2) NOT NULL CHECK (unit_price >= 0),
 		quantity INTEGER NOT NULL CHECK (quantity > 0),
 		total_price NUMERIC(12, 2) NOT NULL CHECK (total_price >= 0),
 		status VARCHAR(50) NOT NULL DEFAULT 'CREATED',
@@ -70,6 +72,9 @@ func EnsureSchemaAndSeed(db *sql.DB) error {
 	);
 
 	ALTER TABLE orders ADD COLUMN IF NOT EXISTS status VARCHAR(50) NOT NULL DEFAULT 'CREATED';
+	ALTER TABLE orders ADD COLUMN IF NOT EXISTS product_model VARCHAR(150);
+	ALTER TABLE orders ADD COLUMN IF NOT EXISTS unit_price NUMERIC(12, 2);
+	UPDATE orders o SET product_model = p.model, unit_price = p.price FROM products p WHERE o.product_id = p.id AND (o.product_model IS NULL OR o.unit_price IS NULL);
 	ALTER TABLE orders DROP CONSTRAINT IF EXISTS orders_user_id_fkey;
 	ALTER TABLE orders ADD CONSTRAINT orders_user_id_fkey FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE RESTRICT;
 
