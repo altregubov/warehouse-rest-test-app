@@ -4,10 +4,15 @@ definitions:
     properties:
       product_id:
         example: c0000000-0000-0000-0000-000000000001
+        format: uuid
         type: string
       quantity:
         example: 1
+        minimum: 1
         type: integer
+    required:
+    - product_id
+    - quantity
     type: object
   domain.CreateProductRequest:
     properties:
@@ -23,10 +28,18 @@ definitions:
       price:
         example: 1099
         format: double
+        minimum: 0
         type: number
       stock_quantity:
         example: 10
+        minimum: 0
         type: integer
+    required:
+    - category
+    - manufacturer
+    - model
+    - price
+    - stock_quantity
     type: object
   domain.CreateUserRequest:
     properties:
@@ -45,16 +58,27 @@ definitions:
       balance:
         example: 1000
         format: double
+        minimum: 0
         type: number
       password:
         example: secret123
+        minLength: 4
         type: string
       role:
+        enum:
+        - admin
+        - user
         example: user
         type: string
       username:
         example: john_doe
+        minLength: 1
         type: string
+    required:
+    - balance
+    - password
+    - role
+    - username
     type: object
   domain.ErrorDetails:
     properties:
@@ -65,6 +89,9 @@ definitions:
       message:
         example: Detailed error description
         type: string
+    required:
+    - code
+    - message
     type: object
   domain.ErrorEnvelope:
     properties:
@@ -73,15 +100,23 @@ definitions:
       success:
         example: false
         type: boolean
+    required:
+    - error
+    - success
     type: object
   domain.LoginRequest:
     properties:
       password:
         example: admin123
+        minLength: 4
         type: string
       username:
         example: admin
+        minLength: 1
         type: string
+    required:
+    - password
+    - username
     type: object
   domain.LoginResponse:
     properties:
@@ -89,61 +124,117 @@ definitions:
         type: string
       user:
         $ref: '#/definitions/domain.UserSummary'
+    required:
+    - token
+    - user
     type: object
   domain.OrderResponse:
     properties:
       created_at:
+        format: date-time
         type: string
       order_id:
+        example: d0000000-0000-0000-0000-000000000001
+        format: uuid
         type: string
       product_id:
+        example: c0000000-0000-0000-0000-000000000001
+        format: uuid
         type: string
       product_model:
+        example: MacBook Pro 16 M3
         type: string
       quantity:
+        example: 1
+        minimum: 1
         type: integer
       remaining_balance:
         example: 500
         format: double
+        minimum: 0
         type: number
       status:
+        enum:
+        - CREATED
+        - PROCESSING
+        - SHIPPED
+        - DELIVERED
+        - CANCELLED
+        example: CREATED
         type: string
       total_price:
         example: 4998
         format: double
+        minimum: 0
         type: number
       unit_price:
         example: 2499
         format: double
+        minimum: 0
         type: number
       user_id:
+        example: b0000000-0000-0000-0000-000000000002
+        format: uuid
         type: string
+    required:
+    - created_at
+    - order_id
+    - product_id
+    - product_model
+    - quantity
+    - status
+    - total_price
+    - unit_price
     type: object
   domain.Product:
     properties:
       category:
+        example: laptop
         type: string
       created_at:
+        format: date-time
         type: string
       id:
+        example: c0000000-0000-0000-0000-000000000001
+        format: uuid
         type: string
       manufacturer:
+        example: Apple
         type: string
       model:
+        example: MacBook Pro 16 M3
         type: string
       price:
+        example: 2499
+        format: double
+        minimum: 0
         type: number
       stock_quantity:
+        example: 15
+        minimum: 0
         type: integer
       updated_at:
+        format: date-time
         type: string
+    required:
+    - category
+    - created_at
+    - id
+    - manufacturer
+    - model
+    - price
+    - stock_quantity
+    - updated_at
     type: object
   domain.SetBalanceRequest:
     properties:
       new_balance:
         example: 5000
         format: double
+        minimum: 0
         type: number
+    required:
+    - new_balance
     type: object
   domain.SuccessEnvelope:
     properties:
@@ -151,13 +242,19 @@ definitions:
       success:
         example: true
         type: boolean
+    required:
+    - data
+    - success
     type: object
   domain.TopUpBalanceRequest:
     properties:
       increment_amount:
         example: 500
         format: double
+        minimum: 0.01
         type: number
+    required:
+    - increment_amount
     type: object
   domain.UpdateBalanceRequest:
     properties:
@@ -165,6 +262,8 @@ definitions:
         example: 500
         format: double
         type: number
+    required:
+    - amount
     type: object
   domain.UpdateFiltersRequest:
     properties:
@@ -181,39 +280,73 @@ definitions:
         items:
           type: string
         type: array
+    required:
+    - allowed_categories
+    - allowed_manufacturers
     type: object
   domain.UpdateOrderStatusRequest:
     properties:
       status:
+        enum:
+        - CREATED
+        - PROCESSING
+        - SHIPPED
+        - DELIVERED
+        - CANCELLED
         example: SHIPPED
         type: string
+    required:
+    - status
     type: object
   domain.UpdateStockRequest:
     properties:
       stock_quantity:
         example: 25
+        minimum: 0
         type: integer
+    required:
+    - stock_quantity
     type: object
   domain.UserSummary:
     properties:
       allowed_categories:
+        example:
+        - '["laptop"]'
         items:
           type: string
         type: array
       allowed_manufacturers:
+        example:
+        - '["Dell"]'
         items:
           type: string
         type: array
       balance:
         example: 1000
         format: double
+        minimum: 0
         type: number
       id:
+        example: b0000000-0000-0000-0000-000000000002
+        format: uuid
         type: string
       role:
+        enum:
+        - admin
+        - user
+        example: user
         type: string
       username:
+        example: userA
+        minLength: 1
         type: string
+    required:
+    - allowed_categories
+    - allowed_manufacturers
+    - balance
+    - id
+    - role
+    - username
     type: object
 host: localhost:8080
 info:
@@ -299,6 +432,7 @@ paths:
         DELIVERED, CANCELLED)
       parameters:
       - description: Order ID (UUID)
+        format: uuid
         in: path
         name: id
         required: true
@@ -426,6 +560,7 @@ paths:
       description: Set stock quantity for a warehouse product
       parameters:
       - description: Product ID (UUID)
+        format: uuid
         in: path
         name: id
         required: true
@@ -566,6 +701,7 @@ paths:
         order records
       parameters:
       - description: User ID (UUID)
+        format: uuid
         in: path
         name: id
         required: true
@@ -609,6 +745,7 @@ paths:
       description: Retrieve a specific user account by UUID
       parameters:
       - description: User ID (UUID)
+        format: uuid
         in: path
         name: id
         required: true
@@ -657,6 +794,7 @@ paths:
         name: Idempotency-Key
         type: string
       - description: User ID (UUID)
+        format: uuid
         in: path
         name: id
         required: true
@@ -715,6 +853,7 @@ paths:
         name: Idempotency-Key
         type: string
       - description: User ID (UUID)
+        format: uuid
         in: path
         name: id
         required: true
@@ -778,6 +917,7 @@ paths:
         name: Idempotency-Key
         type: string
       - description: User ID (UUID)
+        format: uuid
         in: path
         name: id
         required: true
@@ -837,6 +977,7 @@ paths:
         removes restrictions.
       parameters:
       - description: User ID (UUID)
+        format: uuid
         in: path
         name: id
         required: true
@@ -1005,6 +1146,7 @@ paths:
         user
       parameters:
       - description: Order ID (UUID)
+        format: uuid
         in: path
         name: id
         required: true

@@ -72,7 +72,7 @@ func (h *AdminHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 // @Produce json
 // @Security BearerAuth
 // @Param Idempotency-Key header string false "Unique idempotency key to prevent double processing"
-// @Param id path string true "User ID (UUID)"
+// @Param id path string true "User ID (UUID)" Format(uuid)
 // @Param request body domain.TopUpBalanceRequest true "Balance top-up payload"
 // @Success 200 {object} domain.SuccessEnvelope{data=domain.UserSummary} "Balance topped up"
 // @Failure 400 {object} domain.ErrorEnvelope "Invalid input"
@@ -139,7 +139,7 @@ func (h *AdminHandler) TopUpBalance(w http.ResponseWriter, r *http.Request) {
 // @Produce json
 // @Security BearerAuth
 // @Param Idempotency-Key header string false "Unique idempotency key to prevent double processing"
-// @Param id path string true "User ID (UUID)"
+// @Param id path string true "User ID (UUID)" Format(uuid)
 // @Param request body domain.SetBalanceRequest true "Absolute balance payload"
 // @Success 200 {object} domain.SuccessEnvelope{data=domain.UserSummary} "Balance set"
 // @Failure 400 {object} domain.ErrorEnvelope "Invalid input"
@@ -206,7 +206,7 @@ func (h *AdminHandler) SetBalance(w http.ResponseWriter, r *http.Request) {
 // @Produce json
 // @Security BearerAuth
 // @Param Idempotency-Key header string false "Unique idempotency key to prevent double processing"
-// @Param id path string true "User ID (UUID)"
+// @Param id path string true "User ID (UUID)" Format(uuid)
 // @Param request body domain.UpdateBalanceRequest true "Balance adjustment payload"
 // @Success 200 {object} domain.SuccessEnvelope{data=domain.UserSummary} "Balance updated"
 // @Failure 400 {object} domain.ErrorEnvelope "Invalid input or negative balance"
@@ -253,7 +253,7 @@ func (h *AdminHandler) UpdateBalance(w http.ResponseWriter, r *http.Request) {
 // @Accept json
 // @Produce json
 // @Security BearerAuth
-// @Param id path string true "User ID (UUID)"
+// @Param id path string true "User ID (UUID)" Format(uuid)
 // @Param request body domain.UpdateFiltersRequest true "User filter permissions"
 // @Success 200 {object} domain.SuccessEnvelope{data=domain.UserSummary} "Filters updated"
 // @Failure 400 {object} domain.ErrorEnvelope "Invalid input"
@@ -328,7 +328,7 @@ func (h *AdminHandler) CreateProduct(w http.ResponseWriter, r *http.Request) {
 // @Accept json
 // @Produce json
 // @Security BearerAuth
-// @Param id path string true "Product ID (UUID)"
+// @Param id path string true "Product ID (UUID)" Format(uuid)
 // @Param request body domain.UpdateStockRequest true "Stock update payload"
 // @Success 200 {object} domain.SuccessEnvelope{data=domain.Product} "Stock updated"
 // @Failure 400 {object} domain.ErrorEnvelope "Invalid input"
@@ -402,7 +402,7 @@ func (h *AdminHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
 // @Accept json
 // @Produce json
 // @Security BearerAuth
-// @Param id path string true "User ID (UUID)"
+// @Param id path string true "User ID (UUID)" Format(uuid)
 // @Success 200 {object} domain.SuccessEnvelope{data=domain.UserSummary} "User details"
 // @Failure 400 {object} domain.ErrorEnvelope "Invalid ID"
 // @Failure 401 {object} domain.ErrorEnvelope "Unauthorized"
@@ -437,7 +437,7 @@ func (h *AdminHandler) GetUser(w http.ResponseWriter, r *http.Request) {
 // @Accept json
 // @Produce json
 // @Security BearerAuth
-// @Param id path string true "User ID (UUID)"
+// @Param id path string true "User ID (UUID)" Format(uuid)
 // @Success 200 {object} domain.SuccessEnvelope{data=string} "User deactivated successfully"
 // @Failure 400 {object} domain.ErrorEnvelope "Invalid ID"
 // @Failure 401 {object} domain.ErrorEnvelope "Unauthorized"
@@ -513,7 +513,7 @@ func (h *AdminHandler) ListOrders(w http.ResponseWriter, r *http.Request) {
 // @Accept json
 // @Produce json
 // @Security BearerAuth
-// @Param id path string true "Order ID (UUID)"
+// @Param id path string true "Order ID (UUID)" Format(uuid)
 // @Param request body domain.UpdateOrderStatusRequest true "Order status payload"
 // @Success 200 {object} domain.SuccessEnvelope{data=domain.OrderResponse} "Order status updated"
 // @Failure 400 {object} domain.ErrorEnvelope "Invalid input"

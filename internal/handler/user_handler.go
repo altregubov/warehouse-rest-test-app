@@ -188,7 +188,7 @@ func (h *UserHandler) ListOrders(w http.ResponseWriter, r *http.Request) {
 // @Accept json
 // @Produce json
 // @Security BearerAuth
-// @Param id path string true "Order ID (UUID)"
+// @Param id path string true "Order ID (UUID)" Format(uuid)
 // @Success 200 {object} domain.SuccessEnvelope{data=domain.OrderResponse} "Order details"
 // @Failure 401 {object} domain.ErrorEnvelope "Unauthorized"
 // @Failure 404 {object} domain.ErrorEnvelope "Order not found"

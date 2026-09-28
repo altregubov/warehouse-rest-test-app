@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/altregubov/warehouse-rest-test-app/internal/domain"
+	"github.com/google/uuid"
 	_ "github.com/lib/pq"
 )
 
@@ -363,6 +364,9 @@ func TestAtomicOrderPlacement(t *testing.T) {
 	}
 
 	// 3. Insufficient balance: set low balance with valid in-stock quantity -> 422 INSUFFICIENT_FUNDS
+	_, _, _ = adminClient.request(http.MethodPatch, fmt.Sprintf("/api/admin/products/%s/stock", testProduct.ID), domain.UpdateStockRequest{
+		StockQuantity: 10,
+	})
 	_, _, _ = adminClient.request(http.MethodPut, fmt.Sprintf("/api/admin/users/%s/balance", profA.Data.ID), domain.SetBalanceRequest{
 		NewBalance: 10.00,
 	})
@@ -1120,5 +1124,108 @@ func TestMonetaryPrecisionAndReconciliation(t *testing.T) {
 	_ = json.Unmarshal(bodyTopUp, &topUpRes)
 	if topUpRes.Data.Balance != 0.30 {
 		t.Errorf("Expected balance 0.30 after 0.10 + 0.20 additions, got %.4f", topUpRes.Data.Balance)
+	}
+}
+
+func TestSchemaValidationAndOpenAPIContracts(t *testing.T) {
+	tokenAdmin, _ := login(t, "/api/admin/login", "admin", "admin123")
+	adminClient := newClient(tokenAdmin)
+
+	tokenUser, _ := login(t, "/api/user/login", "userA", "user123")
+	userClient := newClient(tokenUser)
+
+	// 1. Path variable UUID validation: invalid UUID rejected as 400
+	respInvalidID, _, _ := adminClient.request(http.MethodGet, "/api/admin/users/not-a-valid-uuid", nil)
+	if respInvalidID.StatusCode != http.StatusBadRequest {
+		t.Errorf("Expected 400 for invalid UUID in path, got %d", respInvalidID.StatusCode)
+	}
+
+	// 2. Role enum validation: invalid role rejected as 400
+	respInvalidRole, _, _ := adminClient.request(http.MethodPost, "/api/admin/users", map[string]any{
+		"username": "super_user_1",
+		"password": "validpassword",
+		"role":     "superadmin",
+		"balance":  100.0,
+	})
+	if respInvalidRole.StatusCode != http.StatusBadRequest {
+		t.Errorf("Expected 400 for invalid role enum, got %d", respInvalidRole.StatusCode)
+	}
+
+	// 3. String length constraints: empty username or short password rejected as 400
+	respShortPass, _, _ := adminClient.request(http.MethodPost, "/api/admin/users", map[string]any{
+		"username": "valid_user_short_pass",
+		"password": "12",
+		"role":     "user",
+		"balance":  100.0,
+	})
+	if respShortPass.StatusCode != http.StatusBadRequest {
+		t.Errorf("Expected 400 for password length < 4, got %d", respShortPass.StatusCode)
+	}
+
+	// 4. Numeric boundary violations: negative balance rejected as 400
+	respNegBal, _, _ := adminClient.request(http.MethodPost, "/api/admin/users", map[string]any{
+		"username": "valid_user_neg_bal",
+		"password": "validpassword",
+		"role":     "user",
+		"balance":  -50.0,
+	})
+	if respNegBal.StatusCode != http.StatusBadRequest {
+		t.Errorf("Expected 400 for negative balance, got %d", respNegBal.StatusCode)
+	}
+
+	// 5. Numeric boundary violations: negative price or stock in product creation
+	respNegPrice, _, _ := adminClient.request(http.MethodPost, "/api/admin/products", map[string]any{
+		"category":       "electronics",
+		"manufacturer":   "Sony",
+		"model":          "WH-1000XM5",
+		"price":          -10.0,
+		"stock_quantity": 5,
+	})
+	if respNegPrice.StatusCode != http.StatusBadRequest {
+		t.Errorf("Expected 400 for negative product price, got %d", respNegPrice.StatusCode)
+	}
+
+	// 6. Numeric boundary: quantity < 1 rejected as 400
+	respZeroQty, _, _ := userClient.request(http.MethodPost, "/api/user/orders", map[string]any{
+		"product_id": uuid.New().String(),
+		"quantity":   0,
+	})
+	if respZeroQty.StatusCode != http.StatusBadRequest {
+		t.Errorf("Expected 400 for order quantity 0, got %d", respZeroQty.StatusCode)
+	}
+
+	// 7. OpenAPI specification audit: verify swagger schema metadata
+	respDoc, bodyDoc, _ := adminClient.request(http.MethodGet, "/swagger/doc.json", nil)
+	if respDoc.StatusCode != http.StatusOK {
+		t.Fatalf("Failed to fetch /swagger/doc.json: %d", respDoc.StatusCode)
+	}
+
+	var swaggerDoc struct {
+		Definitions map[string]struct {
+			Required   []string               `json:"required"`
+			Properties map[string]interface{} `json:"properties"`
+		} `json:"definitions"`
+	}
+	if err := json.Unmarshal(bodyDoc, &swaggerDoc); err != nil {
+		t.Fatalf("Failed to parse swagger doc: %v", err)
+	}
+
+	checkDefinitions := []string{
+		"domain.CreateUserRequest",
+		"domain.CreateProductRequest",
+		"domain.CreateOrderRequest",
+		"domain.LoginRequest",
+		"domain.UpdateStockRequest",
+	}
+
+	for _, defName := range checkDefinitions {
+		def, ok := swaggerDoc.Definitions[defName]
+		if !ok {
+			t.Errorf("Definition %s not found in Swagger docs", defName)
+			continue
+		}
+		if len(def.Required) == 0 {
+			t.Errorf("Definition %s has empty 'required' array", defName)
+		}
 	}
 }

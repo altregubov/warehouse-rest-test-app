@@ -277,6 +277,18 @@ Integrators can design predictable handling around four standard commercial outc
 
 ---
 
+### 2.5 Input Schema Contracts & Boundary Validations
+
+Client applications and automated SDK generators rely on strict, machine-readable validation contracts to reject invalid requests early:
+- **Mandatory Fields**: Request payloads enforce non-empty requirements across core identifiers, credentials, and amounts.
+- **Identifier Format**: Path variables and identifier fields require valid RFC 4122 UUID strings (e.g. `d0000000-0000-0000-0000-000000000001`).
+- **Enumerated Types**: Role assignments are strictly constrained to `admin` or `user`. Order fulfillment transitions follow standard states (`CREATED`, `PROCESSING`, `SHIPPED`, `DELIVERED`, `CANCELLED`).
+- **Domain Boundaries**: Order quantities must be at least 1 unit; product stock quantities, unit prices, and account balances must be non-negative ($\ge 0$). User account creation requires minimum string lengths (username $\ge 1$, password $\ge 4$).
+
+Violations of input formats or domain boundaries trigger immediate `400 Bad Request` responses prior to downstream processing.
+
+---
+
 ## 3. Template Customization Reference
 
 This specification is parameterized for rapid adaptation across different enterprise domains:

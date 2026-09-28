@@ -70,6 +70,21 @@ All API responses follow consistent JSON envelopes:
   - `INSUFFICIENT_STOCK`: Warehouse stock is less than requested quantity.
   - `FILTER_RESTRICTION`: Product is outside user's whitelist/filter access.
 
+### 2.6 OpenAPI Schema Validation & Model Constraints
+To ensure client SDK predictability and prevent unhandled database violations:
+- **Required Fields**: All request and response DTOs define explicit `required` property arrays in OpenAPI definitions via Go struct validation binding (`binding:"required"`).
+- **UUID Formatting**: All entity identifiers, foreign keys, and `{id}` path parameters strictly enforce `"format": "uuid"` (validated using standard RFC 4122 UUID parser).
+- **Date-Time Formatting**: Timestamp fields (`created_at`, `updated_at`, `deleted_at`) enforce `"format": "date-time"` (RFC 3339).
+- **Role Enums**: Role fields and parameters enforce enumerated values: `["admin", "user"]`.
+- **Numeric Boundaries**:
+  - `quantity`: `minimum: 1`
+  - `stock_quantity`, `price`, `balance`, `new_balance`: `minimum: 0`
+  - `increment_amount`: `minimum: 0.01`
+- **String Length Constraints**:
+  - `username`: `minLength: 1`
+  - `password`: `minLength: 4`
+All boundary or type violations are caught at the HTTP handler layer and rejected with `400 Bad Request` (`INVALID_INPUT` / `INVALID_REQUEST`) before invoking backend services or touching the database.
+
 ---
 
 ## 3. Database Schema & Data Models

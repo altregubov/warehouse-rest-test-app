@@ -149,6 +149,7 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
+                        "format": "uuid",
                         "description": "Order ID (UUID)",
                         "name": "id",
                         "in": "path",
@@ -359,6 +360,7 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
+                        "format": "uuid",
                         "description": "Product ID (UUID)",
                         "name": "id",
                         "in": "path",
@@ -589,6 +591,7 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
+                        "format": "uuid",
                         "description": "User ID (UUID)",
                         "name": "id",
                         "in": "path",
@@ -660,6 +663,7 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
+                        "format": "uuid",
                         "description": "User ID (UUID)",
                         "name": "id",
                         "in": "path",
@@ -739,6 +743,7 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
+                        "format": "uuid",
                         "description": "User ID (UUID)",
                         "name": "id",
                         "in": "path",
@@ -837,6 +842,7 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
+                        "format": "uuid",
                         "description": "User ID (UUID)",
                         "name": "id",
                         "in": "path",
@@ -931,6 +937,7 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
+                        "format": "uuid",
                         "description": "User ID (UUID)",
                         "name": "id",
                         "in": "path",
@@ -1025,6 +1032,7 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
+                        "format": "uuid",
                         "description": "User ID (UUID)",
                         "name": "id",
                         "in": "path",
@@ -1299,6 +1307,7 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
+                        "format": "uuid",
                         "description": "Order ID (UUID)",
                         "name": "id",
                         "in": "path",
@@ -1464,19 +1473,32 @@ const docTemplate = `{
     "definitions": {
         "domain.CreateOrderRequest": {
             "type": "object",
+            "required": [
+                "product_id",
+                "quantity"
+            ],
             "properties": {
                 "product_id": {
                     "type": "string",
+                    "format": "uuid",
                     "example": "c0000000-0000-0000-0000-000000000001"
                 },
                 "quantity": {
                     "type": "integer",
+                    "minimum": 1,
                     "example": 1
                 }
             }
         },
         "domain.CreateProductRequest": {
             "type": "object",
+            "required": [
+                "category",
+                "manufacturer",
+                "model",
+                "price",
+                "stock_quantity"
+            ],
             "properties": {
                 "category": {
                     "type": "string",
@@ -1493,16 +1515,24 @@ const docTemplate = `{
                 "price": {
                     "type": "number",
                     "format": "double",
+                    "minimum": 0,
                     "example": 1099
                 },
                 "stock_quantity": {
                     "type": "integer",
+                    "minimum": 0,
                     "example": 10
                 }
             }
         },
         "domain.CreateUserRequest": {
             "type": "object",
+            "required": [
+                "balance",
+                "password",
+                "role",
+                "username"
+            ],
             "properties": {
                 "allowed_categories": {
                     "type": "array",
@@ -1525,24 +1555,35 @@ const docTemplate = `{
                 "balance": {
                     "type": "number",
                     "format": "double",
+                    "minimum": 0,
                     "example": 1000
                 },
                 "password": {
                     "type": "string",
+                    "minLength": 4,
                     "example": "secret123"
                 },
                 "role": {
                     "type": "string",
+                    "enum": [
+                        "admin",
+                        "user"
+                    ],
                     "example": "user"
                 },
                 "username": {
                     "type": "string",
+                    "minLength": 1,
                     "example": "john_doe"
                 }
             }
         },
         "domain.ErrorDetails": {
             "type": "object",
+            "required": [
+                "code",
+                "message"
+            ],
             "properties": {
                 "code": {
                     "type": "string",
@@ -1557,6 +1598,10 @@ const docTemplate = `{
         },
         "domain.ErrorEnvelope": {
             "type": "object",
+            "required": [
+                "error",
+                "success"
+            ],
             "properties": {
                 "error": {
                     "$ref": "#/definitions/domain.ErrorDetails"
@@ -1569,19 +1614,29 @@ const docTemplate = `{
         },
         "domain.LoginRequest": {
             "type": "object",
+            "required": [
+                "password",
+                "username"
+            ],
             "properties": {
                 "password": {
                     "type": "string",
+                    "minLength": 4,
                     "example": "admin123"
                 },
                 "username": {
                     "type": "string",
+                    "minLength": 1,
                     "example": "admin"
                 }
             }
         },
         "domain.LoginResponse": {
             "type": "object",
+            "required": [
+                "token",
+                "user"
+            ],
             "properties": {
                 "token": {
                     "type": "string"
@@ -1593,86 +1648,147 @@ const docTemplate = `{
         },
         "domain.OrderResponse": {
             "type": "object",
+            "required": [
+                "created_at",
+                "order_id",
+                "product_id",
+                "product_model",
+                "quantity",
+                "status",
+                "total_price",
+                "unit_price"
+            ],
             "properties": {
                 "created_at": {
-                    "type": "string"
+                    "type": "string",
+                    "format": "date-time"
                 },
                 "order_id": {
-                    "type": "string"
+                    "type": "string",
+                    "format": "uuid",
+                    "example": "d0000000-0000-0000-0000-000000000001"
                 },
                 "product_id": {
-                    "type": "string"
+                    "type": "string",
+                    "format": "uuid",
+                    "example": "c0000000-0000-0000-0000-000000000001"
                 },
                 "product_model": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "MacBook Pro 16 M3"
                 },
                 "quantity": {
-                    "type": "integer"
+                    "type": "integer",
+                    "minimum": 1,
+                    "example": 1
                 },
                 "remaining_balance": {
                     "type": "number",
                     "format": "double",
+                    "minimum": 0,
                     "example": 500
                 },
                 "status": {
-                    "type": "string"
+                    "type": "string",
+                    "enum": [
+                        "CREATED",
+                        "PROCESSING",
+                        "SHIPPED",
+                        "DELIVERED",
+                        "CANCELLED"
+                    ],
+                    "example": "CREATED"
                 },
                 "total_price": {
                     "type": "number",
                     "format": "double",
+                    "minimum": 0,
                     "example": 4998
                 },
                 "unit_price": {
                     "type": "number",
                     "format": "double",
+                    "minimum": 0,
                     "example": 2499
                 },
                 "user_id": {
-                    "type": "string"
+                    "type": "string",
+                    "format": "uuid",
+                    "example": "b0000000-0000-0000-0000-000000000002"
                 }
             }
         },
         "domain.Product": {
             "type": "object",
+            "required": [
+                "category",
+                "created_at",
+                "id",
+                "manufacturer",
+                "model",
+                "price",
+                "stock_quantity",
+                "updated_at"
+            ],
             "properties": {
                 "category": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "laptop"
                 },
                 "created_at": {
-                    "type": "string"
+                    "type": "string",
+                    "format": "date-time"
                 },
                 "id": {
-                    "type": "string"
+                    "type": "string",
+                    "format": "uuid",
+                    "example": "c0000000-0000-0000-0000-000000000001"
                 },
                 "manufacturer": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "Apple"
                 },
                 "model": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "MacBook Pro 16 M3"
                 },
                 "price": {
-                    "type": "number"
+                    "type": "number",
+                    "format": "double",
+                    "minimum": 0,
+                    "example": 2499
                 },
                 "stock_quantity": {
-                    "type": "integer"
+                    "type": "integer",
+                    "minimum": 0,
+                    "example": 15
                 },
                 "updated_at": {
-                    "type": "string"
+                    "type": "string",
+                    "format": "date-time"
                 }
             }
         },
         "domain.SetBalanceRequest": {
             "type": "object",
+            "required": [
+                "new_balance"
+            ],
             "properties": {
                 "new_balance": {
                     "type": "number",
                     "format": "double",
+                    "minimum": 0,
                     "example": 5000
                 }
             }
         },
         "domain.SuccessEnvelope": {
             "type": "object",
+            "required": [
+                "data",
+                "success"
+            ],
             "properties": {
                 "data": {},
                 "success": {
@@ -1683,16 +1799,23 @@ const docTemplate = `{
         },
         "domain.TopUpBalanceRequest": {
             "type": "object",
+            "required": [
+                "increment_amount"
+            ],
             "properties": {
                 "increment_amount": {
                     "type": "number",
                     "format": "double",
+                    "minimum": 0.01,
                     "example": 500
                 }
             }
         },
         "domain.UpdateBalanceRequest": {
             "type": "object",
+            "required": [
+                "amount"
+            ],
             "properties": {
                 "amount": {
                     "type": "number",
@@ -1703,6 +1826,10 @@ const docTemplate = `{
         },
         "domain.UpdateFiltersRequest": {
             "type": "object",
+            "required": [
+                "allowed_categories",
+                "allowed_manufacturers"
+            ],
             "properties": {
                 "allowed_categories": {
                     "type": "array",
@@ -1727,50 +1854,88 @@ const docTemplate = `{
         },
         "domain.UpdateOrderStatusRequest": {
             "type": "object",
+            "required": [
+                "status"
+            ],
             "properties": {
                 "status": {
                     "type": "string",
+                    "enum": [
+                        "CREATED",
+                        "PROCESSING",
+                        "SHIPPED",
+                        "DELIVERED",
+                        "CANCELLED"
+                    ],
                     "example": "SHIPPED"
                 }
             }
         },
         "domain.UpdateStockRequest": {
             "type": "object",
+            "required": [
+                "stock_quantity"
+            ],
             "properties": {
                 "stock_quantity": {
                     "type": "integer",
+                    "minimum": 0,
                     "example": 25
                 }
             }
         },
         "domain.UserSummary": {
             "type": "object",
+            "required": [
+                "allowed_categories",
+                "allowed_manufacturers",
+                "balance",
+                "id",
+                "role",
+                "username"
+            ],
             "properties": {
                 "allowed_categories": {
                     "type": "array",
                     "items": {
                         "type": "string"
-                    }
+                    },
+                    "example": [
+                        "[\"laptop\"]"
+                    ]
                 },
                 "allowed_manufacturers": {
                     "type": "array",
                     "items": {
                         "type": "string"
-                    }
+                    },
+                    "example": [
+                        "[\"Dell\"]"
+                    ]
                 },
                 "balance": {
                     "type": "number",
                     "format": "double",
+                    "minimum": 0,
                     "example": 1000
                 },
                 "id": {
-                    "type": "string"
+                    "type": "string",
+                    "format": "uuid",
+                    "example": "b0000000-0000-0000-0000-000000000002"
                 },
                 "role": {
-                    "type": "string"
+                    "type": "string",
+                    "enum": [
+                        "admin",
+                        "user"
+                    ],
+                    "example": "user"
                 },
                 "username": {
-                    "type": "string"
+                    "type": "string",
+                    "minLength": 1,
+                    "example": "userA"
                 }
             }
         }
