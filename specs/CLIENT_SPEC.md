@@ -270,15 +270,18 @@ stateDiagram-v2
 
 ### 2.4 Business Outcomes & Exceptions
 
-Integrators can design predictable handling around four standard commercial outcomes:
+Integrators can design predictable error handling and recovery workflows around standardized status code contracts:
 
-| Business Condition | Primary Trigger | System Behavior | Integrator Guidance |
-| :--- | :--- | :--- | :--- |
-| **Order Success** | Available balance ≥ total cost AND stock ≥ requested quantity AND product in whitelist. | Creates `[Core Entity: Order]`, debits customer balance, decrements stock atomically, and returns confirmation. | Display order receipt, refresh client balance badge, and prompt for dispatch tracking. |
-| **Catalog Access Restriction** | Customer attempts to purchase an item outside assigned whitelists or account has `access_level: NONE` / `catalog_access_enabled: false`. | Operation rejected immediately (422 Unprocessable Entity with error code `FILTER_RESTRICTION`). No ledger locks acquired. | Notify customer of commercial contract restrictions or account suspension; prompt them to contact their account administrator. |
-| **Insufficient Stock** | Requested quantity exceeds current warehouse inventory for the target SKU. | Operation rejected. Transaction rolled back with zero side effects. | Inform user of available inventory quantity; offer partial quantity or notify on restock. |
-| **Insufficient Funds** | Total order amount exceeds client's available balance. | Operation rejected. Transaction rolled back with zero side effects. | Prompt client to top up balance or request credit increase from system administrator. |
-| **Entity Not Found** | Referenced product SKU or user account does not exist or has been archived. | Operation rejected gracefully. | Refresh local catalog cache and verify product identifier validity. |
+| Business Condition | Primary Trigger | Status Code & Error Code | System Behavior | Integrator Guidance |
+| :--- | :--- | :--- | :--- | :--- |
+| **Order Success** | Available balance ≥ total cost AND stock ≥ requested quantity AND product in whitelist. | `201 Created` | Creates `[Core Entity: Order]`, debits customer balance, decrements stock atomically, and returns confirmation. | Display order receipt, refresh client balance badge, and prompt for dispatch tracking. |
+| **Catalog Access Restriction** | Customer attempts to purchase an item outside assigned whitelists or account has `access_level: NONE` / `catalog_access_enabled: false`. | `422 Unprocessable Entity` (`FILTER_RESTRICTION`) | Operation rejected immediately. No ledger locks acquired. | Notify customer of commercial contract restrictions or account suspension; prompt them to contact their account administrator. |
+| **Insufficient Stock** | Requested quantity exceeds current warehouse inventory for the target SKU. | `422 Unprocessable Entity` (`INSUFFICIENT_STOCK`) | Operation rejected. Transaction rolled back with zero side effects. | Inform user of available inventory quantity; offer partial quantity or notify on restock. |
+| **Insufficient Funds** | Total order amount exceeds client's available balance. | `422 Unprocessable Entity` (`INSUFFICIENT_FUNDS`) | Operation rejected. Transaction rolled back with zero side effects. | Prompt client to top up balance or request credit increase from system administrator. |
+| **Entity Not Found** | Referenced product SKU, order ID, or user account does not exist or has been archived. | `404 Not Found` (`NOT_FOUND`) | Operation rejected without mutation. | Refresh local catalog cache and verify product/order identifier validity. |
+| **Resource / State Conflict** | Registration with duplicate username, concurrent in-flight idempotency request, or conflicting payload under same key. | `409 Conflict` (`USERNAME_TAKEN`, `IDEMPOTENCY_CONFLICT`) | Operation aborted without double mutation or duplicate account creation. | Prompt user to choose an alternative username, or retry idempotency key after in-flight request finishes. |
+| **Input Validation / Malformed Request** | Missing mandatory field, invalid UUID format, or boundary violation (e.g. quantity < 1). | `400 Bad Request` (`INVALID_INPUT`, `INVALID_REQUEST`, `INVALID_ID`) | Request rejected before touching database or acquiring locks. | Correct request format or payload boundaries prior to resubmission. |
+| **Authentication & Authorization Failure** | Missing/invalid Bearer JWT or attempting administrative operations with customer credentials. | `401 Unauthorized` / `403 Forbidden` (`UNAUTHORIZED`, `FORBIDDEN`) | Request rejected at security boundary. | Re-authenticate client via appropriate login endpoint or check role privileges. |
 
 ---
 

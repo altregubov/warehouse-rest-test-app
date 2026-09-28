@@ -1544,3 +1544,132 @@ func TestCatalogFilterCaseSensitivityAndAccessDenial(t *testing.T) {
 		t.Errorf("Expected full catalog for restored user, got %d products", len(fullProds.Data))
 	}
 }
+
+func TestStatusCodesAlignment404And409(t *testing.T) {
+	adminToken, _ := login(t, "/api/admin/login", "admin", "admin123")
+	adminClient := newClient(adminToken)
+
+	randomUUID := uuid.New()
+
+	// 1. POST /api/admin/users duplicate username -> 409 Conflict
+	username := fmt.Sprintf("status_user_%d", time.Now().UnixNano())
+	respCreate1, _, _ := adminClient.request(http.MethodPost, "/api/admin/users", domain.CreateUserRequest{
+		Username: username,
+		Password: "password123",
+		Role:     domain.RoleUser,
+		Balance:  100.0,
+	})
+	if respCreate1.StatusCode != http.StatusCreated {
+		t.Fatalf("Failed to create first user: %d", respCreate1.StatusCode)
+	}
+
+	respCreateDup, bodyDup, _ := adminClient.request(http.MethodPost, "/api/admin/users", domain.CreateUserRequest{
+		Username: username,
+		Password: "password123",
+		Role:     domain.RoleUser,
+		Balance:  100.0,
+	})
+	if respCreateDup.StatusCode != http.StatusConflict {
+		t.Errorf("Expected 409 Conflict for duplicate username, got %d", respCreateDup.StatusCode)
+	}
+	var errDup domain.ErrorEnvelope
+	_ = json.Unmarshal(bodyDup, &errDup)
+	if errDup.Error.Code != "USERNAME_TAKEN" {
+		t.Errorf("Expected USERNAME_TAKEN error code, got %s", errDup.Error.Code)
+	}
+
+	// 2. 404 on balance endpoints for non-existent user
+	respTopUp, bodyTopUp, _ := adminClient.request(
+		http.MethodPost,
+		fmt.Sprintf("/api/admin/users/%s/balance/top-up", randomUUID),
+		domain.TopUpBalanceRequest{IncrementAmount: 50.0},
+	)
+	if respTopUp.StatusCode != http.StatusNotFound {
+		t.Errorf("Expected 404 for top-up of non-existent user, got %d: %s", respTopUp.StatusCode, string(bodyTopUp))
+	}
+
+	respSetBal, bodySetBal, _ := adminClient.request(
+		http.MethodPut,
+		fmt.Sprintf("/api/admin/users/%s/balance", randomUUID),
+		domain.SetBalanceRequest{NewBalance: 100.0},
+	)
+	if respSetBal.StatusCode != http.StatusNotFound {
+		t.Errorf("Expected 404 for set balance of non-existent user, got %d: %s", respSetBal.StatusCode, string(bodySetBal))
+	}
+
+	// 3. 404 on filters endpoint for non-existent user
+	respFilters, bodyFilters, _ := adminClient.request(
+		http.MethodPut,
+		fmt.Sprintf("/api/admin/users/%s/filters", randomUUID),
+		domain.UpdateFiltersRequest{AllowedCategories: []string{"laptop"}},
+	)
+	if respFilters.StatusCode != http.StatusNotFound {
+		t.Errorf("Expected 404 for filters update on non-existent user, got %d: %s", respFilters.StatusCode, string(bodyFilters))
+	}
+
+	// 4. 404 on get user for non-existent user
+	respGetUser, bodyGetUser, _ := adminClient.request(
+		http.MethodGet,
+		fmt.Sprintf("/api/admin/users/%s", randomUUID),
+		nil,
+	)
+	if respGetUser.StatusCode != http.StatusNotFound {
+		t.Errorf("Expected 404 for get non-existent user, got %d: %s", respGetUser.StatusCode, string(bodyGetUser))
+	}
+
+	// 5. 404 on delete user for non-existent user
+	respDelUser, bodyDelUser, _ := adminClient.request(
+		http.MethodDelete,
+		fmt.Sprintf("/api/admin/users/%s", randomUUID),
+		nil,
+	)
+	if respDelUser.StatusCode != http.StatusNotFound {
+		t.Errorf("Expected 404 for delete non-existent user, got %d: %s", respDelUser.StatusCode, string(bodyDelUser))
+	}
+
+	// 6. 404 on stock update for non-existent product
+	respStock, bodyStock, _ := adminClient.request(
+		http.MethodPatch,
+		fmt.Sprintf("/api/admin/products/%s/stock", randomUUID),
+		domain.UpdateStockRequest{StockQuantity: 10},
+	)
+	if respStock.StatusCode != http.StatusNotFound {
+		t.Errorf("Expected 404 for stock update on non-existent product, got %d: %s", respStock.StatusCode, string(bodyStock))
+	}
+
+	// 7. 404 on order status update for non-existent order
+	respOrderStatus, bodyOrderStatus, _ := adminClient.request(
+		http.MethodPatch,
+		fmt.Sprintf("/api/admin/orders/%s/status", randomUUID),
+		domain.UpdateOrderStatusRequest{Status: "SHIPPED"},
+	)
+	if respOrderStatus.StatusCode != http.StatusNotFound {
+		t.Errorf("Expected 404 for status update on non-existent order, got %d: %s", respOrderStatus.StatusCode, string(bodyOrderStatus))
+	}
+
+	// 8. User ordering non-existent product SKU -> 404
+	userToken, _ := login(t, "/api/user/login", username, "password123")
+	userClient := newClient(userToken)
+	respOrderMissing, bodyOrderMissing, _ := userClient.request(
+		http.MethodPost,
+		"/api/user/orders",
+		domain.CreateOrderRequest{
+			ProductID: randomUUID,
+			Quantity:  1,
+		},
+	)
+	if respOrderMissing.StatusCode != http.StatusNotFound {
+		t.Errorf("Expected 404 for ordering non-existent product, got %d: %s", respOrderMissing.StatusCode, string(bodyOrderMissing))
+	}
+
+	// 9. User fetching non-existent order -> 404
+	respGetOrderMissing, bodyGetOrderMissing, _ := userClient.request(
+		http.MethodGet,
+		fmt.Sprintf("/api/user/orders/%s", randomUUID),
+		nil,
+	)
+	if respGetOrderMissing.StatusCode != http.StatusNotFound {
+		t.Errorf("Expected 404 for fetching non-existent order, got %d: %s", respGetOrderMissing.StatusCode, string(bodyGetOrderMissing))
+	}
+}
+

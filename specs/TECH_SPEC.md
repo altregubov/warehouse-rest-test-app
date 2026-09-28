@@ -60,15 +60,23 @@ All API responses follow consistent JSON envelopes:
 ```
 
 ### 2.5 Standardized Error Taxonomy & Status Code Mapping
-- **`400 Bad Request`**: Reserved strictly for malformed JSON syntax or schema validation failures (`INVALID_REQUEST`, `INVALID_INPUT`).
-- **`401 Unauthorized`**: Authentication failure, invalid credentials, or expired tokens (`INVALID_CREDENTIALS`, `UNAUTHORIZED`).
-- **`403 Forbidden`**: Insufficient administrative permissions on role-guarded endpoints (`FORBIDDEN`).
-- **`404 Not Found`**: Target user, product, or order entity does not exist (`NOT_FOUND`).
-- **`409 Conflict`**: Idempotency conflicts or concurrent requests in flight (`IDEMPOTENCY_CONFLICT`, `REQUEST_IN_FLIGHT`).
+The platform adheres to strict HTTP semantic status code conventions across all endpoints:
+- **`200 OK`**: Synchronous operation completed successfully, returning the requested resource or mutation confirmation.
+- **`201 Created`**: Resource created successfully, returning the created entity representation and generated UUID.
+- **`400 Bad Request`**: Malformed JSON syntax, invalid path parameter UUID format, query parameter syntax errors, or schema validation failures (`INVALID_REQUEST`, `INVALID_INPUT`, `INVALID_ID`).
+- **`401 Unauthorized`**: Authentication failure, missing or invalid Bearer token, invalid credentials, or role-endpoint mismatch (`INVALID_CREDENTIALS`, `UNAUTHORIZED`).
+- **`403 Forbidden`**: Authenticated principal does not possess sufficient role privileges (`FORBIDDEN`).
+- **`404 Not Found`**: Target user, product, or order entity does not exist or has been soft-deleted (`NOT_FOUND`).
+- **`409 Conflict`**: State or concurrency conflict:
+  - `USERNAME_TAKEN`: Attempting to register an account with a username that already exists.
+  - `IDEMPOTENCY_CONFLICT`: Concurrent in-flight request executing under the same idempotency key or conflicting request payload for an existing key.
 - **`422 Unprocessable Entity`**: Domain business rule and semantic validation failures:
   - `INSUFFICIENT_FUNDS`: Account balance is lower than total purchase price.
   - `INSUFFICIENT_STOCK`: Warehouse stock is less than requested quantity.
-  - `FILTER_RESTRICTION`: Product is outside user's whitelist/filter access.
+  - `FILTER_RESTRICTION`: Product is outside user's whitelist/filter access, or user has zero-access governance.
+  - `INVALID_STATUS`: Disallowed order status lifecycle transition.
+  - `INVALID_INPUT`: Domain boundary validation breach (e.g. `increment_amount < 0.01` or `new_balance < 0.00`).
+- **`500 Internal Server Error`**: Unexpected database errors, unhandled panic recovery, or persistence failures (`INTERNAL_ERROR`).
 
 ### 2.6 OpenAPI Schema Validation & Model Constraints
 To ensure client SDK predictability and prevent unhandled database violations:
@@ -198,11 +206,15 @@ CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id);
 - `POST /api/admin/login`
   - Body: `{ "username": "admin", "password": "admin123" }`
   - Response (200 OK): `{ "success": true, "data": { "token": "<jwt>", "user": { "id": "...", "username": "admin", "role": "admin" } } }`
+  - Failure (400 Bad Request): `{ "success": false, "error": {"code": "INVALID_REQUEST", "message": "Failed to parse JSON body"} }`
   - Failure (401 Unauthorized): `{ "success": false, "error": {"code": "INVALID_CREDENTIALS", "message": "Invalid username or password"} }`
+  - Failure (500 Internal Server Error): `{ "success": false, "error": {"code": "INTERNAL_ERROR", "message": "Internal server error"} }`
 - `POST /api/user/login`
   - Body: `{ "username": "userA", "password": "user123" }`
   - Response (200 OK): `{ "success": true, "data": { "token": "<jwt>", "user": { "id": "...", "username": "userA", "role": "user" } } }`
+  - Failure (400 Bad Request): `{ "success": false, "error": {"code": "INVALID_REQUEST", "message": "Failed to parse JSON body"} }`
   - Failure (401 Unauthorized): `{ "success": false, "error": {"code": "INVALID_CREDENTIALS", "message": "Invalid username or password"} }`
+  - Failure (500 Internal Server Error): `{ "success": false, "error": {"code": "INTERNAL_ERROR", "message": "Internal server error"} }`
 
 ### 5.3 Admin Routes (`/api/admin/*`, Bearer Admin Token Required)
 
@@ -216,10 +228,17 @@ CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id);
        "role": "user",
        "balance": 1000.00,
        "allowed_categories": ["laptop"],
-       "allowed_manufacturers": ["Dell"]
+       "allowed_manufacturers": ["Dell"],
+       "access_level": "FILTERED",
+       "catalog_access_enabled": true
      }
      ```
    - Response (201 Created): User details (excluding `password_hash`).
+   - Failure (400 Bad Request): Malformed JSON (`INVALID_REQUEST`) or validation constraint violation (`INVALID_INPUT`).
+   - Failure (401 Unauthorized): Missing or invalid Bearer token.
+   - Failure (403 Forbidden): Caller does not have administrative privileges.
+   - Failure (409 Conflict): `{ "code": "USERNAME_TAKEN", "message": "Username already exists" }`.
+   - Failure (500 Internal Server Error): Database persistence failure.
 
 2. Balance Management Operations (Supports `Idempotency-Key` Header with 24-Hour TTL)
    - **Header Support:** Clients may provide `Idempotency-Key: <uuid-or-string>` on all balance mutation endpoints. Identical replayed requests return the original cached response with `Idempotent-Replayed: true` header. Requests with conflicting payloads or concurrent in-flight executions under the same key return `409 Conflict`.
@@ -227,26 +246,52 @@ CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id);
      - Increases customer balance by a specified positive increment (`increment_amount >= 0.01`).
      - Request: `{ "increment_amount": 500.00 }`
      - Response (200 OK): `{ "success": true, "data": { "id": "...", "username": "...", "balance": 5500.00 } }`
-     - Validation (422 Unprocessable Entity): `{ "code": "INVALID_INPUT", "message": "increment_amount must be at least 0.01" }`
+     - Failure (400 Bad Request): Invalid user ID format (`INVALID_ID`) or malformed JSON (`INVALID_REQUEST`).
+     - Failure (401 Unauthorized): Missing or invalid token.
+     - Failure (403 Forbidden): Insufficient admin privileges.
+     - Failure (404 Not Found): Target user account does not exist or has been deactivated (`NOT_FOUND`).
+     - Failure (409 Conflict): Concurrent request in flight or conflicting payload for key (`IDEMPOTENCY_CONFLICT`).
+     - Failure (422 Unprocessable Entity): `{ "code": "INVALID_INPUT", "message": "increment_amount must be at least 0.01" }`.
+     - Failure (500 Internal Server Error): Server or persistence failure.
    - **Set Absolute Balance:** `PUT /api/admin/users/{id}/balance`
      - Sets customer balance to an absolute new amount (`new_balance >= 0.00`).
      - Request: `{ "new_balance": 5000.00 }`
      - Response (200 OK): `{ "success": true, "data": { "id": "...", "username": "...", "balance": 5000.00 } }`
-     - Validation (422 Unprocessable Entity): `{ "code": "INVALID_INPUT", "message": "balance cannot be negative" }`
+     - Failure (400 Bad Request): Invalid user ID format (`INVALID_ID`) or malformed JSON (`INVALID_REQUEST`).
+     - Failure (401 Unauthorized): Missing or invalid token.
+     - Failure (403 Forbidden): Insufficient admin privileges.
+     - Failure (404 Not Found): Target user account does not exist or has been deactivated (`NOT_FOUND`).
+     - Failure (409 Conflict): Concurrent request in flight or conflicting payload for key (`IDEMPOTENCY_CONFLICT`).
+     - Failure (422 Unprocessable Entity): `{ "code": "INVALID_INPUT", "message": "balance cannot be negative" }`.
+     - Failure (500 Internal Server Error): Server or persistence failure.
    - **Legacy Balance Adjustment:** `PATCH /api/admin/users/{id}/balance`
      - Maintained for backward compatibility. Accepts `{ "amount": 500.00 }`.
+     - Response (200 OK): Updated user details.
+     - Failure (400 Bad Request): Invalid user ID format or malformed request.
+     - Failure (401 Unauthorized): Missing or invalid token.
+     - Failure (403 Forbidden): Insufficient admin privileges.
+     - Failure (404 Not Found): Target user does not exist (`NOT_FOUND`).
+     - Failure (409 Conflict): Idempotency key conflict (`IDEMPOTENCY_CONFLICT`).
+     - Failure (422 Unprocessable Entity): Input validation failure.
+     - Failure (500 Internal Server Error): Persistence failure.
 
 3. `PUT /api/admin/users/{id}/filters`
-   - Configures catalog visibility rules for a user.
+   - Configures catalog visibility rules and access tier for a user.
    - Body:
      ```json
      {
        "allowed_categories": ["laptop"],
-       "allowed_manufacturers": ["Apple", "Dell"]
+       "allowed_manufacturers": ["Apple", "Dell"],
+       "access_level": "FILTERED",
+       "catalog_access_enabled": true
      }
      ```
-   - Note: An empty array `[]` removes filter restrictions and grants full catalog visibility.
    - Response (200 OK): Updated user filter profile.
+   - Failure (400 Bad Request): Invalid UUID format (`INVALID_ID`) or malformed JSON (`INVALID_REQUEST`).
+   - Failure (401 Unauthorized): Missing or invalid token.
+   - Failure (403 Forbidden): Insufficient admin privileges.
+   - Failure (404 Not Found): User not found (`NOT_FOUND`).
+   - Failure (500 Internal Server Error): Persistence failure.
 
 4. `POST /api/admin/products`
    - Adds a new product to inventory.
@@ -261,41 +306,76 @@ CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id);
      }
      ```
    - Response (201 Created): Created product object with UUID.
+   - Failure (400 Bad Request): Malformed JSON (`INVALID_REQUEST`) or validation constraint violation (`INVALID_INPUT`).
+   - Failure (401 Unauthorized): Missing or invalid token.
+   - Failure (403 Forbidden): Insufficient admin privileges.
+   - Failure (500 Internal Server Error): Persistence failure.
 
 5. `PATCH /api/admin/products/{id}/stock`
    - Updates stock level for a product.
    - Body: `{ "stock_quantity": 50 }`
    - Response (200 OK): Updated product inventory details.
+   - Failure (400 Bad Request): Invalid product UUID (`INVALID_ID`) or malformed JSON (`INVALID_REQUEST`).
+   - Failure (401 Unauthorized): Missing or invalid token.
+   - Failure (403 Forbidden): Insufficient admin privileges.
+   - Failure (404 Not Found): Product not found (`NOT_FOUND`).
+   - Failure (500 Internal Server Error): Persistence failure.
 
 6. `GET /api/admin/users`
    - Returns paginated list of users with optional role filtering (`?role=admin|user&page=1&page_size=20`).
    - Response (200 OK): Array of `UserSummary` objects.
+   - Failure (400 Bad Request): Invalid query parameters (`INVALID_INPUT`).
+   - Failure (401 Unauthorized): Missing or invalid token.
+   - Failure (403 Forbidden): Insufficient admin privileges.
+   - Failure (500 Internal Server Error): Persistence failure.
 
 7. `GET /api/admin/users/{id}`
    - Returns details of a specific user account.
    - Response (200 OK): `UserSummary` object.
+   - Failure (400 Bad Request): Invalid user UUID (`INVALID_ID`).
+   - Failure (401 Unauthorized): Missing or invalid token.
+   - Failure (403 Forbidden): Insufficient admin privileges.
+   - Failure (404 Not Found): Target user does not exist (`NOT_FOUND`).
+   - Failure (500 Internal Server Error): Persistence failure.
 
 8. `GET /api/admin/products`
    - Returns full, unrestricted product catalog for administrative inspection.
    - Response (200 OK): Array of `Product` objects.
+   - Failure (401 Unauthorized): Missing or invalid token.
+   - Failure (403 Forbidden): Insufficient admin privileges.
+   - Failure (500 Internal Server Error): Persistence failure.
 
 9. `GET /api/admin/orders`
    - Returns all orders across the system for administrative auditing and fulfillment tracking.
    - Response (200 OK): Array of `OrderResponse` objects (including status and timestamps).
+   - Failure (401 Unauthorized): Missing or invalid token.
+   - Failure (403 Forbidden): Insufficient admin privileges.
+   - Failure (500 Internal Server Error): Persistence failure.
 
 10. `PATCH /api/admin/orders/{id}/status`
     - Updates order fulfillment lifecycle status.
     - Body: `{ "status": "SHIPPED" }` (Valid: `CREATED`, `PROCESSING`, `SHIPPED`, `DELIVERED`, `CANCELLED`).
     - Response (200 OK): Updated `OrderResponse` object.
+    - Failure (400 Bad Request): Invalid order UUID (`INVALID_ID`) or malformed JSON (`INVALID_REQUEST`).
+    - Failure (401 Unauthorized): Missing or invalid token.
+    - Failure (403 Forbidden): Insufficient admin privileges.
+    - Failure (404 Not Found): Target order not found (`NOT_FOUND`).
+    - Failure (422 Unprocessable Entity): Invalid status transition (`INVALID_STATUS`).
+    - Failure (500 Internal Server Error): Persistence failure.
 
 11. `DELETE /api/admin/users/{id}`
     - Soft-deactivates user account (`deleted_at = CURRENT_TIMESTAMP`) while permanently preserving immutable order records and financial audit trails (`ON DELETE RESTRICT`).
     - Response (200 OK): Success message.
+    - Failure (400 Bad Request): Invalid user UUID (`INVALID_ID`).
+    - Failure (401 Unauthorized): Missing or invalid token.
+    - Failure (403 Forbidden): Insufficient admin privileges.
+    - Failure (404 Not Found): Target user not found (`NOT_FOUND`).
+    - Failure (500 Internal Server Error): Persistence failure.
 
 ### 5.4 User Routes (`/api/user/*`, Bearer User Token Required)
 
 1. `GET /api/user/profile`
-   - Returns authenticated user details, balance, and catalog filters.
+   - Returns authenticated user details, balance, access level, and catalog filters.
    - Response (200 OK):
      ```json
      {
@@ -306,19 +386,30 @@ CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id);
          "role": "user",
          "balance": 5000.00,
          "allowed_categories": [],
-         "allowed_manufacturers": []
+         "allowed_manufacturers": [],
+         "access_level": "ALL",
+         "catalog_access_enabled": true
        }
      }
      ```
+   - Failure (401 Unauthorized): Missing or invalid token.
+   - Failure (403 Forbidden): Forbidden.
+   - Failure (404 Not Found): User account not found or deactivated (`NOT_FOUND`).
+   - Failure (500 Internal Server Error): Server error.
 
 2. `GET /api/user/products`
    - Query Parameters: `category` (optional, string).
    - **Catalog Filter Evaluation Rules:**
-     1. If user's `allowed_categories` is non-empty, query must only return items matching `allowed_categories`. If user requests `?category=smartphone` but is only allowed `["laptop"]`, return empty list `[]`.
-     2. If user's `allowed_manufacturers` is non-empty, query must only return items matching `allowed_manufacturers`.
-     3. If `category` query param is provided and allowed, filter by that category.
-     4. If `category` query param is omitted, return all allowed products.
+     1. If user's `access_level` is `NONE` or `catalog_access_enabled` is `false`, return empty list `[]`.
+     2. If user's `access_level` is `FILTERED` and `allowed_categories` is non-empty, query matches case-insensitively using `LOWER(TRIM(...))`.
+     3. If user's `access_level` is `FILTERED` and `allowed_manufacturers` is non-empty, query matches case-insensitively using `LOWER(TRIM(...))`.
+     4. If `category` query param is provided, filter by that category case-insensitively within permitted bounds.
+     5. If user has full access (`access_level: ALL`), return all products matching optional category.
    - Response (200 OK): Array of matching product items.
+   - Failure (401 Unauthorized): Missing or invalid token.
+   - Failure (403 Forbidden): Forbidden.
+   - Failure (404 Not Found): User account not found (`NOT_FOUND`).
+   - Failure (500 Internal Server Error): Persistence error.
 
 3. `POST /api/user/orders` (Supports `Idempotency-Key` Header with 24-Hour TTL)
    - Places an order for a product.
@@ -330,17 +421,6 @@ CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id);
        "quantity": 2
      }
      ```
-   - **Atomic Transaction Workflow (ACID compliant):**
-     1. `BEGIN` transaction with strict deterministic global row-level lock hierarchy: ALWAYS lock user account record first (`SELECT ... FROM users WHERE id = $1 AND deleted_at IS NULL FOR UPDATE`), then product catalog record second (`SELECT ... FROM products WHERE id = $2 FOR UPDATE`) to eliminate cyclic wait deadlocks (`SQLSTATE 40P01`).
-     2. Fetch product and verify existence. Return `404 Not Found` (`NOT_FOUND`) if missing.
-     3. Verify product matches user's permission filters (`allowed_categories` & `allowed_manufacturers`). Return `422 Unprocessable Entity` (`FILTER_RESTRICTION`) if disallowed.
-     4. Check product `stock_quantity >= quantity`. Return `422 Unprocessable Entity` (`INSUFFICIENT_STOCK`) if insufficient stock.
-     5. Calculate `total_cost = price * quantity`.
-     6. Verify user `balance >= total_cost`. Return `422 Unprocessable Entity` (`INSUFFICIENT_FUNDS`) if insufficient balance.
-     7. Deduct stock: `stock_quantity = stock_quantity - quantity`.
-     8. Deduct balance: `balance = balance - total_cost`.
-     9. Record entry in `orders` table.
-     10. `COMMIT` transaction.
    - Response (201 Created):
      ```json
      {
@@ -357,15 +437,32 @@ CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id);
        }
      }
      ```
+   - Failure (400 Bad Request): Malformed JSON (`INVALID_REQUEST`) or quantity <= 0 (`INVALID_INPUT`).
+   - Failure (401 Unauthorized): Missing or invalid token.
+   - Failure (403 Forbidden): Forbidden.
+   - Failure (404 Not Found): Product SKU or purchasing user not found (`NOT_FOUND`).
+   - Failure (409 Conflict): Idempotency collision or concurrent request in flight (`IDEMPOTENCY_CONFLICT`).
+   - Failure (422 Unprocessable Entity): Domain rule violation:
+     - `FILTER_RESTRICTION`: Product is outside user's whitelist/access level.
+     - `INSUFFICIENT_STOCK`: Product stock is less than requested quantity.
+     - `INSUFFICIENT_FUNDS`: Account balance is insufficient for purchase.
+   - Failure (500 Internal Server Error): Persistence failure.
 
 4. `GET /api/user/orders`
    - Returns all historical orders placed by the authenticated customer.
    - Response (200 OK): Array of `OrderResponse` objects.
+   - Failure (401 Unauthorized): Missing or invalid token.
+   - Failure (403 Forbidden): Forbidden.
+   - Failure (500 Internal Server Error): Persistence error.
 
 5. `GET /api/user/orders/{id}`
    - Returns details for a specific order belonging to the authenticated customer.
    - Response (200 OK): `OrderResponse` object.
-   - Failure: `404 Not Found` if order does not exist or belongs to another user.
+   - Failure (400 Bad Request): Invalid order UUID format (`INVALID_ID`).
+   - Failure (401 Unauthorized): Missing or invalid token.
+   - Failure (403 Forbidden): Forbidden.
+   - Failure (404 Not Found): Order does not exist or belongs to another user (`NOT_FOUND`).
+   - Failure (500 Internal Server Error): Persistence error.
 
 ---
 

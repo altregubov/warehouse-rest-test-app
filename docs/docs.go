@@ -69,6 +69,12 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/domain.ErrorEnvelope"
                         }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
+                        }
                     }
                 }
             }
@@ -121,6 +127,12 @@ const docTemplate = `{
                     },
                     "403": {
                         "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
                         "schema": {
                             "$ref": "#/definitions/domain.ErrorEnvelope"
                         }
@@ -213,6 +225,12 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/domain.ErrorEnvelope"
                         }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
+                        }
                     }
                 }
             }
@@ -265,6 +283,12 @@ const docTemplate = `{
                     },
                     "403": {
                         "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
                         "schema": {
                             "$ref": "#/definitions/domain.ErrorEnvelope"
                         }
@@ -332,6 +356,12 @@ const docTemplate = `{
                     },
                     "403": {
                         "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
                         "schema": {
                             "$ref": "#/definitions/domain.ErrorEnvelope"
                         }
@@ -418,6 +448,12 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/domain.ErrorEnvelope"
                         }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
+                        }
                     }
                 }
             }
@@ -482,6 +518,12 @@ const docTemplate = `{
                             ]
                         }
                     },
+                    "400": {
+                        "description": "Invalid query parameters",
+                        "schema": {
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
+                        }
+                    },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
@@ -490,6 +532,12 @@ const docTemplate = `{
                     },
                     "403": {
                         "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
                         "schema": {
                             "$ref": "#/definitions/domain.ErrorEnvelope"
                         }
@@ -563,6 +611,12 @@ const docTemplate = `{
                     },
                     "409": {
                         "description": "Username already exists",
+                        "schema": {
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
                         "schema": {
                             "$ref": "#/definitions/domain.ErrorEnvelope"
                         }
@@ -640,6 +694,12 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/domain.ErrorEnvelope"
                         }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
+                        }
                     }
                 }
             },
@@ -709,6 +769,12 @@ const docTemplate = `{
                     },
                     "404": {
                         "description": "User not found",
+                        "schema": {
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
                         "schema": {
                             "$ref": "#/definitions/domain.ErrorEnvelope"
                         }
@@ -813,6 +879,12 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/domain.ErrorEnvelope"
                         }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
+                        }
                     }
                 }
             },
@@ -903,6 +975,18 @@ const docTemplate = `{
                     },
                     "409": {
                         "description": "Idempotency conflict or concurrent request in flight",
+                        "schema": {
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
+                        }
+                    },
+                    "422": {
+                        "description": "Unprocessable entity / validation failure",
+                        "schema": {
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
                         "schema": {
                             "$ref": "#/definitions/domain.ErrorEnvelope"
                         }
@@ -1007,6 +1091,12 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/domain.ErrorEnvelope"
                         }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
+                        }
                     }
                 }
             }
@@ -1090,6 +1180,12 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/domain.ErrorEnvelope"
                         }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
+                        }
                     }
                 }
             }
@@ -1148,6 +1244,12 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/domain.ErrorEnvelope"
                         }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
+                        }
                     }
                 }
             }
@@ -1194,6 +1296,18 @@ const docTemplate = `{
                     },
                     "401": {
                         "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
                         "schema": {
                             "$ref": "#/definitions/domain.ErrorEnvelope"
                         }
@@ -1265,6 +1379,12 @@ const docTemplate = `{
                             "$ref": "#/definitions/domain.ErrorEnvelope"
                         }
                     },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
+                        }
+                    },
                     "404": {
                         "description": "Product or user not found",
                         "schema": {
@@ -1279,6 +1399,12 @@ const docTemplate = `{
                     },
                     "422": {
                         "description": "Domain business rule violation (INSUFFICIENT_FUNDS, INSUFFICIENT_STOCK, FILTER_RESTRICTION)",
+                        "schema": {
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
                         "schema": {
                             "$ref": "#/definitions/domain.ErrorEnvelope"
                         }
@@ -1333,14 +1459,32 @@ const docTemplate = `{
                             ]
                         }
                     },
+                    "400": {
+                        "description": "Invalid order ID format",
+                        "schema": {
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
+                        }
+                    },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
                             "$ref": "#/definitions/domain.ErrorEnvelope"
                         }
                     },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
+                        }
+                    },
                     "404": {
                         "description": "Order not found",
+                        "schema": {
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
                         "schema": {
                             "$ref": "#/definitions/domain.ErrorEnvelope"
                         }
@@ -1407,6 +1551,18 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/domain.ErrorEnvelope"
                         }
+                    },
+                    "404": {
+                        "description": "User not found",
+                        "schema": {
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
+                        }
                     }
                 }
             }
@@ -1462,6 +1618,12 @@ const docTemplate = `{
                     },
                     "404": {
                         "description": "User not found",
+                        "schema": {
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
                         "schema": {
                             "$ref": "#/definitions/domain.ErrorEnvelope"
                         }

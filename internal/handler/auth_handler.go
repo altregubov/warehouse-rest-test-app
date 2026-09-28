@@ -27,6 +27,7 @@ func NewAuthHandler(authService service.AuthService) *AuthHandler {
 // @Success 200 {object} domain.SuccessEnvelope{data=domain.LoginResponse} "Login successful"
 // @Failure 400 {object} domain.ErrorEnvelope "Invalid request payload"
 // @Failure 401 {object} domain.ErrorEnvelope "Invalid username or password"
+// @Failure 500 {object} domain.ErrorEnvelope "Internal server error"
 // @Router /api/admin/login [post]
 func (h *AuthHandler) AdminLogin(w http.ResponseWriter, r *http.Request) {
 	var req domain.LoginRequest
@@ -58,6 +59,7 @@ func (h *AuthHandler) AdminLogin(w http.ResponseWriter, r *http.Request) {
 // @Success 200 {object} domain.SuccessEnvelope{data=domain.LoginResponse} "Login successful"
 // @Failure 400 {object} domain.ErrorEnvelope "Invalid request payload"
 // @Failure 401 {object} domain.ErrorEnvelope "Invalid username or password"
+// @Failure 500 {object} domain.ErrorEnvelope "Internal server error"
 // @Router /api/user/login [post]
 func (h *AuthHandler) UserLogin(w http.ResponseWriter, r *http.Request) {
 	var req domain.LoginRequest
