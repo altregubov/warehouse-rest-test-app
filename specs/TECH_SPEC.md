@@ -53,11 +53,22 @@ All API responses follow consistent JSON envelopes:
   "success": false,
   "error": {
     "code": "INSUFFICIENT_FUNDS",
-    "message": "User balance is insufficient for this purchase",
+    "message": "Account balance is insufficient for this purchase",
     "details": null
   }
 }
 ```
+
+### 2.5 Standardized Error Taxonomy & Status Code Mapping
+- **`400 Bad Request`**: Reserved strictly for malformed JSON syntax or schema validation failures (`INVALID_REQUEST`, `INVALID_INPUT`).
+- **`401 Unauthorized`**: Authentication failure, invalid credentials, or expired tokens (`INVALID_CREDENTIALS`, `UNAUTHORIZED`).
+- **`403 Forbidden`**: Insufficient administrative permissions on role-guarded endpoints (`FORBIDDEN`).
+- **`404 Not Found`**: Target user, product, or order entity does not exist (`NOT_FOUND`).
+- **`409 Conflict`**: Idempotency conflicts or concurrent requests in flight (`IDEMPOTENCY_CONFLICT`, `REQUEST_IN_FLIGHT`).
+- **`422 Unprocessable Entity`**: Domain business rule and semantic validation failures:
+  - `INSUFFICIENT_FUNDS`: Account balance is lower than total purchase price.
+  - `INSUFFICIENT_STOCK`: Warehouse stock is less than requested quantity.
+  - `FILTER_RESTRICTION`: Product is outside user's whitelist/filter access.
 
 ---
 
@@ -292,11 +303,11 @@ CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id);
      ```
    - **Atomic Transaction Workflow (ACID compliant):**
      1. `BEGIN` transaction with strict deterministic global row-level lock hierarchy: ALWAYS lock user account record first (`SELECT ... FROM users WHERE id = $1 AND deleted_at IS NULL FOR UPDATE`), then product catalog record second (`SELECT ... FROM products WHERE id = $2 FOR UPDATE`) to eliminate cyclic wait deadlocks (`SQLSTATE 40P01`).
-     2. Fetch product and verify existence.
-     3. Verify product matches user's permission filters (`allowed_categories` & `allowed_manufacturers`). Return `403 Forbidden` if disallowed.
-     4. Check product `stock_quantity >= quantity`. Return `400 Bad Request` if insufficient stock.
+     2. Fetch product and verify existence. Return `404 Not Found` (`NOT_FOUND`) if missing.
+     3. Verify product matches user's permission filters (`allowed_categories` & `allowed_manufacturers`). Return `422 Unprocessable Entity` (`FILTER_RESTRICTION`) if disallowed.
+     4. Check product `stock_quantity >= quantity`. Return `422 Unprocessable Entity` (`INSUFFICIENT_STOCK`) if insufficient stock.
      5. Calculate `total_cost = price * quantity`.
-     6. Verify user `balance >= total_cost`. Return `400 Bad Request` if insufficient balance.
+     6. Verify user `balance >= total_cost`. Return `422 Unprocessable Entity` (`INSUFFICIENT_FUNDS`) if insufficient balance.
      7. Deduct stock: `stock_quantity = stock_quantity - quantity`.
      8. Deduct balance: `balance = balance - total_cost`.
      9. Record entry in `orders` table.

@@ -1240,19 +1240,13 @@
                         }
                     },
                     "400": {
-                        "description": "Invalid input, insufficient stock or balance",
+                        "description": "Malformed JSON syntax or schema validation failure",
                         "schema": {
                             "$ref": "#/definitions/domain.ErrorEnvelope"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/domain.ErrorEnvelope"
-                        }
-                    },
-                    "403": {
-                        "description": "Product disallowed by user filters",
                         "schema": {
                             "$ref": "#/definitions/domain.ErrorEnvelope"
                         }
@@ -1265,6 +1259,12 @@
                     },
                     "409": {
                         "description": "Idempotency conflict or concurrent request in flight",
+                        "schema": {
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
+                        }
+                    },
+                    "422": {
+                        "description": "Domain business rule violation (INSUFFICIENT_FUNDS, INSUFFICIENT_STOCK, FILTER_RESTRICTION)",
                         "schema": {
                             "$ref": "#/definitions/domain.ErrorEnvelope"
                         }

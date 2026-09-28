@@ -336,7 +336,7 @@ func TestAtomicOrderPlacement(t *testing.T) {
 		t.Errorf("Expected balance %.2f, got %.2f", expectedBalance, profAfter.Data.Balance)
 	}
 
-	// 2. Disallowed purchase: User B (only laptops) attempts to purchase a smartphone
+	// 2. Disallowed purchase: User B (only laptops) attempts to purchase a smartphone -> 422 FILTER_RESTRICTION
 	tokenB, _ := login(t, "/api/user/login", "userB", "user123")
 	clientB := newClient(tokenB)
 
@@ -348,22 +348,67 @@ func TestAtomicOrderPlacement(t *testing.T) {
 	_ = json.Unmarshal(bodySmartphones, &smartphoneList)
 	if len(smartphoneList.Data) > 0 {
 		smartphone := smartphoneList.Data[0]
-		respDisallowed, _, _ := clientB.request(http.MethodPost, "/api/user/orders", domain.CreateOrderRequest{
+		respDisallowed, bodyDisallowed, _ := clientB.request(http.MethodPost, "/api/user/orders", domain.CreateOrderRequest{
 			ProductID: smartphone.ID,
 			Quantity:  1,
 		})
-		if respDisallowed.StatusCode != http.StatusForbidden {
-			t.Errorf("Expected 403 when User B orders smartphone, got %d", respDisallowed.StatusCode)
+		if respDisallowed.StatusCode != 422 {
+			t.Errorf("Expected 422 when User B orders smartphone, got %d", respDisallowed.StatusCode)
+		}
+		var errDisallowed domain.ErrorEnvelope
+		_ = json.Unmarshal(bodyDisallowed, &errDisallowed)
+		if errDisallowed.Error.Code != "FILTER_RESTRICTION" {
+			t.Errorf("Expected code FILTER_RESTRICTION, got %s", errDisallowed.Error.Code)
 		}
 	}
 
-	// 3. Insufficient balance: attempt to purchase quantity that exceeds user balance
-	respInsufficientFunds, _, _ := clientA.request(http.MethodPost, "/api/user/orders", domain.CreateOrderRequest{
-		ProductID: testProduct.ID,
-		Quantity:  100, // exceeds balance
+	// 3. Insufficient balance: set low balance with valid in-stock quantity -> 422 INSUFFICIENT_FUNDS
+	_, _, _ = adminClient.request(http.MethodPut, fmt.Sprintf("/api/admin/users/%s/balance", profA.Data.ID), domain.SetBalanceRequest{
+		NewBalance: 10.00,
 	})
-	if respInsufficientFunds.StatusCode != http.StatusBadRequest {
-		t.Errorf("Expected 400 for insufficient balance, got %d", respInsufficientFunds.StatusCode)
+	respInsufficientFunds, bodyFunds, _ := clientA.request(http.MethodPost, "/api/user/orders", domain.CreateOrderRequest{
+		ProductID: testProduct.ID,
+		Quantity:  1, // price is > 10.00, stock is available
+	})
+	if respInsufficientFunds.StatusCode != 422 {
+		t.Errorf("Expected 422 for insufficient balance, got %d", respInsufficientFunds.StatusCode)
+	}
+	var errFunds domain.ErrorEnvelope
+	_ = json.Unmarshal(bodyFunds, &errFunds)
+	if errFunds.Error.Code != "INSUFFICIENT_FUNDS" {
+		t.Errorf("Expected code INSUFFICIENT_FUNDS, got %s", errFunds.Error.Code)
+	}
+
+	// 4. Insufficient stock: attempt to purchase quantity exceeding warehouse stock -> 422 INSUFFICIENT_STOCK
+	// Top up balance first so balance check passes
+	_, _, _ = adminClient.request(http.MethodPut, fmt.Sprintf("/api/admin/users/%s/balance", profA.Data.ID), domain.SetBalanceRequest{
+		NewBalance: 5000000.00,
+	})
+	respInsufficientStock, bodyStock, _ := clientA.request(http.MethodPost, "/api/user/orders", domain.CreateOrderRequest{
+		ProductID: testProduct.ID,
+		Quantity:  999999, // exceeds stock
+	})
+	if respInsufficientStock.StatusCode != 422 {
+		t.Errorf("Expected 422 for insufficient stock, got %d", respInsufficientStock.StatusCode)
+	}
+	var errStock domain.ErrorEnvelope
+	_ = json.Unmarshal(bodyStock, &errStock)
+	if errStock.Error.Code != "INSUFFICIENT_STOCK" {
+		t.Errorf("Expected code INSUFFICIENT_STOCK, got %s", errStock.Error.Code)
+	}
+
+	// 5. Schema validation failure: quantity <= 0 -> 400 Bad Request
+	respInvalidQty, bodyInvalidQty, _ := clientA.request(http.MethodPost, "/api/user/orders", domain.CreateOrderRequest{
+		ProductID: testProduct.ID,
+		Quantity:  0,
+	})
+	if respInvalidQty.StatusCode != http.StatusBadRequest {
+		t.Errorf("Expected 400 for non-positive quantity, got %d", respInvalidQty.StatusCode)
+	}
+	var errQty domain.ErrorEnvelope
+	_ = json.Unmarshal(bodyInvalidQty, &errQty)
+	if errQty.Error.Code != "INVALID_INPUT" {
+		t.Errorf("Expected code INVALID_INPUT for bad quantity, got %s", errQty.Error.Code)
 	}
 }
 

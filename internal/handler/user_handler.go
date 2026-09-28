@@ -102,11 +102,11 @@ func (h *UserHandler) ListProducts(w http.ResponseWriter, r *http.Request) {
 // @Param Idempotency-Key header string false "Unique idempotency key to prevent double processing"
 // @Param request body domain.CreateOrderRequest true "Purchase order request"
 // @Success 201 {object} domain.SuccessEnvelope{data=domain.OrderResponse} "Order placed successfully"
-// @Failure 400 {object} domain.ErrorEnvelope "Invalid input, insufficient stock or balance"
+// @Failure 400 {object} domain.ErrorEnvelope "Malformed JSON syntax or schema validation failure"
 // @Failure 401 {object} domain.ErrorEnvelope "Unauthorized"
-// @Failure 403 {object} domain.ErrorEnvelope "Product disallowed by user filters"
 // @Failure 404 {object} domain.ErrorEnvelope "Product or user not found"
 // @Failure 409 {object} domain.ErrorEnvelope "Idempotency conflict or concurrent request in flight"
+// @Failure 422 {object} domain.ErrorEnvelope "Domain business rule violation (INSUFFICIENT_FUNDS, INSUFFICIENT_STOCK, FILTER_RESTRICTION)"
 // @Router /api/user/orders [post]
 func (h *UserHandler) CreateOrder(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.GetUserID(r.Context())
@@ -121,18 +121,23 @@ func (h *UserHandler) CreateOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if req.Quantity <= 0 {
+		Error(w, http.StatusBadRequest, "INVALID_INPUT", "quantity must be greater than 0")
+		return
+	}
+
 	orderResp, err := h.orderService.CreateOrder(r.Context(), userID, req.ProductID, req.Quantity)
 	if err != nil {
 		if errors.Is(err, domain.ErrProductDisallowed) {
-			Error(w, http.StatusForbidden, "PRODUCT_DISALLOWED", "Product is restricted by your account filters")
+			Error(w, 422, "FILTER_RESTRICTION", "Product is restricted by your account filters")
 			return
 		}
 		if errors.Is(err, domain.ErrInsufficientStock) {
-			Error(w, http.StatusBadRequest, "INSUFFICIENT_STOCK", "Product does not have sufficient stock")
+			Error(w, 422, "INSUFFICIENT_STOCK", "Product does not have sufficient stock")
 			return
 		}
 		if errors.Is(err, domain.ErrInsufficientBalance) {
-			Error(w, http.StatusBadRequest, "INSUFFICIENT_FUNDS", "Account balance is insufficient for this purchase")
+			Error(w, 422, "INSUFFICIENT_FUNDS", "Account balance is insufficient for this purchase")
 			return
 		}
 		if errors.Is(err, domain.ErrNotFound) {

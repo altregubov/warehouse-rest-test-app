@@ -190,15 +190,15 @@ sequenceDiagram
 
     alt Validation Failure: Restricted Product
         OrderService-->>Gateway: Reject (Product outside client whitelist)
-        Gateway-->>Client: Business Failure: Restricted catalog item
+        Gateway-->>Client: Domain Business Failure: 422 Unprocessable Entity (FILTER_RESTRICTION)
     else Validation Failure: Insufficient Stock
         OrderService->>DataStore: Abort transaction (No changes)
         OrderService-->>Gateway: Reject (Requested quantity exceeds warehouse stock)
-        Gateway-->>Client: Business Failure: Insufficient inventory
+        Gateway-->>Client: Domain Business Failure: 422 Unprocessable Entity (INSUFFICIENT_STOCK)
     else Validation Failure: Insufficient Funds
         OrderService->>DataStore: Abort transaction (No changes)
         OrderService-->>Gateway: Reject (Total price exceeds client balance)
-        Gateway-->>Client: Business Failure: Insufficient credit balance
+        Gateway-->>Client: Domain Business Failure: 422 Unprocessable Entity (INSUFFICIENT_FUNDS)
     else Success: Order Confirmed
         OrderService->>DataStore: Deduct total cost from client balance
         OrderService->>DataStore: Decrement reserved units from product stock
