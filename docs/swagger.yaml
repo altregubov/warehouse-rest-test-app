@@ -1,6 +1,6 @@
 basePath: /
 definitions:
-  github_com_altregubov_warehouse-rest-test-app_internal_domain.CreateOrderRequest:
+  domain.CreateOrderRequest:
     properties:
       product_id:
         example: c0000000-0000-0000-0000-000000000001
@@ -9,7 +9,7 @@ definitions:
         example: 1
         type: integer
     type: object
-  github_com_altregubov_warehouse-rest-test-app_internal_domain.CreateProductRequest:
+  domain.CreateProductRequest:
     properties:
       category:
         example: laptop
@@ -27,7 +27,7 @@ definitions:
         example: 10
         type: integer
     type: object
-  github_com_altregubov_warehouse-rest-test-app_internal_domain.CreateUserRequest:
+  domain.CreateUserRequest:
     properties:
       allowed_categories:
         example:
@@ -54,7 +54,7 @@ definitions:
         example: john_doe
         type: string
     type: object
-  github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorDetails:
+  domain.ErrorDetails:
     properties:
       code:
         example: BAD_REQUEST
@@ -64,15 +64,15 @@ definitions:
         example: Detailed error description
         type: string
     type: object
-  github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorEnvelope:
+  domain.ErrorEnvelope:
     properties:
       error:
-        $ref: '#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorDetails'
+        $ref: '#/definitions/domain.ErrorDetails'
       success:
         example: false
         type: boolean
     type: object
-  github_com_altregubov_warehouse-rest-test-app_internal_domain.LoginRequest:
+  domain.LoginRequest:
     properties:
       password:
         example: admin123
@@ -81,14 +81,14 @@ definitions:
         example: admin
         type: string
     type: object
-  github_com_altregubov_warehouse-rest-test-app_internal_domain.LoginResponse:
+  domain.LoginResponse:
     properties:
       token:
         type: string
       user:
-        $ref: '#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.UserSummary'
+        $ref: '#/definitions/domain.UserSummary'
     type: object
-  github_com_altregubov_warehouse-rest-test-app_internal_domain.OrderResponse:
+  domain.OrderResponse:
     properties:
       created_at:
         type: string
@@ -102,12 +102,16 @@ definitions:
         type: integer
       remaining_balance:
         type: number
+      status:
+        type: string
       total_price:
         type: number
       unit_price:
         type: number
+      user_id:
+        type: string
     type: object
-  github_com_altregubov_warehouse-rest-test-app_internal_domain.Product:
+  domain.Product:
     properties:
       category:
         type: string
@@ -126,20 +130,32 @@ definitions:
       updated_at:
         type: string
     type: object
-  github_com_altregubov_warehouse-rest-test-app_internal_domain.SuccessEnvelope:
+  domain.SetBalanceRequest:
+    properties:
+      new_balance:
+        example: 5000
+        type: number
+    type: object
+  domain.SuccessEnvelope:
     properties:
       data: {}
       success:
         example: true
         type: boolean
     type: object
-  github_com_altregubov_warehouse-rest-test-app_internal_domain.UpdateBalanceRequest:
+  domain.TopUpBalanceRequest:
+    properties:
+      increment_amount:
+        example: 500
+        type: number
+    type: object
+  domain.UpdateBalanceRequest:
     properties:
       amount:
         example: 500
         type: number
     type: object
-  github_com_altregubov_warehouse-rest-test-app_internal_domain.UpdateFiltersRequest:
+  domain.UpdateFiltersRequest:
     properties:
       allowed_categories:
         example:
@@ -155,13 +171,19 @@ definitions:
           type: string
         type: array
     type: object
-  github_com_altregubov_warehouse-rest-test-app_internal_domain.UpdateStockRequest:
+  domain.UpdateOrderStatusRequest:
+    properties:
+      status:
+        example: SHIPPED
+        type: string
+    type: object
+  domain.UpdateStockRequest:
     properties:
       stock_quantity:
         example: 25
         type: integer
     type: object
-  github_com_altregubov_warehouse-rest-test-app_internal_domain.UserSummary:
+  domain.UserSummary:
     properties:
       allowed_categories:
         items:
@@ -199,7 +221,7 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.LoginRequest'
+          $ref: '#/definitions/domain.LoginRequest'
       produces:
       - application/json
       responses:
@@ -207,27 +229,146 @@ paths:
           description: Login successful
           schema:
             allOf:
-            - $ref: '#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.SuccessEnvelope'
+            - $ref: '#/definitions/domain.SuccessEnvelope'
             - properties:
                 data:
-                  $ref: '#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.LoginResponse'
+                  $ref: '#/definitions/domain.LoginResponse'
               type: object
         "400":
           description: Invalid request payload
           schema:
-            $ref: '#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorEnvelope'
+            $ref: '#/definitions/domain.ErrorEnvelope'
         "401":
           description: Invalid credentials
           schema:
-            $ref: '#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorEnvelope'
+            $ref: '#/definitions/domain.ErrorEnvelope'
         "403":
           description: 'Forbidden: user is not an admin'
           schema:
-            $ref: '#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorEnvelope'
+            $ref: '#/definitions/domain.ErrorEnvelope'
       summary: Admin authentication
       tags:
       - Auth
+  /api/admin/orders:
+    get:
+      consumes:
+      - application/json
+      description: Retrieve all orders across the system for administrative auditing
+        and fulfillment
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of all orders
+          schema:
+            allOf:
+            - $ref: '#/definitions/domain.SuccessEnvelope'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/domain.OrderResponse'
+                  type: array
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/domain.ErrorEnvelope'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/domain.ErrorEnvelope'
+      security:
+      - BearerAuth: []
+      summary: List all orders (Admin)
+      tags:
+      - Admin
+  /api/admin/orders/{id}/status:
+    patch:
+      consumes:
+      - application/json
+      description: Update the fulfillment status of an order (e.g. PROCESSING, SHIPPED,
+        DELIVERED, CANCELLED)
+      parameters:
+      - description: Order ID (UUID)
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Order status payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/domain.UpdateOrderStatusRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Order status updated
+          schema:
+            allOf:
+            - $ref: '#/definitions/domain.SuccessEnvelope'
+            - properties:
+                data:
+                  $ref: '#/definitions/domain.OrderResponse'
+              type: object
+        "400":
+          description: Invalid input
+          schema:
+            $ref: '#/definitions/domain.ErrorEnvelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/domain.ErrorEnvelope'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/domain.ErrorEnvelope'
+        "404":
+          description: Order not found
+          schema:
+            $ref: '#/definitions/domain.ErrorEnvelope'
+        "422":
+          description: Invalid status transition
+          schema:
+            $ref: '#/definitions/domain.ErrorEnvelope'
+      security:
+      - BearerAuth: []
+      summary: Update order fulfillment status
+      tags:
+      - Admin
   /api/admin/products:
+    get:
+      consumes:
+      - application/json
+      description: Retrieve full unrestricted product inventory for administrators
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of all products
+          schema:
+            allOf:
+            - $ref: '#/definitions/domain.SuccessEnvelope'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/domain.Product'
+                  type: array
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/domain.ErrorEnvelope'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/domain.ErrorEnvelope'
+      security:
+      - BearerAuth: []
+      summary: List all warehouse products (Admin)
+      tags:
+      - Admin
     post:
       consumes:
       - application/json
@@ -239,7 +380,7 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.CreateProductRequest'
+          $ref: '#/definitions/domain.CreateProductRequest'
       produces:
       - application/json
       responses:
@@ -247,23 +388,23 @@ paths:
           description: Product created
           schema:
             allOf:
-            - $ref: '#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.SuccessEnvelope'
+            - $ref: '#/definitions/domain.SuccessEnvelope'
             - properties:
                 data:
-                  $ref: '#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.Product'
+                  $ref: '#/definitions/domain.Product'
               type: object
         "400":
           description: Invalid input
           schema:
-            $ref: '#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorEnvelope'
+            $ref: '#/definitions/domain.ErrorEnvelope'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorEnvelope'
+            $ref: '#/definitions/domain.ErrorEnvelope'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorEnvelope'
+            $ref: '#/definitions/domain.ErrorEnvelope'
       security:
       - BearerAuth: []
       summary: Add a new product to warehouse
@@ -285,7 +426,7 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.UpdateStockRequest'
+          $ref: '#/definitions/domain.UpdateStockRequest'
       produces:
       - application/json
       responses:
@@ -293,33 +434,77 @@ paths:
           description: Stock updated
           schema:
             allOf:
-            - $ref: '#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.SuccessEnvelope'
+            - $ref: '#/definitions/domain.SuccessEnvelope'
             - properties:
                 data:
-                  $ref: '#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.Product'
+                  $ref: '#/definitions/domain.Product'
               type: object
         "400":
           description: Invalid input
           schema:
-            $ref: '#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorEnvelope'
+            $ref: '#/definitions/domain.ErrorEnvelope'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorEnvelope'
+            $ref: '#/definitions/domain.ErrorEnvelope'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorEnvelope'
+            $ref: '#/definitions/domain.ErrorEnvelope'
         "404":
           description: Product not found
           schema:
-            $ref: '#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorEnvelope'
+            $ref: '#/definitions/domain.ErrorEnvelope'
       security:
       - BearerAuth: []
       summary: Update product stock quantity
       tags:
       - Admin
   /api/admin/users:
+    get:
+      consumes:
+      - application/json
+      description: Query paginated list of users with optional role filtering
+      parameters:
+      - description: Filter by role (admin or user)
+        in: query
+        name: role
+        type: string
+      - description: Page number (default 1)
+        in: query
+        name: page
+        type: integer
+      - description: Items per page (default 20, max 100)
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of users
+          schema:
+            allOf:
+            - $ref: '#/definitions/domain.SuccessEnvelope'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/domain.UserSummary'
+                  type: array
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/domain.ErrorEnvelope'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/domain.ErrorEnvelope'
+      security:
+      - BearerAuth: []
+      summary: List users
+      tags:
+      - Admin
     post:
       consumes:
       - application/json
@@ -330,7 +515,7 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.CreateUserRequest'
+          $ref: '#/definitions/domain.CreateUserRequest'
       produces:
       - application/json
       responses:
@@ -338,30 +523,118 @@ paths:
           description: User created
           schema:
             allOf:
-            - $ref: '#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.SuccessEnvelope'
+            - $ref: '#/definitions/domain.SuccessEnvelope'
             - properties:
                 data:
-                  $ref: '#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.UserSummary'
+                  $ref: '#/definitions/domain.UserSummary'
               type: object
         "400":
           description: Invalid input
           schema:
-            $ref: '#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorEnvelope'
+            $ref: '#/definitions/domain.ErrorEnvelope'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorEnvelope'
+            $ref: '#/definitions/domain.ErrorEnvelope'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorEnvelope'
+            $ref: '#/definitions/domain.ErrorEnvelope'
         "409":
           description: Username already exists
           schema:
-            $ref: '#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorEnvelope'
+            $ref: '#/definitions/domain.ErrorEnvelope'
       security:
       - BearerAuth: []
       summary: Create a user account
+      tags:
+      - Admin
+  /api/admin/users/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Marks user as deactivated/deleted while preserving immutable historical
+        order records
+      parameters:
+      - description: User ID (UUID)
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: User deactivated successfully
+          schema:
+            allOf:
+            - $ref: '#/definitions/domain.SuccessEnvelope'
+            - properties:
+                data:
+                  type: string
+              type: object
+        "400":
+          description: Invalid ID
+          schema:
+            $ref: '#/definitions/domain.ErrorEnvelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/domain.ErrorEnvelope'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/domain.ErrorEnvelope'
+        "404":
+          description: User not found
+          schema:
+            $ref: '#/definitions/domain.ErrorEnvelope'
+      security:
+      - BearerAuth: []
+      summary: Soft-delete a user account
+      tags:
+      - Admin
+    get:
+      consumes:
+      - application/json
+      description: Retrieve a specific user account by UUID
+      parameters:
+      - description: User ID (UUID)
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: User details
+          schema:
+            allOf:
+            - $ref: '#/definitions/domain.SuccessEnvelope'
+            - properties:
+                data:
+                  $ref: '#/definitions/domain.UserSummary'
+              type: object
+        "400":
+          description: Invalid ID
+          schema:
+            $ref: '#/definitions/domain.ErrorEnvelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/domain.ErrorEnvelope'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/domain.ErrorEnvelope'
+        "404":
+          description: User not found
+          schema:
+            $ref: '#/definitions/domain.ErrorEnvelope'
+      security:
+      - BearerAuth: []
+      summary: Get user by ID
       tags:
       - Admin
   /api/admin/users/{id}/balance:
@@ -370,6 +643,10 @@ paths:
       - application/json
       description: Adjust user account balance by a specified amount (e.g. +500.00)
       parameters:
+      - description: Unique idempotency key to prevent double processing
+        in: header
+        name: Idempotency-Key
+        type: string
       - description: User ID (UUID)
         in: path
         name: id
@@ -380,7 +657,7 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.UpdateBalanceRequest'
+          $ref: '#/definitions/domain.UpdateBalanceRequest'
       produces:
       - application/json
       responses:
@@ -388,30 +665,159 @@ paths:
           description: Balance updated
           schema:
             allOf:
-            - $ref: '#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.SuccessEnvelope'
+            - $ref: '#/definitions/domain.SuccessEnvelope'
             - properties:
                 data:
-                  $ref: '#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.UserSummary'
+                  $ref: '#/definitions/domain.UserSummary'
               type: object
         "400":
           description: Invalid input or negative balance
           schema:
-            $ref: '#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorEnvelope'
+            $ref: '#/definitions/domain.ErrorEnvelope'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorEnvelope'
+            $ref: '#/definitions/domain.ErrorEnvelope'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorEnvelope'
+            $ref: '#/definitions/domain.ErrorEnvelope'
         "404":
           description: User not found
           schema:
-            $ref: '#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorEnvelope'
+            $ref: '#/definitions/domain.ErrorEnvelope'
+        "409":
+          description: Idempotency conflict or concurrent request in flight
+          schema:
+            $ref: '#/definitions/domain.ErrorEnvelope'
       security:
       - BearerAuth: []
-      summary: Update or top up user balance
+      summary: Update or top up user balance (Legacy)
+      tags:
+      - Admin
+    put:
+      consumes:
+      - application/json
+      description: Replaces the user account balance with a specified new balance
+        (minimum 0.00)
+      parameters:
+      - description: Unique idempotency key to prevent double processing
+        in: header
+        name: Idempotency-Key
+        type: string
+      - description: User ID (UUID)
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Absolute balance payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/domain.SetBalanceRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Balance set
+          schema:
+            allOf:
+            - $ref: '#/definitions/domain.SuccessEnvelope'
+            - properties:
+                data:
+                  $ref: '#/definitions/domain.UserSummary'
+              type: object
+        "400":
+          description: Invalid input
+          schema:
+            $ref: '#/definitions/domain.ErrorEnvelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/domain.ErrorEnvelope'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/domain.ErrorEnvelope'
+        "404":
+          description: User not found
+          schema:
+            $ref: '#/definitions/domain.ErrorEnvelope'
+        "409":
+          description: Idempotency conflict or concurrent request in flight
+          schema:
+            $ref: '#/definitions/domain.ErrorEnvelope'
+        "422":
+          description: Unprocessable entity / validation failure
+          schema:
+            $ref: '#/definitions/domain.ErrorEnvelope'
+      security:
+      - BearerAuth: []
+      summary: Set absolute user balance
+      tags:
+      - Admin
+  /api/admin/users/{id}/balance/top-up:
+    post:
+      consumes:
+      - application/json
+      description: Increases the user account balance by a specified increment amount
+        (minimum 0.01)
+      parameters:
+      - description: Unique idempotency key to prevent double processing
+        in: header
+        name: Idempotency-Key
+        type: string
+      - description: User ID (UUID)
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Balance top-up payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/domain.TopUpBalanceRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Balance topped up
+          schema:
+            allOf:
+            - $ref: '#/definitions/domain.SuccessEnvelope'
+            - properties:
+                data:
+                  $ref: '#/definitions/domain.UserSummary'
+              type: object
+        "400":
+          description: Invalid input
+          schema:
+            $ref: '#/definitions/domain.ErrorEnvelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/domain.ErrorEnvelope'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/domain.ErrorEnvelope'
+        "404":
+          description: User not found
+          schema:
+            $ref: '#/definitions/domain.ErrorEnvelope'
+        "409":
+          description: Idempotency conflict or concurrent request in flight
+          schema:
+            $ref: '#/definitions/domain.ErrorEnvelope'
+        "422":
+          description: Unprocessable entity / validation failure
+          schema:
+            $ref: '#/definitions/domain.ErrorEnvelope'
+      security:
+      - BearerAuth: []
+      summary: Top up user balance by an increment
       tags:
       - Admin
   /api/admin/users/{id}/filters:
@@ -431,7 +837,7 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.UpdateFiltersRequest'
+          $ref: '#/definitions/domain.UpdateFiltersRequest'
       produces:
       - application/json
       responses:
@@ -439,27 +845,27 @@ paths:
           description: Filters updated
           schema:
             allOf:
-            - $ref: '#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.SuccessEnvelope'
+            - $ref: '#/definitions/domain.SuccessEnvelope'
             - properties:
                 data:
-                  $ref: '#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.UserSummary'
+                  $ref: '#/definitions/domain.UserSummary'
               type: object
         "400":
           description: Invalid input
           schema:
-            $ref: '#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorEnvelope'
+            $ref: '#/definitions/domain.ErrorEnvelope'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorEnvelope'
+            $ref: '#/definitions/domain.ErrorEnvelope'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorEnvelope'
+            $ref: '#/definitions/domain.ErrorEnvelope'
         "404":
           description: User not found
           schema:
-            $ref: '#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorEnvelope'
+            $ref: '#/definitions/domain.ErrorEnvelope'
       security:
       - BearerAuth: []
       summary: Configure catalog access filters for a user
@@ -476,7 +882,7 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.LoginRequest'
+          $ref: '#/definitions/domain.LoginRequest'
       produces:
       - application/json
       responses:
@@ -484,39 +890,70 @@ paths:
           description: Login successful
           schema:
             allOf:
-            - $ref: '#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.SuccessEnvelope'
+            - $ref: '#/definitions/domain.SuccessEnvelope'
             - properties:
                 data:
-                  $ref: '#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.LoginResponse'
+                  $ref: '#/definitions/domain.LoginResponse'
               type: object
         "400":
           description: Invalid request payload
           schema:
-            $ref: '#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorEnvelope'
+            $ref: '#/definitions/domain.ErrorEnvelope'
         "401":
           description: Invalid credentials
           schema:
-            $ref: '#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorEnvelope'
+            $ref: '#/definitions/domain.ErrorEnvelope'
         "403":
           description: 'Forbidden: user is an admin attempting regular login'
           schema:
-            $ref: '#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorEnvelope'
+            $ref: '#/definitions/domain.ErrorEnvelope'
       summary: User authentication
       tags:
       - Auth
   /api/user/orders:
+    get:
+      consumes:
+      - application/json
+      description: Returns all orders placed by the authenticated user
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of orders
+          schema:
+            allOf:
+            - $ref: '#/definitions/domain.SuccessEnvelope'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/domain.OrderResponse'
+                  type: array
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/domain.ErrorEnvelope'
+      security:
+      - BearerAuth: []
+      summary: List customer purchase history
+      tags:
+      - User
     post:
       consumes:
       - application/json
       description: Atomically purchases a product item, decrements stock, and deducts
         user balance
       parameters:
+      - description: Unique idempotency key to prevent double processing
+        in: header
+        name: Idempotency-Key
+        type: string
       - description: Purchase order request
         in: body
         name: request
         required: true
         schema:
-          $ref: '#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.CreateOrderRequest'
+          $ref: '#/definitions/domain.CreateOrderRequest'
       produces:
       - application/json
       responses:
@@ -524,30 +961,71 @@ paths:
           description: Order placed successfully
           schema:
             allOf:
-            - $ref: '#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.SuccessEnvelope'
+            - $ref: '#/definitions/domain.SuccessEnvelope'
             - properties:
                 data:
-                  $ref: '#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.OrderResponse'
+                  $ref: '#/definitions/domain.OrderResponse'
               type: object
         "400":
           description: Invalid input, insufficient stock or balance
           schema:
-            $ref: '#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorEnvelope'
+            $ref: '#/definitions/domain.ErrorEnvelope'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorEnvelope'
+            $ref: '#/definitions/domain.ErrorEnvelope'
         "403":
           description: Product disallowed by user filters
           schema:
-            $ref: '#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorEnvelope'
+            $ref: '#/definitions/domain.ErrorEnvelope'
         "404":
           description: Product or user not found
           schema:
-            $ref: '#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorEnvelope'
+            $ref: '#/definitions/domain.ErrorEnvelope'
+        "409":
+          description: Idempotency conflict or concurrent request in flight
+          schema:
+            $ref: '#/definitions/domain.ErrorEnvelope'
       security:
       - BearerAuth: []
       summary: Purchase product from warehouse
+      tags:
+      - User
+  /api/user/orders/{id}:
+    get:
+      consumes:
+      - application/json
+      description: Returns details for a specific order placed by the authenticated
+        user
+      parameters:
+      - description: Order ID (UUID)
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Order details
+          schema:
+            allOf:
+            - $ref: '#/definitions/domain.SuccessEnvelope'
+            - properties:
+                data:
+                  $ref: '#/definitions/domain.OrderResponse'
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/domain.ErrorEnvelope'
+        "404":
+          description: Order not found
+          schema:
+            $ref: '#/definitions/domain.ErrorEnvelope'
+      security:
+      - BearerAuth: []
+      summary: Get customer order details
       tags:
       - User
   /api/user/products:
@@ -568,21 +1046,21 @@ paths:
           description: List of allowed products
           schema:
             allOf:
-            - $ref: '#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.SuccessEnvelope'
+            - $ref: '#/definitions/domain.SuccessEnvelope'
             - properties:
                 data:
                   items:
-                    $ref: '#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.Product'
+                    $ref: '#/definitions/domain.Product'
                   type: array
               type: object
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorEnvelope'
+            $ref: '#/definitions/domain.ErrorEnvelope'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorEnvelope'
+            $ref: '#/definitions/domain.ErrorEnvelope'
       security:
       - BearerAuth: []
       summary: Browse warehouse catalog
@@ -601,23 +1079,23 @@ paths:
           description: User profile
           schema:
             allOf:
-            - $ref: '#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.SuccessEnvelope'
+            - $ref: '#/definitions/domain.SuccessEnvelope'
             - properties:
                 data:
-                  $ref: '#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.UserSummary'
+                  $ref: '#/definitions/domain.UserSummary'
               type: object
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorEnvelope'
+            $ref: '#/definitions/domain.ErrorEnvelope'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorEnvelope'
+            $ref: '#/definitions/domain.ErrorEnvelope'
         "404":
           description: User not found
           schema:
-            $ref: '#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorEnvelope'
+            $ref: '#/definitions/domain.ErrorEnvelope'
       security:
       - BearerAuth: []
       summary: Get authenticated user profile

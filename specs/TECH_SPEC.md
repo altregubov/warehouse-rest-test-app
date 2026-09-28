@@ -180,7 +180,8 @@ CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id);
      ```
    - Response (201 Created): User details (excluding `password_hash`).
 
-2. Balance Management Operations
+2. Balance Management Operations (Supports `Idempotency-Key` Header with 24-Hour TTL)
+   - **Header Support:** Clients may provide `Idempotency-Key: <uuid-or-string>` on all balance mutation endpoints. Identical replayed requests return the original cached response with `Idempotent-Replayed: true` header. Requests with conflicting payloads or concurrent in-flight executions under the same key return `409 Conflict`.
    - **Top-Up Balance (Relative Increment):** `POST /api/admin/users/{id}/balance/top-up`
      - Increases customer balance by a specified positive increment (`increment_amount >= 0.01`).
      - Request: `{ "increment_amount": 500.00 }`
@@ -278,8 +279,9 @@ CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id);
      4. If `category` query param is omitted, return all allowed products.
    - Response (200 OK): Array of matching product items.
 
-3. `POST /api/user/orders`
+3. `POST /api/user/orders` (Supports `Idempotency-Key` Header with 24-Hour TTL)
    - Places an order for a product.
+   - **Headers:** `Idempotency-Key` (optional, string / UUID). Clients submitting identical order requests with the same key receive the cached `201 Created` response with `Idempotent-Replayed: true` header without double-charging balance or decrementing stock twice. Concurrent in-flight requests or conflicting payloads under the same key return `409 Conflict`.
    - Body:
      ```json
      {

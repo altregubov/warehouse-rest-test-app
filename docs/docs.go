@@ -35,7 +35,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.LoginRequest"
+                            "$ref": "#/definitions/domain.LoginRequest"
                         }
                     }
                 ],
@@ -45,13 +45,13 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.SuccessEnvelope"
+                                    "$ref": "#/definitions/domain.SuccessEnvelope"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.LoginResponse"
+                                            "$ref": "#/definitions/domain.LoginResponse"
                                         }
                                     }
                                 }
@@ -61,25 +61,221 @@ const docTemplate = `{
                     "400": {
                         "description": "Invalid request payload",
                         "schema": {
-                            "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorEnvelope"
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
                         }
                     },
                     "401": {
                         "description": "Invalid credentials",
                         "schema": {
-                            "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorEnvelope"
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
                         }
                     },
                     "403": {
                         "description": "Forbidden: user is not an admin",
                         "schema": {
-                            "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorEnvelope"
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/orders": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Retrieve all orders across the system for administrative auditing and fulfillment",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "List all orders (Admin)",
+                "responses": {
+                    "200": {
+                        "description": "List of all orders",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/domain.SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/domain.OrderResponse"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/orders/{id}/status": {
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Update the fulfillment status of an order (e.g. PROCESSING, SHIPPED, DELIVERED, CANCELLED)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "Update order fulfillment status",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Order ID (UUID)",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Order status payload",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/domain.UpdateOrderStatusRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Order status updated",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/domain.SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/domain.OrderResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid input",
+                        "schema": {
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
+                        }
+                    },
+                    "404": {
+                        "description": "Order not found",
+                        "schema": {
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
+                        }
+                    },
+                    "422": {
+                        "description": "Invalid status transition",
+                        "schema": {
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
                         }
                     }
                 }
             }
         },
         "/api/admin/products": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Retrieve full unrestricted product inventory for administrators",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "List all warehouse products (Admin)",
+                "responses": {
+                    "200": {
+                        "description": "List of all products",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/domain.SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/domain.Product"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
+                        }
+                    }
+                }
+            },
             "post": {
                 "security": [
                     {
@@ -104,7 +300,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.CreateProductRequest"
+                            "$ref": "#/definitions/domain.CreateProductRequest"
                         }
                     }
                 ],
@@ -114,13 +310,13 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.SuccessEnvelope"
+                                    "$ref": "#/definitions/domain.SuccessEnvelope"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.Product"
+                                            "$ref": "#/definitions/domain.Product"
                                         }
                                     }
                                 }
@@ -130,19 +326,19 @@ const docTemplate = `{
                     "400": {
                         "description": "Invalid input",
                         "schema": {
-                            "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorEnvelope"
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorEnvelope"
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
                         }
                     },
                     "403": {
                         "description": "Forbidden",
                         "schema": {
-                            "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorEnvelope"
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
                         }
                     }
                 }
@@ -180,7 +376,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.UpdateStockRequest"
+                            "$ref": "#/definitions/domain.UpdateStockRequest"
                         }
                     }
                 ],
@@ -190,13 +386,13 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.SuccessEnvelope"
+                                    "$ref": "#/definitions/domain.SuccessEnvelope"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.Product"
+                                            "$ref": "#/definitions/domain.Product"
                                         }
                                     }
                                 }
@@ -206,31 +402,104 @@ const docTemplate = `{
                     "400": {
                         "description": "Invalid input",
                         "schema": {
-                            "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorEnvelope"
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorEnvelope"
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
                         }
                     },
                     "403": {
                         "description": "Forbidden",
                         "schema": {
-                            "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorEnvelope"
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
                         }
                     },
                     "404": {
                         "description": "Product not found",
                         "schema": {
-                            "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorEnvelope"
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
                         }
                     }
                 }
             }
         },
         "/api/admin/users": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Query paginated list of users with optional role filtering",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "List users",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Filter by role (admin or user)",
+                        "name": "role",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page number (default 1)",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Items per page (default 20, max 100)",
+                        "name": "page_size",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "List of users",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/domain.SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/domain.UserSummary"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
+                        }
+                    }
+                }
+            },
             "post": {
                 "security": [
                     {
@@ -255,7 +524,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.CreateUserRequest"
+                            "$ref": "#/definitions/domain.CreateUserRequest"
                         }
                     }
                 ],
@@ -265,13 +534,13 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.SuccessEnvelope"
+                                    "$ref": "#/definitions/domain.SuccessEnvelope"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.UserSummary"
+                                            "$ref": "#/definitions/domain.UserSummary"
                                         }
                                     }
                                 }
@@ -281,31 +550,273 @@ const docTemplate = `{
                     "400": {
                         "description": "Invalid input",
                         "schema": {
-                            "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorEnvelope"
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorEnvelope"
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
                         }
                     },
                     "403": {
                         "description": "Forbidden",
                         "schema": {
-                            "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorEnvelope"
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
                         }
                     },
                     "409": {
                         "description": "Username already exists",
                         "schema": {
-                            "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorEnvelope"
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/users/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Retrieve a specific user account by UUID",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "Get user by ID",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "User ID (UUID)",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "User details",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/domain.SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/domain.UserSummary"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid ID",
+                        "schema": {
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
+                        }
+                    },
+                    "404": {
+                        "description": "User not found",
+                        "schema": {
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Marks user as deactivated/deleted while preserving immutable historical order records",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "Soft-delete a user account",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "User ID (UUID)",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "User deactivated successfully",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/domain.SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid ID",
+                        "schema": {
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
+                        }
+                    },
+                    "404": {
+                        "description": "User not found",
+                        "schema": {
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
                         }
                     }
                 }
             }
         },
         "/api/admin/users/{id}/balance": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Replaces the user account balance with a specified new balance (minimum 0.00)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "Set absolute user balance",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Unique idempotency key to prevent double processing",
+                        "name": "Idempotency-Key",
+                        "in": "header"
+                    },
+                    {
+                        "type": "string",
+                        "description": "User ID (UUID)",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Absolute balance payload",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/domain.SetBalanceRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Balance set",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/domain.SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/domain.UserSummary"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid input",
+                        "schema": {
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
+                        }
+                    },
+                    "404": {
+                        "description": "User not found",
+                        "schema": {
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
+                        }
+                    },
+                    "409": {
+                        "description": "Idempotency conflict or concurrent request in flight",
+                        "schema": {
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
+                        }
+                    },
+                    "422": {
+                        "description": "Unprocessable entity / validation failure",
+                        "schema": {
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
+                        }
+                    }
+                }
+            },
             "patch": {
                 "security": [
                     {
@@ -322,8 +833,14 @@ const docTemplate = `{
                 "tags": [
                     "Admin"
                 ],
-                "summary": "Update or top up user balance",
+                "summary": "Update or top up user balance (Legacy)",
                 "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Unique idempotency key to prevent double processing",
+                        "name": "Idempotency-Key",
+                        "in": "header"
+                    },
                     {
                         "type": "string",
                         "description": "User ID (UUID)",
@@ -337,7 +854,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.UpdateBalanceRequest"
+                            "$ref": "#/definitions/domain.UpdateBalanceRequest"
                         }
                     }
                 ],
@@ -347,13 +864,13 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.SuccessEnvelope"
+                                    "$ref": "#/definitions/domain.SuccessEnvelope"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.UserSummary"
+                                            "$ref": "#/definitions/domain.UserSummary"
                                         }
                                     }
                                 }
@@ -363,25 +880,131 @@ const docTemplate = `{
                     "400": {
                         "description": "Invalid input or negative balance",
                         "schema": {
-                            "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorEnvelope"
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorEnvelope"
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
                         }
                     },
                     "403": {
                         "description": "Forbidden",
                         "schema": {
-                            "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorEnvelope"
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
                         }
                     },
                     "404": {
                         "description": "User not found",
                         "schema": {
-                            "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorEnvelope"
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
+                        }
+                    },
+                    "409": {
+                        "description": "Idempotency conflict or concurrent request in flight",
+                        "schema": {
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/users/{id}/balance/top-up": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Increases the user account balance by a specified increment amount (minimum 0.01)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "Top up user balance by an increment",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Unique idempotency key to prevent double processing",
+                        "name": "Idempotency-Key",
+                        "in": "header"
+                    },
+                    {
+                        "type": "string",
+                        "description": "User ID (UUID)",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Balance top-up payload",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/domain.TopUpBalanceRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Balance topped up",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/domain.SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/domain.UserSummary"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid input",
+                        "schema": {
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
+                        }
+                    },
+                    "404": {
+                        "description": "User not found",
+                        "schema": {
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
+                        }
+                    },
+                    "409": {
+                        "description": "Idempotency conflict or concurrent request in flight",
+                        "schema": {
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
+                        }
+                    },
+                    "422": {
+                        "description": "Unprocessable entity / validation failure",
+                        "schema": {
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
                         }
                     }
                 }
@@ -419,7 +1042,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.UpdateFiltersRequest"
+                            "$ref": "#/definitions/domain.UpdateFiltersRequest"
                         }
                     }
                 ],
@@ -429,13 +1052,13 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.SuccessEnvelope"
+                                    "$ref": "#/definitions/domain.SuccessEnvelope"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.UserSummary"
+                                            "$ref": "#/definitions/domain.UserSummary"
                                         }
                                     }
                                 }
@@ -445,25 +1068,25 @@ const docTemplate = `{
                     "400": {
                         "description": "Invalid input",
                         "schema": {
-                            "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorEnvelope"
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorEnvelope"
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
                         }
                     },
                     "403": {
                         "description": "Forbidden",
                         "schema": {
-                            "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorEnvelope"
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
                         }
                     },
                     "404": {
                         "description": "User not found",
                         "schema": {
-                            "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorEnvelope"
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
                         }
                     }
                 }
@@ -489,7 +1112,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.LoginRequest"
+                            "$ref": "#/definitions/domain.LoginRequest"
                         }
                     }
                 ],
@@ -499,13 +1122,13 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.SuccessEnvelope"
+                                    "$ref": "#/definitions/domain.SuccessEnvelope"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.LoginResponse"
+                                            "$ref": "#/definitions/domain.LoginResponse"
                                         }
                                     }
                                 }
@@ -515,25 +1138,72 @@ const docTemplate = `{
                     "400": {
                         "description": "Invalid request payload",
                         "schema": {
-                            "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorEnvelope"
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
                         }
                     },
                     "401": {
                         "description": "Invalid credentials",
                         "schema": {
-                            "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorEnvelope"
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
                         }
                     },
                     "403": {
                         "description": "Forbidden: user is an admin attempting regular login",
                         "schema": {
-                            "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorEnvelope"
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
                         }
                     }
                 }
             }
         },
         "/api/user/orders": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns all orders placed by the authenticated user",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "User"
+                ],
+                "summary": "List customer purchase history",
+                "responses": {
+                    "200": {
+                        "description": "List of orders",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/domain.SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/domain.OrderResponse"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
+                        }
+                    }
+                }
+            },
             "post": {
                 "security": [
                     {
@@ -553,12 +1223,18 @@ const docTemplate = `{
                 "summary": "Purchase product from warehouse",
                 "parameters": [
                     {
+                        "type": "string",
+                        "description": "Unique idempotency key to prevent double processing",
+                        "name": "Idempotency-Key",
+                        "in": "header"
+                    },
+                    {
                         "description": "Purchase order request",
                         "name": "request",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.CreateOrderRequest"
+                            "$ref": "#/definitions/domain.CreateOrderRequest"
                         }
                     }
                 ],
@@ -568,13 +1244,13 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.SuccessEnvelope"
+                                    "$ref": "#/definitions/domain.SuccessEnvelope"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.OrderResponse"
+                                            "$ref": "#/definitions/domain.OrderResponse"
                                         }
                                     }
                                 }
@@ -584,25 +1260,92 @@ const docTemplate = `{
                     "400": {
                         "description": "Invalid input, insufficient stock or balance",
                         "schema": {
-                            "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorEnvelope"
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorEnvelope"
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
                         }
                     },
                     "403": {
                         "description": "Product disallowed by user filters",
                         "schema": {
-                            "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorEnvelope"
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
                         }
                     },
                     "404": {
                         "description": "Product or user not found",
                         "schema": {
-                            "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorEnvelope"
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
+                        }
+                    },
+                    "409": {
+                        "description": "Idempotency conflict or concurrent request in flight",
+                        "schema": {
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/user/orders/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns details for a specific order placed by the authenticated user",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "User"
+                ],
+                "summary": "Get customer order details",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Order ID (UUID)",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Order details",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/domain.SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/domain.OrderResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
+                        }
+                    },
+                    "404": {
+                        "description": "Order not found",
+                        "schema": {
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
                         }
                     }
                 }
@@ -640,7 +1383,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.SuccessEnvelope"
+                                    "$ref": "#/definitions/domain.SuccessEnvelope"
                                 },
                                 {
                                     "type": "object",
@@ -648,7 +1391,7 @@ const docTemplate = `{
                                         "data": {
                                             "type": "array",
                                             "items": {
-                                                "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.Product"
+                                                "$ref": "#/definitions/domain.Product"
                                             }
                                         }
                                     }
@@ -659,13 +1402,13 @@ const docTemplate = `{
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorEnvelope"
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
                         }
                     },
                     "403": {
                         "description": "Forbidden",
                         "schema": {
-                            "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorEnvelope"
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
                         }
                     }
                 }
@@ -695,13 +1438,13 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.SuccessEnvelope"
+                                    "$ref": "#/definitions/domain.SuccessEnvelope"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.UserSummary"
+                                            "$ref": "#/definitions/domain.UserSummary"
                                         }
                                     }
                                 }
@@ -711,19 +1454,19 @@ const docTemplate = `{
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorEnvelope"
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
                         }
                     },
                     "403": {
                         "description": "Forbidden",
                         "schema": {
-                            "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorEnvelope"
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
                         }
                     },
                     "404": {
                         "description": "User not found",
                         "schema": {
-                            "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorEnvelope"
+                            "$ref": "#/definitions/domain.ErrorEnvelope"
                         }
                     }
                 }
@@ -731,7 +1474,7 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "github_com_altregubov_warehouse-rest-test-app_internal_domain.CreateOrderRequest": {
+        "domain.CreateOrderRequest": {
             "type": "object",
             "properties": {
                 "product_id": {
@@ -744,7 +1487,7 @@ const docTemplate = `{
                 }
             }
         },
-        "github_com_altregubov_warehouse-rest-test-app_internal_domain.CreateProductRequest": {
+        "domain.CreateProductRequest": {
             "type": "object",
             "properties": {
                 "category": {
@@ -769,7 +1512,7 @@ const docTemplate = `{
                 }
             }
         },
-        "github_com_altregubov_warehouse-rest-test-app_internal_domain.CreateUserRequest": {
+        "domain.CreateUserRequest": {
             "type": "object",
             "properties": {
                 "allowed_categories": {
@@ -808,7 +1551,7 @@ const docTemplate = `{
                 }
             }
         },
-        "github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorDetails": {
+        "domain.ErrorDetails": {
             "type": "object",
             "properties": {
                 "code": {
@@ -822,11 +1565,11 @@ const docTemplate = `{
                 }
             }
         },
-        "github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorEnvelope": {
+        "domain.ErrorEnvelope": {
             "type": "object",
             "properties": {
                 "error": {
-                    "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorDetails"
+                    "$ref": "#/definitions/domain.ErrorDetails"
                 },
                 "success": {
                     "type": "boolean",
@@ -834,7 +1577,7 @@ const docTemplate = `{
                 }
             }
         },
-        "github_com_altregubov_warehouse-rest-test-app_internal_domain.LoginRequest": {
+        "domain.LoginRequest": {
             "type": "object",
             "properties": {
                 "password": {
@@ -847,18 +1590,18 @@ const docTemplate = `{
                 }
             }
         },
-        "github_com_altregubov_warehouse-rest-test-app_internal_domain.LoginResponse": {
+        "domain.LoginResponse": {
             "type": "object",
             "properties": {
                 "token": {
                     "type": "string"
                 },
                 "user": {
-                    "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.UserSummary"
+                    "$ref": "#/definitions/domain.UserSummary"
                 }
             }
         },
-        "github_com_altregubov_warehouse-rest-test-app_internal_domain.OrderResponse": {
+        "domain.OrderResponse": {
             "type": "object",
             "properties": {
                 "created_at": {
@@ -879,15 +1622,21 @@ const docTemplate = `{
                 "remaining_balance": {
                     "type": "number"
                 },
+                "status": {
+                    "type": "string"
+                },
                 "total_price": {
                     "type": "number"
                 },
                 "unit_price": {
                     "type": "number"
+                },
+                "user_id": {
+                    "type": "string"
                 }
             }
         },
-        "github_com_altregubov_warehouse-rest-test-app_internal_domain.Product": {
+        "domain.Product": {
             "type": "object",
             "properties": {
                 "category": {
@@ -916,7 +1665,16 @@ const docTemplate = `{
                 }
             }
         },
-        "github_com_altregubov_warehouse-rest-test-app_internal_domain.SuccessEnvelope": {
+        "domain.SetBalanceRequest": {
+            "type": "object",
+            "properties": {
+                "new_balance": {
+                    "type": "number",
+                    "example": 5000
+                }
+            }
+        },
+        "domain.SuccessEnvelope": {
             "type": "object",
             "properties": {
                 "data": {},
@@ -926,7 +1684,16 @@ const docTemplate = `{
                 }
             }
         },
-        "github_com_altregubov_warehouse-rest-test-app_internal_domain.UpdateBalanceRequest": {
+        "domain.TopUpBalanceRequest": {
+            "type": "object",
+            "properties": {
+                "increment_amount": {
+                    "type": "number",
+                    "example": 500
+                }
+            }
+        },
+        "domain.UpdateBalanceRequest": {
             "type": "object",
             "properties": {
                 "amount": {
@@ -935,7 +1702,7 @@ const docTemplate = `{
                 }
             }
         },
-        "github_com_altregubov_warehouse-rest-test-app_internal_domain.UpdateFiltersRequest": {
+        "domain.UpdateFiltersRequest": {
             "type": "object",
             "properties": {
                 "allowed_categories": {
@@ -959,7 +1726,16 @@ const docTemplate = `{
                 }
             }
         },
-        "github_com_altregubov_warehouse-rest-test-app_internal_domain.UpdateStockRequest": {
+        "domain.UpdateOrderStatusRequest": {
+            "type": "object",
+            "properties": {
+                "status": {
+                    "type": "string",
+                    "example": "SHIPPED"
+                }
+            }
+        },
+        "domain.UpdateStockRequest": {
             "type": "object",
             "properties": {
                 "stock_quantity": {
@@ -968,7 +1744,7 @@ const docTemplate = `{
                 }
             }
         },
-        "github_com_altregubov_warehouse-rest-test-app_internal_domain.UserSummary": {
+        "domain.UserSummary": {
             "type": "object",
             "properties": {
                 "allowed_categories": {

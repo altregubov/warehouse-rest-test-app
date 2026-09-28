@@ -144,15 +144,17 @@ erDiagram
 3. **Catalog Presentation:** The filtered inventory with current unit prices and available stock is presented to the client.
 
 #### Journey 3: Transactional Order Placement (`[Core Entity]` Creation)
-1. **Order Submission:** The client submits a purchase intent specifying the desired `productId` and `quantity`.
-2. **Eligibility Pre-check:** The service validates that the product exists and falls within the client's permission whitelists.
+1. **Order Submission:** The client submits a purchase intent specifying the desired `productId` and `quantity`. Clients may supply an optional `Idempotency-Key` header to guard against duplicate orders and double deductions caused by network timeouts and retries.
+2. **Eligibility Pre-check & Idempotency Resolution:**
+   - If an `Idempotency-Key` is supplied, the system verifies previous executions: replayed requests return the original receipt immediately with zero additional deduction; concurrent conflicting requests are rejected.
+   - The service validates that the product exists and falls within the client's permission whitelists.
 3. **Atomic Execution:**
    - Real-time stock availability is verified.
    - Total purchase cost (`price × quantity`) is computed.
    - User balance adequacy is verified (`balance ≥ total cost`).
    - Stock is decremented and balance is debited simultaneously.
    - An immutable `[Core Entity: Order]` transaction record is committed.
-4. **Outcome Delivery:** Confirmation containing the transaction reference, purchased units, and remaining balance is returned to the client.
+4. **Outcome Delivery:** Confirmation containing the transaction reference, purchased units, and remaining balance is returned to the client (and cached for 24 hours under the idempotency key).
 
 ---
 

@@ -99,12 +99,14 @@ func (h *UserHandler) ListProducts(w http.ResponseWriter, r *http.Request) {
 // @Accept json
 // @Produce json
 // @Security BearerAuth
+// @Param Idempotency-Key header string false "Unique idempotency key to prevent double processing"
 // @Param request body domain.CreateOrderRequest true "Purchase order request"
 // @Success 201 {object} domain.SuccessEnvelope{data=domain.OrderResponse} "Order placed successfully"
 // @Failure 400 {object} domain.ErrorEnvelope "Invalid input, insufficient stock or balance"
 // @Failure 401 {object} domain.ErrorEnvelope "Unauthorized"
 // @Failure 403 {object} domain.ErrorEnvelope "Product disallowed by user filters"
 // @Failure 404 {object} domain.ErrorEnvelope "Product or user not found"
+// @Failure 409 {object} domain.ErrorEnvelope "Idempotency conflict or concurrent request in flight"
 // @Router /api/user/orders [post]
 func (h *UserHandler) CreateOrder(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.GetUserID(r.Context())

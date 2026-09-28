@@ -71,6 +71,7 @@ func (h *AdminHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 // @Accept json
 // @Produce json
 // @Security BearerAuth
+// @Param Idempotency-Key header string false "Unique idempotency key to prevent double processing"
 // @Param id path string true "User ID (UUID)"
 // @Param request body domain.TopUpBalanceRequest true "Balance top-up payload"
 // @Success 200 {object} domain.SuccessEnvelope{data=domain.UserSummary} "Balance topped up"
@@ -78,6 +79,7 @@ func (h *AdminHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 // @Failure 401 {object} domain.ErrorEnvelope "Unauthorized"
 // @Failure 403 {object} domain.ErrorEnvelope "Forbidden"
 // @Failure 404 {object} domain.ErrorEnvelope "User not found"
+// @Failure 409 {object} domain.ErrorEnvelope "Idempotency conflict or concurrent request in flight"
 // @Failure 422 {object} domain.ErrorEnvelope "Unprocessable entity / validation failure"
 // @Router /api/admin/users/{id}/balance/top-up [post]
 func (h *AdminHandler) TopUpBalance(w http.ResponseWriter, r *http.Request) {
@@ -136,6 +138,7 @@ func (h *AdminHandler) TopUpBalance(w http.ResponseWriter, r *http.Request) {
 // @Accept json
 // @Produce json
 // @Security BearerAuth
+// @Param Idempotency-Key header string false "Unique idempotency key to prevent double processing"
 // @Param id path string true "User ID (UUID)"
 // @Param request body domain.SetBalanceRequest true "Absolute balance payload"
 // @Success 200 {object} domain.SuccessEnvelope{data=domain.UserSummary} "Balance set"
@@ -143,6 +146,7 @@ func (h *AdminHandler) TopUpBalance(w http.ResponseWriter, r *http.Request) {
 // @Failure 401 {object} domain.ErrorEnvelope "Unauthorized"
 // @Failure 403 {object} domain.ErrorEnvelope "Forbidden"
 // @Failure 404 {object} domain.ErrorEnvelope "User not found"
+// @Failure 409 {object} domain.ErrorEnvelope "Idempotency conflict or concurrent request in flight"
 // @Failure 422 {object} domain.ErrorEnvelope "Unprocessable entity / validation failure"
 // @Router /api/admin/users/{id}/balance [put]
 func (h *AdminHandler) SetBalance(w http.ResponseWriter, r *http.Request) {
@@ -201,6 +205,7 @@ func (h *AdminHandler) SetBalance(w http.ResponseWriter, r *http.Request) {
 // @Accept json
 // @Produce json
 // @Security BearerAuth
+// @Param Idempotency-Key header string false "Unique idempotency key to prevent double processing"
 // @Param id path string true "User ID (UUID)"
 // @Param request body domain.UpdateBalanceRequest true "Balance adjustment payload"
 // @Success 200 {object} domain.SuccessEnvelope{data=domain.UserSummary} "Balance updated"
@@ -208,6 +213,7 @@ func (h *AdminHandler) SetBalance(w http.ResponseWriter, r *http.Request) {
 // @Failure 401 {object} domain.ErrorEnvelope "Unauthorized"
 // @Failure 403 {object} domain.ErrorEnvelope "Forbidden"
 // @Failure 404 {object} domain.ErrorEnvelope "User not found"
+// @Failure 409 {object} domain.ErrorEnvelope "Idempotency conflict or concurrent request in flight"
 // @Router /api/admin/users/{id}/balance [patch]
 func (h *AdminHandler) UpdateBalance(w http.ResponseWriter, r *http.Request) {
 	idStr := chi.URLParam(r, "id")
