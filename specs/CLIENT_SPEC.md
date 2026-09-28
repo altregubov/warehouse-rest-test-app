@@ -183,8 +183,8 @@ sequenceDiagram
     Client->>Gateway: Request purchase (Product SKU, Quantity)
     Gateway->>OrderService: Execute order placement workflow
 
-    OrderService->>DataStore: Initiate atomic transaction & lock product + account
-    DataStore-->>OrderService: Current stock & customer balance locked
+    OrderService->>DataStore: Acquire locks in strict hierarchy (User Account first, Product Stock second)
+    DataStore-->>OrderService: Customer balance & product stock locked deterministically
 
     alt Validation Failure: Restricted Product
         OrderService-->>Gateway: Reject (Product outside client whitelist)

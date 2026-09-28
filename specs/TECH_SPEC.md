@@ -288,7 +288,7 @@ CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id);
      }
      ```
    - **Atomic Transaction Workflow (ACID compliant):**
-     1. `BEGIN` transaction with row-level locks (`SELECT ... FOR UPDATE` on product and user).
+     1. `BEGIN` transaction with strict deterministic global row-level lock hierarchy: ALWAYS lock user account record first (`SELECT ... FROM users WHERE id = $1 AND deleted_at IS NULL FOR UPDATE`), then product catalog record second (`SELECT ... FROM products WHERE id = $2 FOR UPDATE`) to eliminate cyclic wait deadlocks (`SQLSTATE 40P01`).
      2. Fetch product and verify existence.
      3. Verify product matches user's permission filters (`allowed_categories` & `allowed_manufacturers`). Return `403 Forbidden` if disallowed.
      4. Check product `stock_quantity >= quantity`. Return `400 Bad Request` if insufficient stock.

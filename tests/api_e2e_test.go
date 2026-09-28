@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"sync"
 	"testing"
 	"time"
 
@@ -240,7 +241,11 @@ func TestAtomicOrderPlacement(t *testing.T) {
 	tokenA, _ := login(t, "/api/user/login", "userA", "user123")
 	clientA := newClient(tokenA)
 
-	// Fetch profile to verify initial balance
+	// Reset userA balance to guarantee sufficient funds regardless of prior test runs
+	adminToken, _ := login(t, "/api/admin/login", "admin", "admin123")
+	adminClient := newClient(adminToken)
+
+	// Fetch profile to verify initial balance and get user ID
 	respProf, bodyProf, _ := clientA.request(http.MethodGet, "/api/user/profile", nil)
 	if respProf.StatusCode != http.StatusOK {
 		t.Fatalf("Failed to fetch profile: %d", respProf.StatusCode)
@@ -249,7 +254,11 @@ func TestAtomicOrderPlacement(t *testing.T) {
 		Data domain.UserSummary `json:"data"`
 	}
 	_ = json.Unmarshal(bodyProf, &profA)
-	initialBalance := profA.Data.Balance
+
+	_, _, _ = adminClient.request(http.MethodPut, fmt.Sprintf("/api/admin/users/%s/balance", profA.Data.ID), domain.SetBalanceRequest{
+		NewBalance: 5000.00,
+	})
+	initialBalance := 5000.00
 
 	// Fetch available products
 	_, bodyProds, _ := clientA.request(http.MethodGet, "/api/user/products?category=laptop", nil)
@@ -690,5 +699,98 @@ func TestSoftDeleteAndRestrictCascade(t *testing.T) {
 	}
 	if !orderFound {
 		t.Errorf("Order %s was lost after user soft deletion; expected to remain for auditability", orderID)
+	}
+}
+
+func TestConcurrentDeterministicLockOrdering(t *testing.T) {
+	adminToken, _ := login(t, "/api/admin/login", "admin", "admin123")
+	adminClient := newClient(adminToken)
+
+	// Create test user with generous balance
+	username := fmt.Sprintf("lock_test_%d", time.Now().UnixNano())
+	respCreate, bodyCreate, _ := adminClient.request(http.MethodPost, "/api/admin/users", domain.CreateUserRequest{
+		Username: username,
+		Password: "password123",
+		Role:     domain.RoleUser,
+		Balance:  50000.00,
+	})
+	if respCreate.StatusCode != http.StatusCreated {
+		t.Fatalf("Failed to create user: %s", string(bodyCreate))
+	}
+	var createdUser struct {
+		Data domain.UserSummary `json:"data"`
+	}
+	_ = json.Unmarshal(bodyCreate, &createdUser)
+	userID := createdUser.Data.ID
+
+	// Create a dedicated product with ample stock
+	respProd, bodyProd, _ := adminClient.request(http.MethodPost, "/api/admin/products", domain.CreateProductRequest{
+		Category:      "hardware",
+		Manufacturer:  "TestCorp",
+		Model:         fmt.Sprintf("LockModel_%d", time.Now().UnixNano()),
+		Price:         10.00,
+		StockQuantity: 1000,
+	})
+	if respProd.StatusCode != http.StatusCreated {
+		t.Fatalf("Failed to create product: %s", string(bodyProd))
+	}
+	var createdProd struct {
+		Data domain.Product `json:"data"`
+	}
+	_ = json.Unmarshal(bodyProd, &createdProd)
+	productID := createdProd.Data.ID
+
+	userToken, _ := login(t, "/api/user/login", username, "password123")
+
+	const concurrency = 15
+	var wg sync.WaitGroup
+	errCh := make(chan error, concurrency*2)
+
+	// Launch concurrent checkouts and admin balance/stock updates
+	for i := 0; i < concurrency; i++ {
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+			c := newClient(userToken)
+			resp, body, err := c.request(http.MethodPost, "/api/user/orders", domain.CreateOrderRequest{
+				ProductID: productID,
+				Quantity:  1,
+			})
+			if err != nil {
+				errCh <- fmt.Errorf("checkout %d network error: %w", idx, err)
+				return
+			}
+			// Status should be 201 Created or clean business error, never 500 deadlock
+			if resp.StatusCode == http.StatusInternalServerError {
+				errCh <- fmt.Errorf("checkout %d hit 500 internal error (potential deadlock): %s", idx, string(body))
+			}
+		}(i)
+
+		if i%3 == 0 {
+			wg.Add(1)
+			go func(idx int) {
+				defer wg.Done()
+				c := newClient(adminToken)
+				resp, body, err := c.request(
+					http.MethodPost,
+					fmt.Sprintf("/api/admin/users/%s/balance/top-up", userID),
+					domain.TopUpBalanceRequest{IncrementAmount: 5.00},
+				)
+				if err != nil {
+					errCh <- fmt.Errorf("admin top-up %d network error: %w", idx, err)
+					return
+				}
+				if resp.StatusCode == http.StatusInternalServerError {
+					errCh <- fmt.Errorf("admin top-up %d hit 500 (potential deadlock): %s", idx, string(body))
+				}
+			}(i)
+		}
+	}
+
+	wg.Wait()
+	close(errCh)
+
+	for err := range errCh {
+		t.Errorf("Concurrency deadlock error: %v", err)
 	}
 }
