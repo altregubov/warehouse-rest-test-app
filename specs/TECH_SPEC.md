@@ -156,6 +156,7 @@ To ensure client SDK predictability and prevent unhandled database violations:
 - **Role Enums**: Role fields and parameters enforce enumerated values: `["admin", "user"]`.
 - **Native Array Examples**: Array properties (`allowed_categories`, `allowed_manufacturers`) define native JSON array examples (`["laptop"]`, `["Apple", "Dell"]`) rather than escaped string literals, ensuring Swagger UI "Try It Out" and automated contract generators populate valid request bodies out-of-the-box.
 - **Sanitized Schema Definition Names**: Swagger definition keys use clean, unqualified model names (e.g. `CreateOrderRequest`, `Product`, `UserSummary`) without internal Go package paths (`domain.`) or repository URLs (`github_com_altregubov_...`). Generated using `swag --useStructName` for encapsulation, developer ergonomics, and clean client SDK generation.
+- **Structural OpenAPI Hygiene**: Root specification explicitly declares `schemes: ["http", "https"]`. All operations assign unique, camelCase `operationId` values (e.g. `adminLogin`, `createOrder`, `listUserProducts`) for typed SDK client generation. Endpoints without request bodies (`GET`, `DELETE`) strictly omit `consumes` declarations.
 - **Numeric Boundaries**:
   - `quantity`: `minimum: 1`
   - `stock_quantity`: `minimum: 0`, `maximum: 2147483647` (enforced via `binding:"required,gte=0"`)

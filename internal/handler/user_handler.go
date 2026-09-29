@@ -32,7 +32,6 @@ func NewUserHandler(userService service.UserService, productService service.Prod
 // @Summary Get authenticated user profile
 // @Description Returns the profile, current balance, and assigned filter permissions for the logged in user
 // @Tags User
-// @Accept json
 // @Produce json
 // @Security BearerAuth
 // @Success 200 {object} domain.SuccessEnvelope{data=domain.UserSummary} "User profile"
@@ -42,6 +41,7 @@ func NewUserHandler(userService service.UserService, productService service.Prod
 // @Failure 500 {object} domain.ErrorEnvelope "Internal server error"
 // @Failure 503 {object} domain.ErrorEnvelope "Service unavailable"
 // @Router /api/user/profile [get]
+// @ID getUserProfile
 func (h *UserHandler) GetProfile(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.GetUserID(r.Context())
 	if !ok {
@@ -66,7 +66,6 @@ func (h *UserHandler) GetProfile(w http.ResponseWriter, r *http.Request) {
 // @Summary Browse warehouse catalog
 // @Description Browse warehouse items with optional category/manufacturer filters, sorting, and pagination
 // @Tags User
-// @Accept json
 // @Produce json
 // @Security BearerAuth
 // @Param category query string false "Filter by category (e.g. laptop, smartphone)"
@@ -83,6 +82,7 @@ func (h *UserHandler) GetProfile(w http.ResponseWriter, r *http.Request) {
 // @Failure 500 {object} domain.ErrorEnvelope "Internal server error"
 // @Failure 503 {object} domain.ErrorEnvelope "Service unavailable"
 // @Router /api/user/products [get]
+// @ID listUserProducts
 func (h *UserHandler) ListProducts(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.GetUserID(r.Context())
 	if !ok {
@@ -171,6 +171,7 @@ func (h *UserHandler) ListProducts(w http.ResponseWriter, r *http.Request) {
 // @Failure 500 {object} domain.ErrorEnvelope "Internal server error"
 // @Failure 503 {object} domain.ErrorEnvelope "Service unavailable"
 // @Router /api/user/orders [post]
+// @ID createOrder
 func (h *UserHandler) CreateOrder(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.GetUserID(r.Context())
 	if !ok {
@@ -222,7 +223,6 @@ func (h *UserHandler) CreateOrder(w http.ResponseWriter, r *http.Request) {
 // @Summary List customer purchase history
 // @Description Returns all orders placed by the authenticated user
 // @Tags User
-// @Accept json
 // @Produce json
 // @Security BearerAuth
 // @Success 200 {object} domain.SuccessEnvelope{data=[]domain.OrderResponse} "List of orders"
@@ -231,6 +231,7 @@ func (h *UserHandler) CreateOrder(w http.ResponseWriter, r *http.Request) {
 // @Failure 500 {object} domain.ErrorEnvelope "Internal server error"
 // @Failure 503 {object} domain.ErrorEnvelope "Service unavailable"
 // @Router /api/user/orders [get]
+// @ID listUserOrders
 func (h *UserHandler) ListOrders(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.GetUserID(r.Context())
 	if !ok {
@@ -251,7 +252,6 @@ func (h *UserHandler) ListOrders(w http.ResponseWriter, r *http.Request) {
 // @Summary Get customer order details
 // @Description Returns details for a specific order placed by the authenticated user
 // @Tags User
-// @Accept json
 // @Produce json
 // @Security BearerAuth
 // @Param id path string true "Order ID (UUID)" Format(uuid)
@@ -263,6 +263,7 @@ func (h *UserHandler) ListOrders(w http.ResponseWriter, r *http.Request) {
 // @Failure 500 {object} domain.ErrorEnvelope "Internal server error"
 // @Failure 503 {object} domain.ErrorEnvelope "Service unavailable"
 // @Router /api/user/orders/{id} [get]
+// @ID getUserOrderById
 func (h *UserHandler) GetOrder(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.GetUserID(r.Context())
 	if !ok {

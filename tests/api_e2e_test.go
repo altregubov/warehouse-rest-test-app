@@ -2371,3 +2371,64 @@ func TestCleanSwaggerSchemaDefinitionNames(t *testing.T) {
 	}
 }
 
+func TestOpenAPIStructuralHygiene(t *testing.T) {
+	client := newClient("")
+	respDoc, bodyDoc, err := client.request(http.MethodGet, "/swagger/doc.json", nil)
+	if err != nil || respDoc.StatusCode != http.StatusOK {
+		t.Fatalf("Failed to fetch /swagger/doc.json: status=%v, err=%v", respDoc.StatusCode, err)
+	}
+
+	var specDoc struct {
+		Schemes []string `json:"schemes"`
+		Paths   map[string]map[string]struct {
+			OperationID string   `json:"operationId"`
+			Consumes    []string `json:"consumes"`
+		} `json:"paths"`
+	}
+	if err := json.Unmarshal(bodyDoc, &specDoc); err != nil {
+		t.Fatalf("Failed to parse Swagger JSON: %v", err)
+	}
+
+	// 1. Schemes verification
+	hasHTTP := false
+	hasHTTPS := false
+	for _, scheme := range specDoc.Schemes {
+		if scheme == "http" {
+			hasHTTP = true
+		}
+		if scheme == "https" {
+			hasHTTPS = true
+		}
+	}
+	if !hasHTTP || !hasHTTPS {
+		t.Errorf("Expected schemes to include 'http' and 'https', got %v", specDoc.Schemes)
+	}
+
+	// 2. Operation IDs and Consumes on GET/DELETE
+	totalOperations := 0
+	seenOpIDs := make(map[string]string)
+	for path, methods := range specDoc.Paths {
+		for method, op := range methods {
+			totalOperations++
+			if op.OperationID == "" {
+				t.Errorf("Operation %s %s missing operationId", strings.ToUpper(method), path)
+			} else {
+				if prevPath, exists := seenOpIDs[op.OperationID]; exists {
+					t.Errorf("Duplicate operationId '%s' for %s %s (already used by %s)", op.OperationID, strings.ToUpper(method), path, prevPath)
+				}
+				seenOpIDs[op.OperationID] = fmt.Sprintf("%s %s", strings.ToUpper(method), path)
+			}
+
+			if strings.EqualFold(method, "get") && len(op.Consumes) > 0 {
+				t.Errorf("GET %s declares consumes: %v (GET must not declare consumes)", path, op.Consumes)
+			}
+			if strings.EqualFold(method, "delete") && len(op.Consumes) > 0 {
+				t.Errorf("DELETE %s declares consumes: %v (DELETE must not declare consumes)", path, op.Consumes)
+			}
+		}
+	}
+
+	if totalOperations < 15 {
+		t.Errorf("Expected at least 15 operations, found %d", totalOperations)
+	}
+}

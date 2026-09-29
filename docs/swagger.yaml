@@ -453,6 +453,7 @@ paths:
       consumes:
       - application/json
       description: Authenticate an admin user and return a JWT token with admin claims
+      operationId: adminLogin
       parameters:
       - description: Admin credentials
         in: body
@@ -493,10 +494,9 @@ paths:
       - Auth
   /api/admin/orders:
     get:
-      consumes:
-      - application/json
       description: Retrieve all orders across the system for administrative auditing
         and fulfillment
+      operationId: listAdminOrders
       produces:
       - application/json
       responses:
@@ -538,6 +538,7 @@ paths:
       - application/json
       description: Update the fulfillment status of an order (e.g. PROCESSING, SHIPPED,
         DELIVERED, CANCELLED)
+      operationId: updateOrderStatus
       parameters:
       - description: Order ID (UUID)
         format: uuid
@@ -598,9 +599,8 @@ paths:
       - Admin
   /api/admin/products:
     get:
-      consumes:
-      - application/json
       description: Retrieve full unrestricted product inventory for administrators
+      operationId: listAdminProducts
       produces:
       - application/json
       responses:
@@ -641,6 +641,7 @@ paths:
       - application/json
       description: Add a new product item with arbitrary category, manufacturer, model,
         price, and stock
+      operationId: createProduct
       parameters:
       - description: Product details
         in: body
@@ -690,6 +691,7 @@ paths:
       consumes:
       - application/json
       description: Set stock quantity for a warehouse product
+      operationId: updateProductStock
       parameters:
       - description: Product ID (UUID)
         format: uuid
@@ -746,9 +748,8 @@ paths:
       - Admin
   /api/admin/users:
     get:
-      consumes:
-      - application/json
       description: Query paginated list of users with optional role filtering
+      operationId: listAdminUsers
       parameters:
       - description: Filter by role (admin or user)
         in: query
@@ -805,6 +806,7 @@ paths:
       consumes:
       - application/json
       description: Create a new admin or regular user account
+      operationId: createAdminUser
       parameters:
       - description: User details
         in: body
@@ -855,10 +857,9 @@ paths:
       - Admin
   /api/admin/users/{id}:
     delete:
-      consumes:
-      - application/json
       description: Marks user as deactivated/deleted while preserving immutable historical
         order records
+      operationId: deleteAdminUser
       parameters:
       - description: User ID (UUID)
         format: uuid
@@ -908,9 +909,8 @@ paths:
       tags:
       - Admin
     get:
-      consumes:
-      - application/json
       description: Retrieve a specific user account by UUID
+      operationId: getAdminUserById
       parameters:
       - description: User ID (UUID)
         format: uuid
@@ -964,6 +964,7 @@ paths:
       consumes:
       - application/json
       description: Adjust user account balance by a specified amount (e.g. +500.00)
+      operationId: adjustUserBalance
       parameters:
       - description: Unique idempotency key to prevent double processing
         in: header
@@ -1035,6 +1036,7 @@ paths:
       - application/json
       description: Replaces the user account balance with a specified new balance
         (minimum 0.00)
+      operationId: setUserBalance
       parameters:
       - description: Unique idempotency key to prevent double processing
         in: header
@@ -1107,6 +1109,7 @@ paths:
       - application/json
       description: Increases the user account balance by a specified increment amount
         (minimum 0.01)
+      operationId: topUpUserBalance
       parameters:
       - description: Unique idempotency key to prevent double processing
         in: header
@@ -1179,6 +1182,7 @@ paths:
       - application/json
       description: Set allowed categories and manufacturers for a user. Empty array
         removes restrictions.
+      operationId: updateUserFilters
       parameters:
       - description: User ID (UUID)
         format: uuid
@@ -1238,6 +1242,7 @@ paths:
       consumes:
       - application/json
       description: Authenticate a regular user and return a JWT token with user claims
+      operationId: userLogin
       parameters:
       - description: User credentials
         in: body
@@ -1278,9 +1283,8 @@ paths:
       - Auth
   /api/user/orders:
     get:
-      consumes:
-      - application/json
       description: Returns all orders placed by the authenticated user
+      operationId: listUserOrders
       produces:
       - application/json
       responses:
@@ -1321,6 +1325,7 @@ paths:
       - application/json
       description: Atomically purchases a product item, decrements stock, and deducts
         user balance
+      operationId: createOrder
       parameters:
       - description: Unique idempotency key to prevent double processing
         in: header
@@ -1384,10 +1389,9 @@ paths:
       - User
   /api/user/orders/{id}:
     get:
-      consumes:
-      - application/json
       description: Returns details for a specific order placed by the authenticated
         user
+      operationId: getUserOrderById
       parameters:
       - description: Order ID (UUID)
         format: uuid
@@ -1438,10 +1442,9 @@ paths:
       - User
   /api/user/products:
     get:
-      consumes:
-      - application/json
       description: Browse warehouse items with optional category/manufacturer filters,
         sorting, and pagination
+      operationId: listUserProducts
       parameters:
       - description: Filter by category (e.g. laptop, smartphone)
         in: query
@@ -1524,10 +1527,9 @@ paths:
       - User
   /api/user/profile:
     get:
-      consumes:
-      - application/json
       description: Returns the profile, current balance, and assigned filter permissions
         for the logged in user
+      operationId: getUserProfile
       produces:
       - application/json
       responses:
@@ -1565,6 +1567,9 @@ paths:
       summary: Get authenticated user profile
       tags:
       - User
+schemes:
+- http
+- https
 securityDefinitions:
   BearerAuth:
     description: 'Type "Bearer" followed by a space and JWT token. Example: "Bearer

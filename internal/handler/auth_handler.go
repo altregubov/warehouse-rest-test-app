@@ -30,6 +30,7 @@ func NewAuthHandler(authService service.AuthService) *AuthHandler {
 // @Failure 500 {object} domain.ErrorEnvelope "Internal server error"
 // @Failure 503 {object} domain.ErrorEnvelope "Service unavailable"
 // @Router /api/admin/login [post]
+// @ID adminLogin
 func (h *AuthHandler) AdminLogin(w http.ResponseWriter, r *http.Request) {
 	var req domain.LoginRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -63,6 +64,7 @@ func (h *AuthHandler) AdminLogin(w http.ResponseWriter, r *http.Request) {
 // @Failure 500 {object} domain.ErrorEnvelope "Internal server error"
 // @Failure 503 {object} domain.ErrorEnvelope "Service unavailable"
 // @Router /api/user/login [post]
+// @ID userLogin
 func (h *AuthHandler) UserLogin(w http.ResponseWriter, r *http.Request) {
 	var req domain.LoginRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {

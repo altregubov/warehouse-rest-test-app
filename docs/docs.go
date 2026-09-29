@@ -28,6 +28,7 @@ const docTemplate = `{
                     "Auth"
                 ],
                 "summary": "Admin authentication",
+                "operationId": "adminLogin",
                 "parameters": [
                     {
                         "description": "Admin credentials",
@@ -93,9 +94,6 @@ const docTemplate = `{
                     }
                 ],
                 "description": "Retrieve all orders across the system for administrative auditing and fulfillment",
-                "consumes": [
-                    "application/json"
-                ],
                 "produces": [
                     "application/json"
                 ],
@@ -103,6 +101,7 @@ const docTemplate = `{
                     "Admin"
                 ],
                 "summary": "List all orders (Admin)",
+                "operationId": "listAdminOrders",
                 "responses": {
                     "200": {
                         "description": "List of all orders",
@@ -170,6 +169,7 @@ const docTemplate = `{
                     "Admin"
                 ],
                 "summary": "Update order fulfillment status",
+                "operationId": "updateOrderStatus",
                 "parameters": [
                     {
                         "type": "string",
@@ -261,9 +261,6 @@ const docTemplate = `{
                     }
                 ],
                 "description": "Retrieve full unrestricted product inventory for administrators",
-                "consumes": [
-                    "application/json"
-                ],
                 "produces": [
                     "application/json"
                 ],
@@ -271,6 +268,7 @@ const docTemplate = `{
                     "Admin"
                 ],
                 "summary": "List all warehouse products (Admin)",
+                "operationId": "listAdminProducts",
                 "responses": {
                     "200": {
                         "description": "List of all products",
@@ -336,6 +334,7 @@ const docTemplate = `{
                     "Admin"
                 ],
                 "summary": "Add a new product to warehouse",
+                "operationId": "createProduct",
                 "parameters": [
                     {
                         "description": "Product details",
@@ -417,6 +416,7 @@ const docTemplate = `{
                     "Admin"
                 ],
                 "summary": "Update product stock quantity",
+                "operationId": "updateProductStock",
                 "parameters": [
                     {
                         "type": "string",
@@ -502,9 +502,6 @@ const docTemplate = `{
                     }
                 ],
                 "description": "Query paginated list of users with optional role filtering",
-                "consumes": [
-                    "application/json"
-                ],
                 "produces": [
                     "application/json"
                 ],
@@ -512,6 +509,7 @@ const docTemplate = `{
                     "Admin"
                 ],
                 "summary": "List users",
+                "operationId": "listAdminUsers",
                 "parameters": [
                     {
                         "type": "string",
@@ -603,6 +601,7 @@ const docTemplate = `{
                     "Admin"
                 ],
                 "summary": "Create a user account",
+                "operationId": "createAdminUser",
                 "parameters": [
                     {
                         "description": "User details",
@@ -680,9 +679,6 @@ const docTemplate = `{
                     }
                 ],
                 "description": "Retrieve a specific user account by UUID",
-                "consumes": [
-                    "application/json"
-                ],
                 "produces": [
                     "application/json"
                 ],
@@ -690,6 +686,7 @@ const docTemplate = `{
                     "Admin"
                 ],
                 "summary": "Get user by ID",
+                "operationId": "getAdminUserById",
                 "parameters": [
                     {
                         "type": "string",
@@ -764,9 +761,6 @@ const docTemplate = `{
                     }
                 ],
                 "description": "Marks user as deactivated/deleted while preserving immutable historical order records",
-                "consumes": [
-                    "application/json"
-                ],
                 "produces": [
                     "application/json"
                 ],
@@ -774,6 +768,7 @@ const docTemplate = `{
                     "Admin"
                 ],
                 "summary": "Soft-delete a user account",
+                "operationId": "deleteAdminUser",
                 "parameters": [
                     {
                         "type": "string",
@@ -860,6 +855,7 @@ const docTemplate = `{
                     "Admin"
                 ],
                 "summary": "Set absolute user balance",
+                "operationId": "setUserBalance",
                 "parameters": [
                     {
                         "type": "string",
@@ -971,6 +967,7 @@ const docTemplate = `{
                     "Admin"
                 ],
                 "summary": "Update or top up user balance (Legacy)",
+                "operationId": "adjustUserBalance",
                 "parameters": [
                     {
                         "type": "string",
@@ -1084,6 +1081,7 @@ const docTemplate = `{
                     "Admin"
                 ],
                 "summary": "Top up user balance by an increment",
+                "operationId": "topUpUserBalance",
                 "parameters": [
                     {
                         "type": "string",
@@ -1197,6 +1195,7 @@ const docTemplate = `{
                     "Admin"
                 ],
                 "summary": "Configure catalog access filters for a user",
+                "operationId": "updateUserFilters",
                 "parameters": [
                     {
                         "type": "string",
@@ -1287,6 +1286,7 @@ const docTemplate = `{
                     "Auth"
                 ],
                 "summary": "User authentication",
+                "operationId": "userLogin",
                 "parameters": [
                     {
                         "description": "User credentials",
@@ -1352,9 +1352,6 @@ const docTemplate = `{
                     }
                 ],
                 "description": "Returns all orders placed by the authenticated user",
-                "consumes": [
-                    "application/json"
-                ],
                 "produces": [
                     "application/json"
                 ],
@@ -1362,6 +1359,7 @@ const docTemplate = `{
                     "User"
                 ],
                 "summary": "List customer purchase history",
+                "operationId": "listUserOrders",
                 "responses": {
                     "200": {
                         "description": "List of orders",
@@ -1427,6 +1425,7 @@ const docTemplate = `{
                     "User"
                 ],
                 "summary": "Purchase product from warehouse",
+                "operationId": "createOrder",
                 "parameters": [
                     {
                         "type": "string",
@@ -1522,9 +1521,6 @@ const docTemplate = `{
                     }
                 ],
                 "description": "Returns details for a specific order placed by the authenticated user",
-                "consumes": [
-                    "application/json"
-                ],
                 "produces": [
                     "application/json"
                 ],
@@ -1532,6 +1528,7 @@ const docTemplate = `{
                     "User"
                 ],
                 "summary": "Get customer order details",
+                "operationId": "getUserOrderById",
                 "parameters": [
                     {
                         "type": "string",
@@ -1608,9 +1605,6 @@ const docTemplate = `{
                     }
                 ],
                 "description": "Browse warehouse items with optional category/manufacturer filters, sorting, and pagination",
-                "consumes": [
-                    "application/json"
-                ],
                 "produces": [
                     "application/json"
                 ],
@@ -1618,6 +1612,7 @@ const docTemplate = `{
                     "User"
                 ],
                 "summary": "Browse warehouse catalog",
+                "operationId": "listUserProducts",
                 "parameters": [
                     {
                         "type": "string",
@@ -1739,9 +1734,6 @@ const docTemplate = `{
                     }
                 ],
                 "description": "Returns the profile, current balance, and assigned filter permissions for the logged in user",
-                "consumes": [
-                    "application/json"
-                ],
                 "produces": [
                     "application/json"
                 ],
@@ -1749,6 +1741,7 @@ const docTemplate = `{
                     "User"
                 ],
                 "summary": "Get authenticated user profile",
+                "operationId": "getUserProfile",
                 "responses": {
                     "200": {
                         "description": "User profile",
@@ -2409,7 +2402,7 @@ var SwaggerInfo = &swag.Spec{
 	Version:          "1.0",
 	Host:             "localhost:8080",
 	BasePath:         "/",
-	Schemes:          []string{},
+	Schemes:          []string{"http", "https"},
 	Title:            "Warehouse REST API Testbench",
 	Description:      "Clean, lightweight, and idiomatic Go backend for warehouse inventory and transactional ordering.",
 	InfoInstanceName: "swagger",

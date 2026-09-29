@@ -1,4 +1,8 @@
 {
+    "schemes": [
+        "http",
+        "https"
+    ],
     "swagger": "2.0",
     "info": {
         "description": "Clean, lightweight, and idiomatic Go backend for warehouse inventory and transactional ordering.",
@@ -22,6 +26,7 @@
                     "Auth"
                 ],
                 "summary": "Admin authentication",
+                "operationId": "adminLogin",
                 "parameters": [
                     {
                         "description": "Admin credentials",
@@ -87,9 +92,6 @@
                     }
                 ],
                 "description": "Retrieve all orders across the system for administrative auditing and fulfillment",
-                "consumes": [
-                    "application/json"
-                ],
                 "produces": [
                     "application/json"
                 ],
@@ -97,6 +99,7 @@
                     "Admin"
                 ],
                 "summary": "List all orders (Admin)",
+                "operationId": "listAdminOrders",
                 "responses": {
                     "200": {
                         "description": "List of all orders",
@@ -164,6 +167,7 @@
                     "Admin"
                 ],
                 "summary": "Update order fulfillment status",
+                "operationId": "updateOrderStatus",
                 "parameters": [
                     {
                         "type": "string",
@@ -255,9 +259,6 @@
                     }
                 ],
                 "description": "Retrieve full unrestricted product inventory for administrators",
-                "consumes": [
-                    "application/json"
-                ],
                 "produces": [
                     "application/json"
                 ],
@@ -265,6 +266,7 @@
                     "Admin"
                 ],
                 "summary": "List all warehouse products (Admin)",
+                "operationId": "listAdminProducts",
                 "responses": {
                     "200": {
                         "description": "List of all products",
@@ -330,6 +332,7 @@
                     "Admin"
                 ],
                 "summary": "Add a new product to warehouse",
+                "operationId": "createProduct",
                 "parameters": [
                     {
                         "description": "Product details",
@@ -411,6 +414,7 @@
                     "Admin"
                 ],
                 "summary": "Update product stock quantity",
+                "operationId": "updateProductStock",
                 "parameters": [
                     {
                         "type": "string",
@@ -496,9 +500,6 @@
                     }
                 ],
                 "description": "Query paginated list of users with optional role filtering",
-                "consumes": [
-                    "application/json"
-                ],
                 "produces": [
                     "application/json"
                 ],
@@ -506,6 +507,7 @@
                     "Admin"
                 ],
                 "summary": "List users",
+                "operationId": "listAdminUsers",
                 "parameters": [
                     {
                         "type": "string",
@@ -597,6 +599,7 @@
                     "Admin"
                 ],
                 "summary": "Create a user account",
+                "operationId": "createAdminUser",
                 "parameters": [
                     {
                         "description": "User details",
@@ -674,9 +677,6 @@
                     }
                 ],
                 "description": "Retrieve a specific user account by UUID",
-                "consumes": [
-                    "application/json"
-                ],
                 "produces": [
                     "application/json"
                 ],
@@ -684,6 +684,7 @@
                     "Admin"
                 ],
                 "summary": "Get user by ID",
+                "operationId": "getAdminUserById",
                 "parameters": [
                     {
                         "type": "string",
@@ -758,9 +759,6 @@
                     }
                 ],
                 "description": "Marks user as deactivated/deleted while preserving immutable historical order records",
-                "consumes": [
-                    "application/json"
-                ],
                 "produces": [
                     "application/json"
                 ],
@@ -768,6 +766,7 @@
                     "Admin"
                 ],
                 "summary": "Soft-delete a user account",
+                "operationId": "deleteAdminUser",
                 "parameters": [
                     {
                         "type": "string",
@@ -854,6 +853,7 @@
                     "Admin"
                 ],
                 "summary": "Set absolute user balance",
+                "operationId": "setUserBalance",
                 "parameters": [
                     {
                         "type": "string",
@@ -965,6 +965,7 @@
                     "Admin"
                 ],
                 "summary": "Update or top up user balance (Legacy)",
+                "operationId": "adjustUserBalance",
                 "parameters": [
                     {
                         "type": "string",
@@ -1078,6 +1079,7 @@
                     "Admin"
                 ],
                 "summary": "Top up user balance by an increment",
+                "operationId": "topUpUserBalance",
                 "parameters": [
                     {
                         "type": "string",
@@ -1191,6 +1193,7 @@
                     "Admin"
                 ],
                 "summary": "Configure catalog access filters for a user",
+                "operationId": "updateUserFilters",
                 "parameters": [
                     {
                         "type": "string",
@@ -1281,6 +1284,7 @@
                     "Auth"
                 ],
                 "summary": "User authentication",
+                "operationId": "userLogin",
                 "parameters": [
                     {
                         "description": "User credentials",
@@ -1346,9 +1350,6 @@
                     }
                 ],
                 "description": "Returns all orders placed by the authenticated user",
-                "consumes": [
-                    "application/json"
-                ],
                 "produces": [
                     "application/json"
                 ],
@@ -1356,6 +1357,7 @@
                     "User"
                 ],
                 "summary": "List customer purchase history",
+                "operationId": "listUserOrders",
                 "responses": {
                     "200": {
                         "description": "List of orders",
@@ -1421,6 +1423,7 @@
                     "User"
                 ],
                 "summary": "Purchase product from warehouse",
+                "operationId": "createOrder",
                 "parameters": [
                     {
                         "type": "string",
@@ -1516,9 +1519,6 @@
                     }
                 ],
                 "description": "Returns details for a specific order placed by the authenticated user",
-                "consumes": [
-                    "application/json"
-                ],
                 "produces": [
                     "application/json"
                 ],
@@ -1526,6 +1526,7 @@
                     "User"
                 ],
                 "summary": "Get customer order details",
+                "operationId": "getUserOrderById",
                 "parameters": [
                     {
                         "type": "string",
@@ -1602,9 +1603,6 @@
                     }
                 ],
                 "description": "Browse warehouse items with optional category/manufacturer filters, sorting, and pagination",
-                "consumes": [
-                    "application/json"
-                ],
                 "produces": [
                     "application/json"
                 ],
@@ -1612,6 +1610,7 @@
                     "User"
                 ],
                 "summary": "Browse warehouse catalog",
+                "operationId": "listUserProducts",
                 "parameters": [
                     {
                         "type": "string",
@@ -1733,9 +1732,6 @@
                     }
                 ],
                 "description": "Returns the profile, current balance, and assigned filter permissions for the logged in user",
-                "consumes": [
-                    "application/json"
-                ],
                 "produces": [
                     "application/json"
                 ],
@@ -1743,6 +1739,7 @@
                     "User"
                 ],
                 "summary": "Get authenticated user profile",
+                "operationId": "getUserProfile",
                 "responses": {
                     "200": {
                         "description": "User profile",

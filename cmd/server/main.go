@@ -26,6 +26,7 @@ import (
 // @description Clean, lightweight, and idiomatic Go backend for warehouse inventory and transactional ordering.
 // @host localhost:8080
 // @BasePath /
+// @schemes http https
 
 // @securityDefinitions.apikey BearerAuth
 // @in header

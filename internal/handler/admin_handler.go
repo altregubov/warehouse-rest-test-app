@@ -42,6 +42,7 @@ func NewAdminHandler(userService service.UserService, productService service.Pro
 // @Failure 500 {object} domain.ErrorEnvelope "Internal server error"
 // @Failure 503 {object} domain.ErrorEnvelope "Service unavailable"
 // @Router /api/admin/users [post]
+// @ID createAdminUser
 func (h *AdminHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 	var req domain.CreateUserRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -86,6 +87,7 @@ func (h *AdminHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 // @Failure 500 {object} domain.ErrorEnvelope "Internal server error"
 // @Failure 503 {object} domain.ErrorEnvelope "Service unavailable"
 // @Router /api/admin/users/{id}/balance/top-up [post]
+// @ID topUpUserBalance
 func (h *AdminHandler) TopUpBalance(w http.ResponseWriter, r *http.Request) {
 	idStr := chi.URLParam(r, "id")
 	userID, err := uuid.Parse(idStr)
@@ -157,6 +159,7 @@ func (h *AdminHandler) TopUpBalance(w http.ResponseWriter, r *http.Request) {
 // @Failure 500 {object} domain.ErrorEnvelope "Internal server error"
 // @Failure 503 {object} domain.ErrorEnvelope "Service unavailable"
 // @Router /api/admin/users/{id}/balance [put]
+// @ID setUserBalance
 func (h *AdminHandler) SetBalance(w http.ResponseWriter, r *http.Request) {
 	idStr := chi.URLParam(r, "id")
 	userID, err := uuid.Parse(idStr)
@@ -226,6 +229,7 @@ func (h *AdminHandler) SetBalance(w http.ResponseWriter, r *http.Request) {
 // @Failure 500 {object} domain.ErrorEnvelope "Internal server error"
 // @Failure 503 {object} domain.ErrorEnvelope "Service unavailable"
 // @Router /api/admin/users/{id}/balance [patch]
+// @ID adjustUserBalance
 func (h *AdminHandler) UpdateBalance(w http.ResponseWriter, r *http.Request) {
 	idStr := chi.URLParam(r, "id")
 	userID, err := uuid.Parse(idStr)
@@ -274,6 +278,7 @@ func (h *AdminHandler) UpdateBalance(w http.ResponseWriter, r *http.Request) {
 // @Failure 500 {object} domain.ErrorEnvelope "Internal server error"
 // @Failure 503 {object} domain.ErrorEnvelope "Service unavailable"
 // @Router /api/admin/users/{id}/filters [put]
+// @ID updateUserFilters
 func (h *AdminHandler) UpdateFilters(w http.ResponseWriter, r *http.Request) {
 	idStr := chi.URLParam(r, "id")
 	userID, err := uuid.Parse(idStr)
@@ -320,6 +325,7 @@ func (h *AdminHandler) UpdateFilters(w http.ResponseWriter, r *http.Request) {
 // @Failure 500 {object} domain.ErrorEnvelope "Internal server error"
 // @Failure 503 {object} domain.ErrorEnvelope "Service unavailable"
 // @Router /api/admin/products [post]
+// @ID createProduct
 func (h *AdminHandler) CreateProduct(w http.ResponseWriter, r *http.Request) {
 	var req domain.CreateProductRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -357,6 +363,7 @@ func (h *AdminHandler) CreateProduct(w http.ResponseWriter, r *http.Request) {
 // @Failure 500 {object} domain.ErrorEnvelope "Internal server error"
 // @Failure 503 {object} domain.ErrorEnvelope "Service unavailable"
 // @Router /api/admin/products/{id}/stock [patch]
+// @ID updateProductStock
 func (h *AdminHandler) UpdateStock(w http.ResponseWriter, r *http.Request) {
 	idStr := chi.URLParam(r, "id")
 	prodID, err := uuid.Parse(idStr)
@@ -397,7 +404,6 @@ func (h *AdminHandler) UpdateStock(w http.ResponseWriter, r *http.Request) {
 // @Summary List users
 // @Description Query paginated list of users with optional role filtering
 // @Tags Admin
-// @Accept json
 // @Produce json
 // @Security BearerAuth
 // @Param role query string false "Filter by role (admin or user)"
@@ -410,6 +416,7 @@ func (h *AdminHandler) UpdateStock(w http.ResponseWriter, r *http.Request) {
 // @Failure 500 {object} domain.ErrorEnvelope "Internal server error"
 // @Failure 503 {object} domain.ErrorEnvelope "Service unavailable"
 // @Router /api/admin/users [get]
+// @ID listAdminUsers
 func (h *AdminHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
 	role := r.URL.Query().Get("role")
 	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
@@ -428,7 +435,6 @@ func (h *AdminHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
 // @Summary Get user by ID
 // @Description Retrieve a specific user account by UUID
 // @Tags Admin
-// @Accept json
 // @Produce json
 // @Security BearerAuth
 // @Param id path string true "User ID (UUID)" Format(uuid)
@@ -440,6 +446,7 @@ func (h *AdminHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
 // @Failure 500 {object} domain.ErrorEnvelope "Internal server error"
 // @Failure 503 {object} domain.ErrorEnvelope "Service unavailable"
 // @Router /api/admin/users/{id} [get]
+// @ID getAdminUserById
 func (h *AdminHandler) GetUser(w http.ResponseWriter, r *http.Request) {
 	idStr := chi.URLParam(r, "id")
 	userID, err := uuid.Parse(idStr)
@@ -465,7 +472,6 @@ func (h *AdminHandler) GetUser(w http.ResponseWriter, r *http.Request) {
 // @Summary Soft-delete a user account
 // @Description Marks user as deactivated/deleted while preserving immutable historical order records
 // @Tags Admin
-// @Accept json
 // @Produce json
 // @Security BearerAuth
 // @Param id path string true "User ID (UUID)" Format(uuid)
@@ -477,6 +483,7 @@ func (h *AdminHandler) GetUser(w http.ResponseWriter, r *http.Request) {
 // @Failure 500 {object} domain.ErrorEnvelope "Internal server error"
 // @Failure 503 {object} domain.ErrorEnvelope "Service unavailable"
 // @Router /api/admin/users/{id} [delete]
+// @ID deleteAdminUser
 func (h *AdminHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 	idStr := chi.URLParam(r, "id")
 	userID, err := uuid.Parse(idStr)
@@ -501,7 +508,6 @@ func (h *AdminHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 // @Summary List all warehouse products (Admin)
 // @Description Retrieve full unrestricted product inventory for administrators
 // @Tags Admin
-// @Accept json
 // @Produce json
 // @Security BearerAuth
 // @Success 200 {object} domain.SuccessEnvelope{data=[]domain.Product} "List of all products"
@@ -510,6 +516,7 @@ func (h *AdminHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 // @Failure 500 {object} domain.ErrorEnvelope "Internal server error"
 // @Failure 503 {object} domain.ErrorEnvelope "Service unavailable"
 // @Router /api/admin/products [get]
+// @ID listAdminProducts
 func (h *AdminHandler) ListProducts(w http.ResponseWriter, r *http.Request) {
 	products, err := h.productService.ListAllProducts(r.Context())
 	if err != nil {
@@ -524,7 +531,6 @@ func (h *AdminHandler) ListProducts(w http.ResponseWriter, r *http.Request) {
 // @Summary List all orders (Admin)
 // @Description Retrieve all orders across the system for administrative auditing and fulfillment
 // @Tags Admin
-// @Accept json
 // @Produce json
 // @Security BearerAuth
 // @Success 200 {object} domain.SuccessEnvelope{data=[]domain.OrderResponse} "List of all orders"
@@ -533,6 +539,7 @@ func (h *AdminHandler) ListProducts(w http.ResponseWriter, r *http.Request) {
 // @Failure 500 {object} domain.ErrorEnvelope "Internal server error"
 // @Failure 503 {object} domain.ErrorEnvelope "Service unavailable"
 // @Router /api/admin/orders [get]
+// @ID listAdminOrders
 func (h *AdminHandler) ListOrders(w http.ResponseWriter, r *http.Request) {
 	orders, err := h.orderService.ListAllOrders(r.Context())
 	if err != nil {
@@ -561,6 +568,7 @@ func (h *AdminHandler) ListOrders(w http.ResponseWriter, r *http.Request) {
 // @Failure 500 {object} domain.ErrorEnvelope "Internal server error"
 // @Failure 503 {object} domain.ErrorEnvelope "Service unavailable"
 // @Router /api/admin/orders/{id}/status [patch]
+// @ID updateOrderStatus
 func (h *AdminHandler) UpdateOrderStatus(w http.ResponseWriter, r *http.Request) {
 	idStr := chi.URLParam(r, "id")
 	orderID, err := uuid.Parse(idStr)
