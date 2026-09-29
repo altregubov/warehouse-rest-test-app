@@ -159,7 +159,7 @@ All tests verify Swagger endpoints, authentication separation, RBAC guards, cate
 │   └── api_e2e_test.go  # End-to-end integration tests
 ├── docker-compose.yml   # Multi-container orchestration
 ├── Dockerfile           # Multi-stage production container build
-├── SPEC.md              # Detailed technical specification
+├── specs/               # Technical and client specifications
 └── README.md            # Setup and user guide
 ```
 
