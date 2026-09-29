@@ -1246,11 +1246,11 @@ func TestSchemaValidationAndOpenAPIContracts(t *testing.T) {
 	}
 
 	checkDefinitions := []string{
-		"domain.CreateUserRequest",
-		"domain.CreateProductRequest",
-		"domain.CreateOrderRequest",
-		"domain.LoginRequest",
-		"domain.UpdateStockRequest",
+		"CreateUserRequest",
+		"CreateProductRequest",
+		"CreateOrderRequest",
+		"LoginRequest",
+		"UpdateStockRequest",
 	}
 
 	for _, defName := range checkDefinitions {
@@ -1963,9 +1963,9 @@ func TestCleanOpenAPIArrayExamples(t *testing.T) {
 	}
 
 	// 1. CreateUserRequest allowed_categories and allowed_manufacturers
-	createReq, ok := spec.Definitions["domain.CreateUserRequest"]
+	createReq, ok := spec.Definitions["CreateUserRequest"]
 	if !ok {
-		t.Fatalf("domain.CreateUserRequest definition not found in swagger spec")
+		t.Fatalf("CreateUserRequest definition not found in swagger spec")
 	}
 
 	catProp, ok := createReq.Properties["allowed_categories"]
@@ -1987,9 +1987,9 @@ func TestCleanOpenAPIArrayExamples(t *testing.T) {
 	}
 
 	// 2. UpdateFiltersRequest allowed_categories and allowed_manufacturers
-	filterReq, ok := spec.Definitions["domain.UpdateFiltersRequest"]
+	filterReq, ok := spec.Definitions["UpdateFiltersRequest"]
 	if !ok {
-		t.Fatalf("domain.UpdateFiltersRequest definition not found in swagger spec")
+		t.Fatalf("UpdateFiltersRequest definition not found in swagger spec")
 	}
 
 	filterCatProp, ok := filterReq.Properties["allowed_categories"]
@@ -2242,13 +2242,13 @@ func TestUpdateStockQuantityBoundaryValidation(t *testing.T) {
 		t.Fatalf("Failed to parse Swagger JSON: %v", err)
 	}
 
-	updateStockDef, ok := specDoc.Definitions["domain.UpdateStockRequest"]
+	updateStockDef, ok := specDoc.Definitions["UpdateStockRequest"]
 	if !ok {
-		t.Fatalf("domain.UpdateStockRequest definition not found in swagger doc")
+		t.Fatalf("UpdateStockRequest definition not found in swagger doc")
 	}
 	stockProp, ok := updateStockDef.Properties["stock_quantity"]
 	if !ok {
-		t.Fatalf("stock_quantity property not found in domain.UpdateStockRequest")
+		t.Fatalf("stock_quantity property not found in UpdateStockRequest")
 	}
 	if stockProp.Minimum == nil || *stockProp.Minimum != 0 {
 		t.Errorf("Expected minimum: 0 on stock_quantity, got %v", stockProp.Minimum)
@@ -2320,9 +2320,54 @@ func TestOperationalMiddlewareConfiguration(t *testing.T) {
 	}
 }
 
+func TestCleanSwaggerSchemaDefinitionNames(t *testing.T) {
+	client := newClient("")
+	respDoc, bodyDoc, err := client.request(http.MethodGet, "/swagger/doc.json", nil)
+	if err != nil || respDoc.StatusCode != http.StatusOK {
+		t.Fatalf("Failed to fetch /swagger/doc.json: status=%v, err=%v", respDoc.StatusCode, err)
+	}
 
+	var specDoc struct {
+		Definitions map[string]interface{} `json:"definitions"`
+	}
+	if err := json.Unmarshal(bodyDoc, &specDoc); err != nil {
+		t.Fatalf("Failed to parse Swagger JSON: %v", err)
+	}
 
+	if len(specDoc.Definitions) == 0 {
+		t.Fatalf("No definitions found in Swagger spec")
+	}
 
+	for defName := range specDoc.Definitions {
+		if strings.Contains(defName, ".") {
+			t.Errorf("Swagger definition name '%s' contains dot (should be clean unqualified struct name)", defName)
+		}
+		if strings.Contains(defName, "domain") {
+			t.Errorf("Swagger definition name '%s' contains package name 'domain'", defName)
+		}
+		if strings.Contains(defName, "github_com") || strings.Contains(defName, "/") {
+			t.Errorf("Swagger definition name '%s' contains package path", defName)
+		}
+	}
 
+	expectedCleanDefinitions := []string{
+		"CreateOrderRequest",
+		"CreateProductRequest",
+		"CreateUserRequest",
+		"LoginRequest",
+		"LoginResponse",
+		"OrderResponse",
+		"Product",
+		"SetBalanceRequest",
+		"TopUpBalanceRequest",
+		"UpdateStockRequest",
+		"UserSummary",
+	}
 
+	for _, expected := range expectedCleanDefinitions {
+		if _, exists := specDoc.Definitions[expected]; !exists {
+			t.Errorf("Expected clean Swagger definition '%s' not found", expected)
+		}
+	}
+}
 

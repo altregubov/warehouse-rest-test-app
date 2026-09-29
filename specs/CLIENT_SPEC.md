@@ -295,6 +295,7 @@ Client applications and automated SDK generators rely on strict, machine-readabl
 - **Enumerated Types**: Role assignments are strictly constrained to `admin` or `user`. Order fulfillment transitions follow standard states (`CREATED`, `PROCESSING`, `SHIPPED`, `DELIVERED`, `CANCELLED`).
 - **Domain Boundaries**: Order quantities must be at least 1 unit; product stock quantities must be non-negative and within integer bounds ($0 \le \text{stock} \le 2,147,483,647$); unit prices and account balances must be non-negative ($\ge 0$). User account creation requires minimum string lengths and password complexity (username $\ge 1$, password $\ge 8$ characters containing both letters and numbers).
 - **Native Schema Examples**: Schema definitions for array properties (`allowed_categories`, `allowed_manufacturers`) specify native array examples (`["laptop"]`, `["Apple", "Dell"]`) without escaped brackets or string quotes, providing turn-key valid payloads in interactive API documentation and developer sandboxes.
+- **Sanitized Model Naming**: OpenAPI model definitions expose clean, unqualified domain entity names (e.g. `CreateOrderRequest`, `Product`, `UserSummary`, `OrderResponse`) without internal Go package paths or vendor usernames, ensuring SDK generators output idiomatic, developer-friendly client classes.
 
 Violations of input formats or domain boundaries trigger immediate `400 Bad Request` or `422 Unprocessable Entity` responses containing typed field violation details prior to downstream processing.
 

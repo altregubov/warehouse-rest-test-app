@@ -154,7 +154,8 @@ To ensure client SDK predictability and prevent unhandled database violations:
 - **UUID Formatting**: All entity identifiers, foreign keys, and `{id}` path parameters strictly enforce `"format": "uuid"` (validated using standard RFC 4122 UUID parser).
 - **Date-Time Formatting**: Timestamp fields (`created_at`, `updated_at`, `deleted_at`) enforce `"format": "date-time"` (RFC 3339).
 - **Role Enums**: Role fields and parameters enforce enumerated values: `["admin", "user"]`.
-- **Clean Array Examples**: Array properties (`allowed_categories`, `allowed_manufacturers`) define native JSON array examples (`["laptop"]`, `["Apple", "Dell"]`) rather than escaped string literals, ensuring Swagger UI "Try It Out" and automated contract generators populate valid request bodies out-of-the-box.
+- **Native Array Examples**: Array properties (`allowed_categories`, `allowed_manufacturers`) define native JSON array examples (`["laptop"]`, `["Apple", "Dell"]`) rather than escaped string literals, ensuring Swagger UI "Try It Out" and automated contract generators populate valid request bodies out-of-the-box.
+- **Sanitized Schema Definition Names**: Swagger definition keys use clean, unqualified model names (e.g. `CreateOrderRequest`, `Product`, `UserSummary`) without internal Go package paths (`domain.`) or repository URLs (`github_com_altregubov_...`). Generated using `swag --useStructName` for encapsulation, developer ergonomics, and clean client SDK generation.
 - **Numeric Boundaries**:
   - `quantity`: `minimum: 1`
   - `stock_quantity`: `minimum: 0`, `maximum: 2147483647` (enforced via `binding:"required,gte=0"`)

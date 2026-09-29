@@ -1,6 +1,6 @@
 basePath: /
 definitions:
-  domain.CreateOrderRequest:
+  CreateOrderRequest:
     properties:
       product_id:
         example: c0000000-0000-0000-0000-000000000001
@@ -14,7 +14,7 @@ definitions:
     - product_id
     - quantity
     type: object
-  domain.CreateProductRequest:
+  CreateProductRequest:
     properties:
       category:
         example: laptop
@@ -41,7 +41,7 @@ definitions:
     - price
     - stock_quantity
     type: object
-  domain.CreateUserRequest:
+  CreateUserRequest:
     properties:
       access_level:
         enum:
@@ -90,14 +90,14 @@ definitions:
     - role
     - username
     type: object
-  domain.ErrorDetails:
+  ErrorDetails:
     properties:
       code:
         example: BAD_REQUEST
         type: string
       details:
         items:
-          $ref: '#/definitions/domain.FieldViolation'
+          $ref: '#/definitions/FieldViolation'
         type: array
       message:
         example: Detailed error description
@@ -106,10 +106,10 @@ definitions:
     - code
     - message
     type: object
-  domain.ErrorEnvelope:
+  ErrorEnvelope:
     properties:
       error:
-        $ref: '#/definitions/domain.ErrorDetails'
+        $ref: '#/definitions/ErrorDetails'
       requestId:
         example: c56a4180-65aa-42ec-a945-5fd21dec0538
         type: string
@@ -120,7 +120,7 @@ definitions:
     - error
     - success
     type: object
-  domain.FieldViolation:
+  FieldViolation:
     properties:
       field:
         example: quantity
@@ -132,7 +132,7 @@ definitions:
     - field
     - issue
     type: object
-  domain.LoginRequest:
+  LoginRequest:
     properties:
       password:
         example: admin123
@@ -146,17 +146,17 @@ definitions:
     - password
     - username
     type: object
-  domain.LoginResponse:
+  LoginResponse:
     properties:
       token:
         type: string
       user:
-        $ref: '#/definitions/domain.UserSummary'
+        $ref: '#/definitions/UserSummary'
     required:
     - token
     - user
     type: object
-  domain.OrderResponse:
+  OrderResponse:
     properties:
       created_at:
         format: date-time
@@ -214,7 +214,7 @@ definitions:
     - total_price
     - unit_price
     type: object
-  domain.PaginationMetadata:
+  PaginationMetadata:
     properties:
       page:
         example: 1
@@ -239,7 +239,7 @@ definitions:
     - total_count
     - total_pages
     type: object
-  domain.Product:
+  Product:
     properties:
       category:
         example: laptop
@@ -279,7 +279,7 @@ definitions:
     - stock_quantity
     - updated_at
     type: object
-  domain.SetBalanceRequest:
+  SetBalanceRequest:
     properties:
       new_balance:
         example: 5000
@@ -289,7 +289,7 @@ definitions:
     required:
     - new_balance
     type: object
-  domain.SuccessEnvelope:
+  SuccessEnvelope:
     properties:
       data: {}
       page:
@@ -299,7 +299,7 @@ definitions:
         example: 20
         type: integer
       pagination:
-        $ref: '#/definitions/domain.PaginationMetadata'
+        $ref: '#/definitions/PaginationMetadata'
       requestId:
         example: c56a4180-65aa-42ec-a945-5fd21dec0538
         type: string
@@ -316,7 +316,7 @@ definitions:
     - data
     - success
     type: object
-  domain.TopUpBalanceRequest:
+  TopUpBalanceRequest:
     properties:
       increment_amount:
         example: 500
@@ -326,7 +326,7 @@ definitions:
     required:
     - increment_amount
     type: object
-  domain.UpdateBalanceRequest:
+  UpdateBalanceRequest:
     properties:
       amount:
         example: 500
@@ -335,7 +335,7 @@ definitions:
     required:
     - amount
     type: object
-  domain.UpdateFiltersRequest:
+  UpdateFiltersRequest:
     properties:
       access_level:
         enum:
@@ -364,7 +364,7 @@ definitions:
     - allowed_categories
     - allowed_manufacturers
     type: object
-  domain.UpdateOrderStatusRequest:
+  UpdateOrderStatusRequest:
     properties:
       status:
         enum:
@@ -378,7 +378,7 @@ definitions:
     required:
     - status
     type: object
-  domain.UpdateStockRequest:
+  UpdateStockRequest:
     properties:
       stock_quantity:
         example: 25
@@ -388,7 +388,7 @@ definitions:
     required:
     - stock_quantity
     type: object
-  domain.UserSummary:
+  UserSummary:
     properties:
       access_level:
         enum:
@@ -459,7 +459,7 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/domain.LoginRequest'
+          $ref: '#/definitions/LoginRequest'
       produces:
       - application/json
       responses:
@@ -467,27 +467,27 @@ paths:
           description: Login successful
           schema:
             allOf:
-            - $ref: '#/definitions/domain.SuccessEnvelope'
+            - $ref: '#/definitions/SuccessEnvelope'
             - properties:
                 data:
-                  $ref: '#/definitions/domain.LoginResponse'
+                  $ref: '#/definitions/LoginResponse'
               type: object
         "400":
           description: Invalid request payload
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
         "401":
           description: Invalid username or password
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
         "500":
           description: Internal server error
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
         "503":
           description: Service unavailable
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
       summary: Admin authentication
       tags:
       - Auth
@@ -504,29 +504,29 @@ paths:
           description: List of all orders
           schema:
             allOf:
-            - $ref: '#/definitions/domain.SuccessEnvelope'
+            - $ref: '#/definitions/SuccessEnvelope'
             - properties:
                 data:
                   items:
-                    $ref: '#/definitions/domain.OrderResponse'
+                    $ref: '#/definitions/OrderResponse'
                   type: array
               type: object
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
         "500":
           description: Internal server error
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
         "503":
           description: Service unavailable
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
       security:
       - BearerAuth: []
       summary: List all orders (Admin)
@@ -550,7 +550,7 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/domain.UpdateOrderStatusRequest'
+          $ref: '#/definitions/UpdateOrderStatusRequest'
       produces:
       - application/json
       responses:
@@ -558,39 +558,39 @@ paths:
           description: Order status updated
           schema:
             allOf:
-            - $ref: '#/definitions/domain.SuccessEnvelope'
+            - $ref: '#/definitions/SuccessEnvelope'
             - properties:
                 data:
-                  $ref: '#/definitions/domain.OrderResponse'
+                  $ref: '#/definitions/OrderResponse'
               type: object
         "400":
           description: Invalid input
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
         "404":
           description: Order not found
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
         "422":
           description: Invalid status transition
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
         "500":
           description: Internal server error
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
         "503":
           description: Service unavailable
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
       security:
       - BearerAuth: []
       summary: Update order fulfillment status
@@ -608,29 +608,29 @@ paths:
           description: List of all products
           schema:
             allOf:
-            - $ref: '#/definitions/domain.SuccessEnvelope'
+            - $ref: '#/definitions/SuccessEnvelope'
             - properties:
                 data:
                   items:
-                    $ref: '#/definitions/domain.Product'
+                    $ref: '#/definitions/Product'
                   type: array
               type: object
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
         "500":
           description: Internal server error
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
         "503":
           description: Service unavailable
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
       security:
       - BearerAuth: []
       summary: List all warehouse products (Admin)
@@ -647,7 +647,7 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/domain.CreateProductRequest'
+          $ref: '#/definitions/CreateProductRequest'
       produces:
       - application/json
       responses:
@@ -655,31 +655,31 @@ paths:
           description: Product created
           schema:
             allOf:
-            - $ref: '#/definitions/domain.SuccessEnvelope'
+            - $ref: '#/definitions/SuccessEnvelope'
             - properties:
                 data:
-                  $ref: '#/definitions/domain.Product'
+                  $ref: '#/definitions/Product'
               type: object
         "400":
           description: Invalid input
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
         "500":
           description: Internal server error
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
         "503":
           description: Service unavailable
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
       security:
       - BearerAuth: []
       summary: Add a new product to warehouse
@@ -702,7 +702,7 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/domain.UpdateStockRequest'
+          $ref: '#/definitions/UpdateStockRequest'
       produces:
       - application/json
       responses:
@@ -710,35 +710,35 @@ paths:
           description: Stock updated
           schema:
             allOf:
-            - $ref: '#/definitions/domain.SuccessEnvelope'
+            - $ref: '#/definitions/SuccessEnvelope'
             - properties:
                 data:
-                  $ref: '#/definitions/domain.Product'
+                  $ref: '#/definitions/Product'
               type: object
         "400":
           description: Invalid input
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
         "404":
           description: Product not found
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
         "500":
           description: Internal server error
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
         "503":
           description: Service unavailable
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
       security:
       - BearerAuth: []
       summary: Update product stock quantity
@@ -769,33 +769,33 @@ paths:
           description: List of users
           schema:
             allOf:
-            - $ref: '#/definitions/domain.SuccessEnvelope'
+            - $ref: '#/definitions/SuccessEnvelope'
             - properties:
                 data:
                   items:
-                    $ref: '#/definitions/domain.UserSummary'
+                    $ref: '#/definitions/UserSummary'
                   type: array
               type: object
         "400":
           description: Invalid query parameters
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
         "500":
           description: Internal server error
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
         "503":
           description: Service unavailable
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
       security:
       - BearerAuth: []
       summary: List users
@@ -811,7 +811,7 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/domain.CreateUserRequest'
+          $ref: '#/definitions/CreateUserRequest'
       produces:
       - application/json
       responses:
@@ -819,35 +819,35 @@ paths:
           description: User created
           schema:
             allOf:
-            - $ref: '#/definitions/domain.SuccessEnvelope'
+            - $ref: '#/definitions/SuccessEnvelope'
             - properties:
                 data:
-                  $ref: '#/definitions/domain.UserSummary'
+                  $ref: '#/definitions/UserSummary'
               type: object
         "400":
           description: Invalid input
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
         "409":
           description: Username already exists
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
         "500":
           description: Internal server error
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
         "503":
           description: Service unavailable
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
       security:
       - BearerAuth: []
       summary: Create a user account
@@ -873,7 +873,7 @@ paths:
           description: User deactivated successfully
           schema:
             allOf:
-            - $ref: '#/definitions/domain.SuccessEnvelope'
+            - $ref: '#/definitions/SuccessEnvelope'
             - properties:
                 data:
                   type: string
@@ -881,27 +881,27 @@ paths:
         "400":
           description: Invalid ID
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
         "404":
           description: User not found
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
         "500":
           description: Internal server error
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
         "503":
           description: Service unavailable
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
       security:
       - BearerAuth: []
       summary: Soft-delete a user account
@@ -925,35 +925,35 @@ paths:
           description: User details
           schema:
             allOf:
-            - $ref: '#/definitions/domain.SuccessEnvelope'
+            - $ref: '#/definitions/SuccessEnvelope'
             - properties:
                 data:
-                  $ref: '#/definitions/domain.UserSummary'
+                  $ref: '#/definitions/UserSummary'
               type: object
         "400":
           description: Invalid ID
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
         "404":
           description: User not found
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
         "500":
           description: Internal server error
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
         "503":
           description: Service unavailable
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
       security:
       - BearerAuth: []
       summary: Get user by ID
@@ -980,7 +980,7 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/domain.UpdateBalanceRequest'
+          $ref: '#/definitions/UpdateBalanceRequest'
       produces:
       - application/json
       responses:
@@ -988,43 +988,43 @@ paths:
           description: Balance updated
           schema:
             allOf:
-            - $ref: '#/definitions/domain.SuccessEnvelope'
+            - $ref: '#/definitions/SuccessEnvelope'
             - properties:
                 data:
-                  $ref: '#/definitions/domain.UserSummary'
+                  $ref: '#/definitions/UserSummary'
               type: object
         "400":
           description: Invalid input or negative balance
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
         "404":
           description: User not found
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
         "409":
           description: Idempotency conflict or concurrent request in flight
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
         "422":
           description: Unprocessable entity / validation failure
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
         "500":
           description: Internal server error
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
         "503":
           description: Service unavailable
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
       security:
       - BearerAuth: []
       summary: Update or top up user balance (Legacy)
@@ -1051,7 +1051,7 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/domain.SetBalanceRequest'
+          $ref: '#/definitions/SetBalanceRequest'
       produces:
       - application/json
       responses:
@@ -1059,43 +1059,43 @@ paths:
           description: Balance set
           schema:
             allOf:
-            - $ref: '#/definitions/domain.SuccessEnvelope'
+            - $ref: '#/definitions/SuccessEnvelope'
             - properties:
                 data:
-                  $ref: '#/definitions/domain.UserSummary'
+                  $ref: '#/definitions/UserSummary'
               type: object
         "400":
           description: Invalid input
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
         "404":
           description: User not found
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
         "409":
           description: Idempotency conflict or concurrent request in flight
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
         "422":
           description: Unprocessable entity / validation failure
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
         "500":
           description: Internal server error
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
         "503":
           description: Service unavailable
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
       security:
       - BearerAuth: []
       summary: Set absolute user balance
@@ -1123,7 +1123,7 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/domain.TopUpBalanceRequest'
+          $ref: '#/definitions/TopUpBalanceRequest'
       produces:
       - application/json
       responses:
@@ -1131,43 +1131,43 @@ paths:
           description: Balance topped up
           schema:
             allOf:
-            - $ref: '#/definitions/domain.SuccessEnvelope'
+            - $ref: '#/definitions/SuccessEnvelope'
             - properties:
                 data:
-                  $ref: '#/definitions/domain.UserSummary'
+                  $ref: '#/definitions/UserSummary'
               type: object
         "400":
           description: Invalid input
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
         "404":
           description: User not found
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
         "409":
           description: Idempotency conflict or concurrent request in flight
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
         "422":
           description: Unprocessable entity / validation failure
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
         "500":
           description: Internal server error
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
         "503":
           description: Service unavailable
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
       security:
       - BearerAuth: []
       summary: Top up user balance by an increment
@@ -1191,7 +1191,7 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/domain.UpdateFiltersRequest'
+          $ref: '#/definitions/UpdateFiltersRequest'
       produces:
       - application/json
       responses:
@@ -1199,35 +1199,35 @@ paths:
           description: Filters updated
           schema:
             allOf:
-            - $ref: '#/definitions/domain.SuccessEnvelope'
+            - $ref: '#/definitions/SuccessEnvelope'
             - properties:
                 data:
-                  $ref: '#/definitions/domain.UserSummary'
+                  $ref: '#/definitions/UserSummary'
               type: object
         "400":
           description: Invalid input
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
         "404":
           description: User not found
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
         "500":
           description: Internal server error
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
         "503":
           description: Service unavailable
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
       security:
       - BearerAuth: []
       summary: Configure catalog access filters for a user
@@ -1244,7 +1244,7 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/domain.LoginRequest'
+          $ref: '#/definitions/LoginRequest'
       produces:
       - application/json
       responses:
@@ -1252,27 +1252,27 @@ paths:
           description: Login successful
           schema:
             allOf:
-            - $ref: '#/definitions/domain.SuccessEnvelope'
+            - $ref: '#/definitions/SuccessEnvelope'
             - properties:
                 data:
-                  $ref: '#/definitions/domain.LoginResponse'
+                  $ref: '#/definitions/LoginResponse'
               type: object
         "400":
           description: Invalid request payload
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
         "401":
           description: Invalid username or password
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
         "500":
           description: Internal server error
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
         "503":
           description: Service unavailable
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
       summary: User authentication
       tags:
       - Auth
@@ -1288,29 +1288,29 @@ paths:
           description: List of orders
           schema:
             allOf:
-            - $ref: '#/definitions/domain.SuccessEnvelope'
+            - $ref: '#/definitions/SuccessEnvelope'
             - properties:
                 data:
                   items:
-                    $ref: '#/definitions/domain.OrderResponse'
+                    $ref: '#/definitions/OrderResponse'
                   type: array
               type: object
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
         "500":
           description: Internal server error
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
         "503":
           description: Service unavailable
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
       security:
       - BearerAuth: []
       summary: List customer purchase history
@@ -1331,7 +1331,7 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/domain.CreateOrderRequest'
+          $ref: '#/definitions/CreateOrderRequest'
       produces:
       - application/json
       responses:
@@ -1339,44 +1339,44 @@ paths:
           description: Order placed successfully
           schema:
             allOf:
-            - $ref: '#/definitions/domain.SuccessEnvelope'
+            - $ref: '#/definitions/SuccessEnvelope'
             - properties:
                 data:
-                  $ref: '#/definitions/domain.OrderResponse'
+                  $ref: '#/definitions/OrderResponse'
               type: object
         "400":
           description: Malformed JSON syntax or schema validation failure
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
         "404":
           description: Product or user not found
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
         "409":
           description: Idempotency conflict or concurrent request in flight
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
         "422":
           description: Domain business rule violation (INSUFFICIENT_FUNDS, INSUFFICIENT_STOCK,
             FILTER_RESTRICTION)
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
         "500":
           description: Internal server error
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
         "503":
           description: Service unavailable
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
       security:
       - BearerAuth: []
       summary: Purchase product from warehouse
@@ -1402,35 +1402,35 @@ paths:
           description: Order details
           schema:
             allOf:
-            - $ref: '#/definitions/domain.SuccessEnvelope'
+            - $ref: '#/definitions/SuccessEnvelope'
             - properties:
                 data:
-                  $ref: '#/definitions/domain.OrderResponse'
+                  $ref: '#/definitions/OrderResponse'
               type: object
         "400":
           description: Invalid order ID format
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
         "404":
           description: Order not found
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
         "500":
           description: Internal server error
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
         "503":
           description: Service unavailable
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
       security:
       - BearerAuth: []
       summary: Get customer order details
@@ -1486,37 +1486,37 @@ paths:
           description: List of allowed products with pagination
           schema:
             allOf:
-            - $ref: '#/definitions/domain.SuccessEnvelope'
+            - $ref: '#/definitions/SuccessEnvelope'
             - properties:
                 data:
                   items:
-                    $ref: '#/definitions/domain.Product'
+                    $ref: '#/definitions/Product'
                   type: array
               type: object
         "400":
           description: Invalid pagination, sorting, or filter parameters
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
         "404":
           description: User not found
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
         "500":
           description: Internal server error
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
         "503":
           description: Service unavailable
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
       security:
       - BearerAuth: []
       summary: Browse warehouse catalog
@@ -1535,31 +1535,31 @@ paths:
           description: User profile
           schema:
             allOf:
-            - $ref: '#/definitions/domain.SuccessEnvelope'
+            - $ref: '#/definitions/SuccessEnvelope'
             - properties:
                 data:
-                  $ref: '#/definitions/domain.UserSummary'
+                  $ref: '#/definitions/UserSummary'
               type: object
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
         "404":
           description: User not found
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
         "500":
           description: Internal server error
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
         "503":
           description: Service unavailable
           schema:
-            $ref: '#/definitions/domain.ErrorEnvelope'
+            $ref: '#/definitions/ErrorEnvelope'
       security:
       - BearerAuth: []
       summary: Get authenticated user profile
