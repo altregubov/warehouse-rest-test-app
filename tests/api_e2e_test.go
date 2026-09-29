@@ -7,12 +7,14 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/altregubov/warehouse-rest-test-app/internal/domain"
+	"github.com/altregubov/warehouse-rest-test-app/internal/middleware"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	_ "github.com/lib/pq"
@@ -2255,6 +2257,69 @@ func TestUpdateStockQuantityBoundaryValidation(t *testing.T) {
 		t.Errorf("Expected maximum: 2147483647 on stock_quantity, got %v", stockProp.Maximum)
 	}
 }
+
+// TestOperationalMiddlewareConfiguration tests Issue #22:
+// 1. CORS pre-flight OPTIONS request returns 200, allows headers including X-Request-ID and Idempotency-Key
+// 2. Panic recovery middleware catches unhandled exceptions and returns standard 500 ErrorEnvelope with requestId
+func TestOperationalMiddlewareConfiguration(t *testing.T) {
+	// 1. Test CORS Pre-flight on live server
+	client := newClient("")
+	corsHeaders := map[string]string{
+		"Origin":                         "http://localhost:3000",
+		"Access-Control-Request-Method":  "POST",
+		"Access-Control-Request-Headers": "authorization,content-type,idempotency-key,x-request-id",
+	}
+	respCors, _, err := client.requestWithHeaders(http.MethodOptions, "/api/user/orders", nil, corsHeaders)
+	if err != nil {
+		t.Fatalf("CORS preflight request failed: %v", err)
+	}
+	if respCors.StatusCode != http.StatusOK && respCors.StatusCode != http.StatusNoContent {
+		t.Errorf("Expected 200/204 for CORS preflight, got %d", respCors.StatusCode)
+	}
+	originHeader := respCors.Header.Get("Access-Control-Allow-Origin")
+	if originHeader != "*" && originHeader != "http://localhost:3000" {
+		t.Errorf("Expected Access-Control-Allow-Origin, got '%s'", originHeader)
+	}
+	allowHeaders := strings.ToLower(respCors.Header.Get("Access-Control-Allow-Headers"))
+	if !strings.Contains(allowHeaders, "x-request-id") || !strings.Contains(allowHeaders, "idempotency-key") {
+		t.Errorf("Expected allow-headers to contain x-request-id and idempotency-key, got '%s'", allowHeaders)
+	}
+
+	// 2. Test Panic Recovery middleware unit contract
+	panickingHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		panic("simulated catastrophic panic")
+	})
+
+	recoveryStack := middleware.Tracing()(middleware.Recoverer()(panickingHandler))
+
+	req := httptest.NewRequest(http.MethodGet, "/test/panic", nil)
+	req.Header.Set("X-Request-ID", "test-panic-trace-id")
+	rec := httptest.NewRecorder()
+
+	recoveryStack.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Errorf("Expected 500 Internal Server Error from panic recovery, got %d", rec.Code)
+	}
+	if !strings.Contains(rec.Header().Get("Content-Type"), "application/json") {
+		t.Errorf("Expected application/json Content-Type, got '%s'", rec.Header().Get("Content-Type"))
+	}
+
+	var errEnv domain.ErrorEnvelope
+	if err := json.Unmarshal(rec.Body.Bytes(), &errEnv); err != nil {
+		t.Fatalf("Failed to unmarshal recovered error envelope: %v", err)
+	}
+	if errEnv.Success != false {
+		t.Errorf("Expected success == false in error envelope")
+	}
+	if errEnv.Error.Code != "INTERNAL_ERROR" {
+		t.Errorf("Expected error code 'INTERNAL_ERROR', got '%s'", errEnv.Error.Code)
+	}
+	if errEnv.RequestID != "test-panic-trace-id" {
+		t.Errorf("Expected requestId 'test-panic-trace-id', got '%s'", errEnv.RequestID)
+	}
+}
+
 
 
 

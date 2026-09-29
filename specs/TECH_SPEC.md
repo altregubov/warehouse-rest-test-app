@@ -81,9 +81,52 @@ All API responses follow consistent JSON envelopes and carry an end-to-end distr
 }
 ```
 
-### 2.4 Operational Observability & Logging
-- **Distributed Request Tracing**: The `Tracing` middleware inspects the incoming `X-Request-ID` header. If absent, a cryptographically secure UUID v4 is automatically generated. The ID is stored in the request context, propagated to outbound headers via `X-Request-ID`, and automatically injected into both `SuccessEnvelope` and `ErrorEnvelope` payloads.
-- **Structured JSON Logging**: Every HTTP request emits an operational JSON log record with fields `timestamp`, `level` (`INFO`, `WARN`, `ERROR`), `requestId`, `method`, `path`, `status`, `latency_ms`, and `client_ip`.
+### 2.4 Operational Observability & Middleware Infrastructure
+
+#### 2.4.1 Distributed Request Tracing
+- **Trace Context Extraction & Generation**: The `Tracing` middleware inspects the incoming `X-Request-ID` HTTP header. If absent, a cryptographically secure UUID v4 is automatically generated.
+- **Context Propagation**: The ID is stored in the Go `http.Request` context, echoed in the `X-Request-ID` HTTP response header, and automatically injected into top-level `requestId` in all `SuccessEnvelope` and `ErrorEnvelope` payloads.
+
+#### 2.4.2 Structured JSON Logging
+Every HTTP interaction emits a structured JSON line to standard output (`stdout`), decoupling application logs from transport concerns and enabling ingestion into modern log aggregators (e.g. Datadog, ELK, CloudWatch):
+```json
+{
+  "timestamp": "2026-09-29T09:30:00.123456789Z",
+  "level": "INFO",
+  "requestId": "c56a4180-65aa-42ec-a945-5fd21dec0538",
+  "method": "POST",
+  "path": "/api/user/orders",
+  "status": 201,
+  "latency_ms": 14.82,
+  "client_ip": "192.168.1.1:54321"
+}
+```
+- **Log Levels:** `INFO` for status `< 400`, `WARN` for `400 <= status < 500`, and `ERROR` for `status >= 500`.
+- **Latency Tracking:** Sub-millisecond precision (`latency_ms`) measuring request inception through response flush.
+
+#### 2.4.3 Panic Recovery & Graceful Degradation
+- **Crash Interception**: The `Recoverer` middleware intercepts unhandled runtime panics, capturing call stack traces to `stderr` with correlation identifiers to facilitate rapid debugging.
+- **Strict Error Envelope Contract**: Unlike default recovery middlewares that emit plain text strings, the service intercepts crashes and writes an RFC-compliant `ErrorEnvelope` with HTTP status `500 Internal Server Error`, guaranteeing that client SDKs receive valid JSON:
+  ```json
+  {
+    "success": false,
+    "error": {
+      "code": "INTERNAL_ERROR",
+      "message": "Internal server error occurred",
+      "details": null
+    },
+    "requestId": "c56a4180-65aa-42ec-a945-5fd21dec0538"
+  }
+  ```
+
+#### 2.4.4 Cross-Origin Resource Sharing (CORS) Policy
+To facilitate direct web client and single-page application (SPA) integration across staging, testing, and production origins:
+- **Allowed Origins:** `*` (wildcard, permitting public educational testbench consumption).
+- **Allowed HTTP Methods:** `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `OPTIONS`.
+- **Allowed Headers:** `Accept`, `Authorization`, `Content-Type`, `X-CSRF-Token`, `X-Request-ID`, `Idempotency-Key`.
+- **Exposed Response Headers:** `Link`, `X-Request-ID`.
+- **Credentials Policy:** `AllowCredentials: false` (stateless Bearer JWT authentication avoids cross-site cookie vulnerabilities).
+- **Pre-flight Caching:** `MaxAge: 300` (pre-flight OPTIONS requests cached for 5 minutes).
 
 ### 2.5 Standardized Error Taxonomy & Status Code Mapping
 The platform adheres to strict HTTP semantic status code conventions across all endpoints:

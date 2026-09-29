@@ -300,22 +300,24 @@ Violations of input formats or domain boundaries trigger immediate `400 Bad Requ
 
 ---
 
-### 2.6 Distributed Request Tracing & Structured Error Observability
+### 2.6 Distributed Request Tracing & Structured Observability
 
 To accelerate end-to-end troubleshooting across integrated client applications and distributed microservices:
 - **Correlation Header (`X-Request-ID`)**: Clients may supply a unique tracing ID via the `X-Request-ID` HTTP header. If omitted, the API gateway automatically generates an RFC 4122 UUID v4.
 - **Response Propagation**: The correlation ID is echoed in the `X-Request-ID` response header and encapsulated directly within every response payload as top-level `requestId`.
 - **Structured Error Details**: Schema and domain validation errors provide an array of machine-readable field violation objects under `error.details` (e.g., `{"field": "increment_amount", "issue": "must be at least 0.01"}`), enabling automated form highlighting and localized client error presentation.
+- **Panic Recovery Contract**: Unhandled runtime panics and unexpected infrastructure faults are intercepted by recovery middleware, returning a standardized JSON `ErrorEnvelope` with HTTP status `500 Internal Server Error`, `code: "INTERNAL_ERROR"`, and the associated `requestId` rather than raw text crashes or severed TCP connections.
 
 ---
 
-### 2.7 Security Architecture, JWT Standards & Secret Lifecycle
+### 2.7 Security Architecture, CORS & Cryptographic Standards
 
-Integration partners and client applications operate under standardized cryptographic constraints:
+Integration partners and client applications operate under standardized cryptographic and transport constraints:
 - **Pinned Token Algorithm**: All Bearer tokens use HMAC-SHA256 (`HS256`). Verification middleware rejects unapproved signing algorithms (such as `alg: none` or algorithm confusion attempts).
 - **Audience & Issuer Enforcement**: Tokens are stamped with `iss: "warehouse-api"` and `aud: "warehouse-clients"`. Replay or cross-service substitution attempts are rejected with `401 Unauthorized`.
 - **Password Protection**: Passwords are never stored in plaintext and are hashed using **bcrypt** with work factor 12 (`cost: 12`). Timing side-channel attacks and username enumeration are mitigated via constant-time dummy hashing.
 - **Secret Provisioning & Rotation**: Production signing keys require at least 256 bits of entropy generated via cryptographically secure random sources (`openssl rand -hex 32`). Zero-downtime key rotation is supported through phased rollover with 24-hour overlapping expiration windows.
+- **Cross-Origin Resource Sharing (CORS)**: Web and SPA integrations are permitted across all origins (`AllowedOrigins: ["*"]`), supporting standard HTTP methods (`GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `OPTIONS`). Standard headers (`Authorization`, `Content-Type`, `X-Request-ID`, `Idempotency-Key`) are accepted, and `X-Request-ID` is exposed in response headers. Preflight requests are cached for 300 seconds (`MaxAge: 300`).
 
 ---
 

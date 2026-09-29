@@ -73,7 +73,7 @@ func main() {
 	r.Use(middleware.Tracing())
 	r.Use(chimiddleware.RealIP)
 	r.Use(middleware.StructuredLogger())
-	r.Use(chimiddleware.Recoverer)
+	r.Use(middleware.Recoverer())
 	r.Use(middleware.CORS())
 
 	// Swagger UI
