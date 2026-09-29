@@ -88,20 +88,6 @@ func EnsureSchemaAndSeed(db *sql.DB) error {
 	CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id);
 	CREATE INDEX IF NOT EXISTS idx_users_deleted_at ON users(deleted_at);
 
-	CREATE TABLE IF NOT EXISTS idempotency_keys (
-		key VARCHAR(255) PRIMARY KEY,
-		request_path VARCHAR(255) NOT NULL,
-		request_method VARCHAR(20) NOT NULL,
-		request_hash VARCHAR(64) NOT NULL,
-		status_code INTEGER NULL,
-		response_body TEXT NULL,
-		state VARCHAR(20) NOT NULL DEFAULT 'STARTED',
-		created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-		expires_at TIMESTAMP WITH TIME ZONE DEFAULT (CURRENT_TIMESTAMP + INTERVAL '24 hours')
-	);
-
-	CREATE INDEX IF NOT EXISTS idx_idempotency_keys_expires_at ON idempotency_keys(expires_at);
-
 	-- Seed default users
 	INSERT INTO users (id, username, password_hash, role, balance, allowed_categories, allowed_manufacturers, access_level, catalog_access_enabled)
 	VALUES

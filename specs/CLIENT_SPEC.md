@@ -10,14 +10,13 @@
 
 ### Executive Summary
 
-Modern commerce, logistics, and supply chain integrations require real-time inventory visibility and uncompromising transaction integrity. In high-velocity commercial environments, traditional systems often encounter critical vulnerabilities: overselling limited stock under concurrent demand, inconsistent financial ledgers from uncoordinated deductions, unauthorized ordering outside contractual partner terms, and accidental duplicate billing caused by network retries.
+Modern commerce, logistics, and supply chain integrations require real-time inventory visibility and uncompromising transaction integrity. In high-velocity commercial environments, traditional systems often encounter critical vulnerabilities: overselling limited stock under concurrent demand, inconsistent financial ledgers from uncoordinated deductions, and unauthorized ordering outside contractual partner terms.
 
 The **Warehouse REST API Platform** solves these operational challenges by providing a robust, highly resilient transaction service designed for seamless integration with client applications, partner portals, and automated enterprise resource planning (ERP) systems.
 
 #### Core Value Delivered
 - **Atomic Transactional Integrity:** Balances and warehouse inventory are bound within strict, all-or-nothing transactional guarantees. Stock decrements and account debits occur indivisibly, eliminating overselling, negative inventory, balance overdrafts, and phantom orders under peak concurrency.
 - **Contract-Governed Catalog Whitelisting:** Administrators can dynamically enforce account-level brand and category permissions. Clients only discover and purchase products they are legally contracted to acquire, preventing compliance disputes and unauthorized order processing.
-- **Idempotent Commercial Execution:** Purchase submissions and financial adjustments support idempotency tokens. Network retries, client timeouts, or connection disconnects safely return the original transaction confirmation without duplicate deductions or split orders.
 - **Auditable Financial Precision:** All financial calculations (account balances, unit prices, transaction totals) are managed with exact-cent precision, eliminating floating-point rounding drift across corporate ledgers while maintaining immutable historical price snapshots on every completed transaction.
 
 ---
@@ -29,7 +28,7 @@ The platform serves two primary commercial personas within an enterprise warehou
 | Persona | Business Role & Objectives | Key Responsibilities & Capabilities |
 | :--- | :--- | :--- |
 | **Warehouse Administrator** | Operational Overseer & System Governance | • Onboard new client accounts and govern organizational credentials.<br>• Credit customer balances upon invoice settlement or adjust credit ceilings.<br>• Configure category and manufacturer whitelists aligned with partner contracts.<br>• Register catalog items, manage inventory, and oversee fulfillment lifecycles. |
-| **Purchasing Client** | Commercial Partner & Authorized Buyer | • Authenticate securely through commercial role channels.<br>• Explore permitted warehouse products with real-time stock availability.<br>• Monitor active purchasing credit and available operational balances.<br>• Submit binding purchase orders with automated idempotency safeguards.<br>• Inspect transaction history and track fulfillment status through delivery. |
+| **Purchasing Client** | Commercial Partner & Authorized Buyer | • Authenticate securely through commercial role channels.<br>• Explore permitted warehouse products with real-time stock availability.<br>• Monitor active purchasing credit and available operational balances.<br>• Submit binding purchase orders with real-time settlement.<br>• Inspect transaction history and track fulfillment status through delivery. |
 
 #### Core Business Use Cases
 1. **Contract-Governed Catalog Browsing:** A purchasing client explores warehouse stock. The system dynamically filters the catalog based on contractual permissions, presenting only authorized product lines and hiding restricted inventory.
@@ -59,7 +58,7 @@ flowchart TD
         subgraph DomainEngines["Domain Services"]
             AuthEngine["Identity & Access\nGovernance Engine"]
             CatalogEngine["Catalog Governance &\nWhitelist Rules Engine"]
-            OrderEngine["Atomic Order Orchestrator\n& Idempotency Engine"]
+            OrderEngine["Atomic Order Orchestrator\n& Transaction Engine"]
             InventoryEngine["Inventory & Stock\nManagement Engine"]
         end
     end
@@ -123,7 +122,6 @@ erDiagram
         integer quantity "Number of units acquired"
         decimal totalAmount "Settled order total amount"
         string fulfillmentStatus "Lifecycle state: Created, Processing, Shipped, Delivered, or Cancelled"
-        string idempotencyReference "Unique client-supplied idempotency key"
     }
 ```
 
@@ -153,14 +151,11 @@ erDiagram
    - **Filtered Access (`Filtered`):** Products are matched case-insensitively against the client's whitelisted categories and manufacturers, guaranteeing reliable matching regardless of casing variations.
 3. **Catalog Presentation:** The system presents permitted items along with live warehouse stock availability and pagination metadata.
 
-#### Journey 3: Idempotent Atomic Order Placement
-1. **Purchase Intent Submission:** The client submits a purchase request specifying target product SKU, desired quantity, and an optional client-generated idempotency key.
-2. **Idempotency Check:**
-   - If the request is a replay of an existing completed order under the same key, the original confirmation is returned immediately with zero additional deduction.
-   - If an operation with the same key is currently executing, duplicate execution is blocked.
-3. **Eligibility & Inventory Validation:** The platform verifies product existence, ensures the item is within the client's whitelist, confirms warehouse stock sufficiency, and verifies credit adequacy.
-4. **Atomic Settlement:** The service executes balance debit and inventory decrement as a single atomic operation, captures an immutable price/model snapshot, and records the confirmed order.
-5. **Outcome Delivery:** An order confirmation receipt containing the transaction reference, purchased units, and remaining balance is returned to the client.
+#### Journey 3: Atomic Order Placement
+1. **Purchase Intent Submission:** The client submits a purchase request specifying target product SKU and desired quantity.
+2. **Eligibility & Inventory Validation:** The platform verifies product existence, ensures the item is within the client's whitelist, confirms warehouse stock sufficiency, and verifies credit adequacy.
+3. **Atomic Settlement:** The service executes balance debit and inventory decrement as a single atomic operation, captures an immutable price/model snapshot, and records the confirmed order.
+4. **Outcome Delivery:** An order confirmation receipt containing the transaction reference, purchased units, and remaining balance is returned to the client.
 
 #### Journey 4: Administrative Balance & Fulfillment Governance
 1. **Balance Adjustment:** Administrators deposit funds into customer accounts via relative top-ups (e.g., following wire transfers) or set absolute balance limits.
@@ -192,29 +187,25 @@ sequenceDiagram
     Service-->>Customer: Present filtered catalog to client
 
     Note over Customer,Ledger: Phase 2: Atomic Order Placement
-    Customer->>Service: Submit order (SKU, Quantity, Idempotency Token)
+    Customer->>Service: Submit order (SKU, Quantity)
     
-    alt Replayed Request Detected (Idempotency)
-        Service-->>Customer: Return original purchase receipt (Zero duplicate charge)
-    else New Purchase Intent
-        Service->>Ledger: Lock customer balance & product stock deterministically
-        Ledger-->>Service: Resources locked for atomic settlement
+    Service->>Ledger: Lock customer balance & product stock deterministically
+    Ledger-->>Service: Resources locked for atomic settlement
 
-        alt Policy Check: Restricted Product Line
-            Service-->>Customer: Purchase rejected (Product restricted by commercial policy)
-        else Availability Check: Insufficient Stock
-            Service->>Ledger: Release locks without modification
-            Service-->>Customer: Purchase rejected (Requested quantity exceeds available stock)
-        else Credit Check: Insufficient Balance
-            Service->>Ledger: Release locks without modification
-            Service-->>Customer: Purchase rejected (Total order amount exceeds available balance)
-        else Validation Passed: Atomic Settlement
-            Service->>Ledger: Debit total cost from customer balance
-            Service->>Ledger: Decrement reserved units from warehouse stock
-            Service->>Ledger: Record confirmed order with immutable price snapshot
-            Ledger-->>Service: Commit transaction successfully
-            Service-->>Customer: Order confirmed (Receipt, order reference & remaining balance)
-        end
+    alt Policy Check: Restricted Product Line
+        Service-->>Customer: Purchase rejected (Product restricted by commercial policy)
+    else Availability Check: Insufficient Stock
+        Service->>Ledger: Release locks without modification
+        Service-->>Customer: Purchase rejected (Requested quantity exceeds available stock)
+    else Credit Check: Insufficient Balance
+        Service->>Ledger: Release locks without modification
+        Service-->>Customer: Purchase rejected (Total order amount exceeds available balance)
+    else Validation Passed: Atomic Settlement
+        Service->>Ledger: Debit total cost from customer balance
+        Service->>Ledger: Decrement reserved units from warehouse stock
+        Service->>Ledger: Record confirmed order with immutable price snapshot
+        Ledger-->>Service: Commit transaction successfully
+        Service-->>Customer: Order confirmed (Receipt, order reference & remaining balance)
     end
 ```
 
@@ -287,8 +278,6 @@ Integrators can design predictable recovery workflows and client user interfaces
 | **Catalog Policy Restriction** | Client attempts to order an item outside contractual category/brand whitelists, or catalog access is disabled. | Operation declined immediately without resource locks or state mutation. | Inform client of commercial agreement boundaries; prompt client to request whitelist updates from administrators. |
 | **Insufficient Warehouse Stock** | Requested units exceed currently available inventory for the target SKU. | Operation declined without state modification. Balance remains untouched. | Inform user of available stock; offer partial quantity purchase or notify upon restock. |
 | **Insufficient Account Balance** | Total purchase amount exceeds available purchasing balance. | Operation declined without state modification. Inventory remains untouched. | Prompt client to top up balance or request credit limit adjustment from administrator. |
-| **Duplicate Action (Idempotency Replay)** | Re-transmitting an order with a previously processed idempotency key. | System recognizes previous completion and returns original confirmation without re-executing deduction. | Treat as successful completion; display original receipt and update client interface seamlessly. |
-| **Concurrent Action Conflict** | Simultaneous submission of identical operations with the same idempotency key. | In-flight collision is detected; subsequent concurrent request is safely rejected to prevent race conditions. | Advise client to await completion of in-flight operation before retrying. |
 | **Entity Not Found** | Target SKU, order reference, or account identifier does not exist or was archived. | Request rejected without data mutation. | Refresh client catalog cache and verify entity identifiers before resubmitting. |
 | **Input Boundary Violation** | Submitting non-positive quantity, negative balance, or malformed identifiers. | Request rejected at input boundary before touching database or acquiring locks. | Ensure client form validation enforces non-negative inputs and valid identifier formats. |
 | **Channel Privilege Rejection** | Missing valid session credentials or attempting administrative functions with client credentials. | Request rejected at security boundary. | Direct client to commercial login portal or check organizational role privileges. |

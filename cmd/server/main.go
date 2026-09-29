@@ -51,7 +51,6 @@ func main() {
 	userRepo := repository.NewUserRepository(db)
 	prodRepo := repository.NewProductRepository(db)
 	orderRepo := repository.NewOrderRepository(db)
-	idempotencyRepo := repository.NewIdempotencyRepository(db)
 
 	// Services
 	authService := service.NewAuthService(userRepo, cfg.JWTSecret)
@@ -63,9 +62,6 @@ func main() {
 	authHandler := handler.NewAuthHandler(authService)
 	adminHandler := handler.NewAdminHandler(userService, prodService, orderService)
 	userHandler := handler.NewUserHandler(userService, prodService, orderService)
-
-	// Middlewares
-	idempotencyMiddleware := middleware.Idempotency(idempotencyRepo)
 
 	// Router
 	r := chi.NewRouter()
@@ -95,9 +91,9 @@ func main() {
 		adminRouter.Get("/api/admin/users/{id}", adminHandler.GetUser)
 		adminRouter.Delete("/api/admin/users/{id}", adminHandler.DeleteUser)
 		adminRouter.Post("/api/admin/users", adminHandler.CreateUser)
-		adminRouter.With(idempotencyMiddleware).Post("/api/admin/users/{id}/balance/top-up", adminHandler.TopUpBalance)
-		adminRouter.With(idempotencyMiddleware).Put("/api/admin/users/{id}/balance", adminHandler.SetBalance)
-		adminRouter.With(idempotencyMiddleware).Patch("/api/admin/users/{id}/balance", adminHandler.UpdateBalance)
+		adminRouter.Post("/api/admin/users/{id}/balance/top-up", adminHandler.TopUpBalance)
+		adminRouter.Put("/api/admin/users/{id}/balance", adminHandler.SetBalance)
+		adminRouter.Patch("/api/admin/users/{id}/balance", adminHandler.UpdateBalance)
 		adminRouter.Put("/api/admin/users/{id}/filters", adminHandler.UpdateFilters)
 		adminRouter.Get("/api/admin/products", adminHandler.ListProducts)
 		adminRouter.Post("/api/admin/products", adminHandler.CreateProduct)
@@ -115,7 +111,7 @@ func main() {
 		userRouter.Get("/api/user/products", userHandler.ListProducts)
 		userRouter.Get("/api/user/orders", userHandler.ListOrders)
 		userRouter.Get("/api/user/orders/{id}", userHandler.GetOrder)
-		userRouter.With(idempotencyMiddleware).Post("/api/user/orders", userHandler.CreateOrder)
+		userRouter.Post("/api/user/orders", userHandler.CreateOrder)
 	})
 
 	server := &http.Server{

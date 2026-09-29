@@ -966,10 +966,6 @@ paths:
       description: Adjust user account balance by a specified amount (e.g. +500.00)
       operationId: adjustUserBalance
       parameters:
-      - description: Unique idempotency key to prevent double processing
-        in: header
-        name: Idempotency-Key
-        type: string
       - description: User ID (UUID)
         format: uuid
         in: path
@@ -1010,10 +1006,6 @@ paths:
           description: User not found
           schema:
             $ref: '#/definitions/ErrorEnvelope'
-        "409":
-          description: Idempotency conflict or concurrent request in flight
-          schema:
-            $ref: '#/definitions/ErrorEnvelope'
         "422":
           description: Unprocessable entity / validation failure
           schema:
@@ -1038,10 +1030,6 @@ paths:
         (minimum 0.00)
       operationId: setUserBalance
       parameters:
-      - description: Unique idempotency key to prevent double processing
-        in: header
-        name: Idempotency-Key
-        type: string
       - description: User ID (UUID)
         format: uuid
         in: path
@@ -1082,10 +1070,6 @@ paths:
           description: User not found
           schema:
             $ref: '#/definitions/ErrorEnvelope'
-        "409":
-          description: Idempotency conflict or concurrent request in flight
-          schema:
-            $ref: '#/definitions/ErrorEnvelope'
         "422":
           description: Unprocessable entity / validation failure
           schema:
@@ -1111,10 +1095,6 @@ paths:
         (minimum 0.01)
       operationId: topUpUserBalance
       parameters:
-      - description: Unique idempotency key to prevent double processing
-        in: header
-        name: Idempotency-Key
-        type: string
       - description: User ID (UUID)
         format: uuid
         in: path
@@ -1153,10 +1133,6 @@ paths:
             $ref: '#/definitions/ErrorEnvelope'
         "404":
           description: User not found
-          schema:
-            $ref: '#/definitions/ErrorEnvelope'
-        "409":
-          description: Idempotency conflict or concurrent request in flight
           schema:
             $ref: '#/definitions/ErrorEnvelope'
         "422":
@@ -1327,10 +1303,6 @@ paths:
         user balance
       operationId: createOrder
       parameters:
-      - description: Unique idempotency key to prevent double processing
-        in: header
-        name: Idempotency-Key
-        type: string
       - description: Purchase order request
         in: body
         name: request
@@ -1363,10 +1335,6 @@ paths:
             $ref: '#/definitions/ErrorEnvelope'
         "404":
           description: Product or user not found
-          schema:
-            $ref: '#/definitions/ErrorEnvelope'
-        "409":
-          description: Idempotency conflict or concurrent request in flight
           schema:
             $ref: '#/definitions/ErrorEnvelope'
         "422":

@@ -138,7 +138,6 @@ The platform adheres to strict HTTP semantic status code conventions across all 
 - **`404 Not Found`**: Target user, product, or order entity does not exist or has been soft-deleted (`NOT_FOUND`).
 - **`409 Conflict`**: State or concurrency conflict:
   - `USERNAME_TAKEN`: Attempting to register an account with a username that already exists.
-  - `IDEMPOTENCY_CONFLICT`: Concurrent in-flight request executing under the same idempotency key or conflicting request payload for an existing key.
 - **`422 Unprocessable Entity`**: Domain business rule and semantic validation failures:
   - `INSUFFICIENT_FUNDS`: Account balance is lower than total purchase price.
   - `INSUFFICIENT_STOCK`: Warehouse stock is less than requested quantity.
@@ -339,8 +338,7 @@ CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id);
    - Failure (409 Conflict): `{ "code": "USERNAME_TAKEN", "message": "Username already exists" }`.
    - Failure (500 Internal Server Error): Database persistence failure.
 
-2. Balance Management Operations (Supports `Idempotency-Key` Header with 24-Hour TTL)
-   - **Header Support:** Clients may provide `Idempotency-Key: <uuid-or-string>` on all balance mutation endpoints. Identical replayed requests return the original cached response with `Idempotent-Replayed: true` header. Requests with conflicting payloads or concurrent in-flight executions under the same key return `409 Conflict`.
+2. Balance Management Operations
    - **Top-Up Balance (Relative Increment):** `POST /api/admin/users/{id}/balance/top-up`
      - Increases customer balance by a specified positive increment (`increment_amount >= 0.01`).
      - Request: `{ "increment_amount": 500.00 }`
@@ -349,7 +347,6 @@ CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id);
      - Failure (401 Unauthorized): Missing or invalid token.
      - Failure (403 Forbidden): Insufficient admin privileges.
      - Failure (404 Not Found): Target user account does not exist or has been deactivated (`NOT_FOUND`).
-     - Failure (409 Conflict): Concurrent request in flight or conflicting payload for key (`IDEMPOTENCY_CONFLICT`).
      - Failure (422 Unprocessable Entity): `{ "code": "INVALID_INPUT", "message": "increment_amount must be at least 0.01" }`.
      - Failure (500 Internal Server Error): Server or persistence failure.
    - **Set Absolute Balance:** `PUT /api/admin/users/{id}/balance`
@@ -360,7 +357,6 @@ CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id);
      - Failure (401 Unauthorized): Missing or invalid token.
      - Failure (403 Forbidden): Insufficient admin privileges.
      - Failure (404 Not Found): Target user account does not exist or has been deactivated (`NOT_FOUND`).
-     - Failure (409 Conflict): Concurrent request in flight or conflicting payload for key (`IDEMPOTENCY_CONFLICT`).
      - Failure (422 Unprocessable Entity): `{ "code": "INVALID_INPUT", "message": "balance cannot be negative" }`.
      - Failure (500 Internal Server Error): Server or persistence failure.
    - **Legacy Balance Adjustment:** `PATCH /api/admin/users/{id}/balance`
@@ -370,7 +366,6 @@ CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id);
      - Failure (401 Unauthorized): Missing or invalid token.
      - Failure (403 Forbidden): Insufficient admin privileges.
      - Failure (404 Not Found): Target user does not exist (`NOT_FOUND`).
-     - Failure (409 Conflict): Idempotency key conflict (`IDEMPOTENCY_CONFLICT`).
      - Failure (422 Unprocessable Entity): Input validation failure.
      - Failure (500 Internal Server Error): Persistence failure.
 
@@ -543,9 +538,8 @@ CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id);
    - Failure (404 Not Found): User account not found (`NOT_FOUND`).
    - Failure (500 Internal Server Error): Persistence error.
 
-3. `POST /api/user/orders` (Supports `Idempotency-Key` Header with 24-Hour TTL)
+3. `POST /api/user/orders`
    - Places an order for a product.
-   - **Headers:** `Idempotency-Key` (optional, string / UUID). Clients submitting identical order requests with the same key receive the cached `201 Created` response with `Idempotent-Replayed: true` header without double-charging balance or decrementing stock twice. Concurrent in-flight requests or conflicting payloads under the same key return `409 Conflict`.
    - Body:
      ```json
      {
@@ -573,7 +567,6 @@ CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id);
    - Failure (401 Unauthorized): Missing or invalid token.
    - Failure (403 Forbidden): Forbidden.
    - Failure (404 Not Found): Product SKU or purchasing user not found (`NOT_FOUND`).
-   - Failure (409 Conflict): Idempotency collision or concurrent request in flight (`IDEMPOTENCY_CONFLICT`).
    - Failure (422 Unprocessable Entity): Domain rule violation:
      - `FILTER_RESTRICTION`: Product is outside user's whitelist/access level.
      - `INSUFFICIENT_STOCK`: Product stock is less than requested quantity.

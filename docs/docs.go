@@ -859,12 +859,6 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Unique idempotency key to prevent double processing",
-                        "name": "Idempotency-Key",
-                        "in": "header"
-                    },
-                    {
-                        "type": "string",
                         "format": "uuid",
                         "description": "User ID (UUID)",
                         "name": "id",
@@ -924,12 +918,6 @@ const docTemplate = `{
                             "$ref": "#/definitions/ErrorEnvelope"
                         }
                     },
-                    "409": {
-                        "description": "Idempotency conflict or concurrent request in flight",
-                        "schema": {
-                            "$ref": "#/definitions/ErrorEnvelope"
-                        }
-                    },
                     "422": {
                         "description": "Unprocessable entity / validation failure",
                         "schema": {
@@ -969,12 +957,6 @@ const docTemplate = `{
                 "summary": "Update or top up user balance (Legacy)",
                 "operationId": "adjustUserBalance",
                 "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Unique idempotency key to prevent double processing",
-                        "name": "Idempotency-Key",
-                        "in": "header"
-                    },
                     {
                         "type": "string",
                         "format": "uuid",
@@ -1036,12 +1018,6 @@ const docTemplate = `{
                             "$ref": "#/definitions/ErrorEnvelope"
                         }
                     },
-                    "409": {
-                        "description": "Idempotency conflict or concurrent request in flight",
-                        "schema": {
-                            "$ref": "#/definitions/ErrorEnvelope"
-                        }
-                    },
                     "422": {
                         "description": "Unprocessable entity / validation failure",
                         "schema": {
@@ -1083,12 +1059,6 @@ const docTemplate = `{
                 "summary": "Top up user balance by an increment",
                 "operationId": "topUpUserBalance",
                 "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Unique idempotency key to prevent double processing",
-                        "name": "Idempotency-Key",
-                        "in": "header"
-                    },
                     {
                         "type": "string",
                         "format": "uuid",
@@ -1146,12 +1116,6 @@ const docTemplate = `{
                     },
                     "404": {
                         "description": "User not found",
-                        "schema": {
-                            "$ref": "#/definitions/ErrorEnvelope"
-                        }
-                    },
-                    "409": {
-                        "description": "Idempotency conflict or concurrent request in flight",
                         "schema": {
                             "$ref": "#/definitions/ErrorEnvelope"
                         }
@@ -1428,12 +1392,6 @@ const docTemplate = `{
                 "operationId": "createOrder",
                 "parameters": [
                     {
-                        "type": "string",
-                        "description": "Unique idempotency key to prevent double processing",
-                        "name": "Idempotency-Key",
-                        "in": "header"
-                    },
-                    {
                         "description": "Purchase order request",
                         "name": "request",
                         "in": "body",
@@ -1482,12 +1440,6 @@ const docTemplate = `{
                     },
                     "404": {
                         "description": "Product or user not found",
-                        "schema": {
-                            "$ref": "#/definitions/ErrorEnvelope"
-                        }
-                    },
-                    "409": {
-                        "description": "Idempotency conflict or concurrent request in flight",
                         "schema": {
                             "$ref": "#/definitions/ErrorEnvelope"
                         }

@@ -159,14 +159,12 @@ func (h *UserHandler) ListProducts(w http.ResponseWriter, r *http.Request) {
 // @Accept json
 // @Produce json
 // @Security BearerAuth
-// @Param Idempotency-Key header string false "Unique idempotency key to prevent double processing"
 // @Param request body domain.CreateOrderRequest true "Purchase order request"
 // @Success 201 {object} domain.SuccessEnvelope{data=domain.OrderResponse} "Order placed successfully"
 // @Failure 400 {object} domain.ErrorEnvelope "Malformed JSON syntax or schema validation failure"
 // @Failure 401 {object} domain.ErrorEnvelope "Unauthorized"
 // @Failure 403 {object} domain.ErrorEnvelope "Forbidden"
 // @Failure 404 {object} domain.ErrorEnvelope "Product or user not found"
-// @Failure 409 {object} domain.ErrorEnvelope "Idempotency conflict or concurrent request in flight"
 // @Failure 422 {object} domain.ErrorEnvelope "Domain business rule violation (INSUFFICIENT_FUNDS, INSUFFICIENT_STOCK, FILTER_RESTRICTION)"
 // @Failure 500 {object} domain.ErrorEnvelope "Internal server error"
 // @Failure 503 {object} domain.ErrorEnvelope "Service unavailable"

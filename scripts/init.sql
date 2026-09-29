@@ -59,22 +59,7 @@ CREATE INDEX IF NOT EXISTS idx_products_manufacturer ON products(manufacturer);
 CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id);
 CREATE INDEX IF NOT EXISTS idx_users_deleted_at ON users(deleted_at);
 
--- 4. Idempotency Keys Table
-CREATE TABLE IF NOT EXISTS idempotency_keys (
-    key VARCHAR(255) PRIMARY KEY,
-    request_path VARCHAR(255) NOT NULL,
-    request_method VARCHAR(20) NOT NULL,
-    request_hash VARCHAR(64) NOT NULL,
-    status_code INTEGER NULL,
-    response_body TEXT NULL,
-    state VARCHAR(20) NOT NULL DEFAULT 'STARTED',
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    expires_at TIMESTAMP WITH TIME ZONE DEFAULT (CURRENT_TIMESTAMP + INTERVAL '24 hours')
-);
-
-CREATE INDEX IF NOT EXISTS idx_idempotency_keys_expires_at ON idempotency_keys(expires_at);
-
--- 5. Seed Data
+-- 4. Seed Data
 -- Passwords:
 -- admin123: $2a$10$RUP6Lknor1aYWPyngT8WjOkiwFpkibEmguyv7e5gTbKae/hn5OAKW
 -- user123:  $2a$10$pp.NmQ27Jz1aeJiA2fPJTu79LQhY9v/Pxh02nSJvQ5k1cpq7BFAD2
