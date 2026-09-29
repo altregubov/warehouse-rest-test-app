@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/altregubov/warehouse-rest-test-app/internal/domain"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	_ "github.com/lib/pq"
 )
@@ -455,7 +456,7 @@ func TestAdminManagementEndpoints(t *testing.T) {
 	newUsername := fmt.Sprintf("testuser_%d", time.Now().UnixNano())
 	createUserReq := domain.CreateUserRequest{
 		Username:             newUsername,
-		Password:             "user123",
+		Password:             "password123",
 		Role:                 "user",
 		Balance:              100.00,
 		AllowedCategories:   []string{"tablet"},
@@ -2024,6 +2025,131 @@ func TestCleanOpenAPIArrayExamples(t *testing.T) {
 		}
 	}
 }
+
+// TestJWTSecurityAndComplexityPolicy tests Issue #19:
+// 1. JWT verification explicitly validates algorithm (HS256 pinned), issuer, and audience
+// 2. Rejecting tokens signed with alg:none, wrong issuer, or wrong audience
+// 3. User creation enforces password minLength: 8 and complexity (letters and digits)
+func TestJWTSecurityAndComplexityPolicy(t *testing.T) {
+	jwtSecret := []byte("warehouse-secret-key-change-in-production")
+	validUserID := "b0000000-0000-0000-0000-000000000002"
+
+	// 1. Test alg: none rejection
+	noneClaims := jwt.MapClaims{
+		"sub":      validUserID,
+		"username": "userA",
+		"role":     "user",
+		"iss":      "warehouse-api",
+		"aud":      "warehouse-clients",
+		"exp":      time.Now().Add(1 * time.Hour).Unix(),
+	}
+	noneToken := jwt.NewWithClaims(jwt.SigningMethodNone, noneClaims)
+	noneTokenStr, err := noneToken.SignedString(jwt.UnsafeAllowNoneSignatureType)
+	if err != nil {
+		t.Fatalf("Failed to generate none token: %v", err)
+	}
+
+	noneClient := newClient(noneTokenStr)
+	respNone, _, _ := noneClient.request(http.MethodGet, "/api/user/profile", nil)
+	if respNone.StatusCode != http.StatusUnauthorized {
+		t.Errorf("Expected 401 Unauthorized for alg:none token, got %d", respNone.StatusCode)
+	}
+
+	// 2. Test wrong issuer rejection
+	badIssClaims := jwt.MapClaims{
+		"sub":      validUserID,
+		"username": "userA",
+		"role":     "user",
+		"iss":      "evil-issuer",
+		"aud":      "warehouse-clients",
+		"exp":      time.Now().Add(1 * time.Hour).Unix(),
+	}
+	badIssToken := jwt.NewWithClaims(jwt.SigningMethodHS256, badIssClaims)
+	badIssStr, err := badIssToken.SignedString(jwtSecret)
+	if err != nil {
+		t.Fatalf("Failed to sign bad issuer token: %v", err)
+	}
+
+	badIssClient := newClient(badIssStr)
+	respBadIss, _, _ := badIssClient.request(http.MethodGet, "/api/user/profile", nil)
+	if respBadIss.StatusCode != http.StatusUnauthorized {
+		t.Errorf("Expected 401 Unauthorized for bad issuer, got %d", respBadIss.StatusCode)
+	}
+
+	// 3. Test wrong audience rejection
+	badAudClaims := jwt.MapClaims{
+		"sub":      validUserID,
+		"username": "userA",
+		"role":     "user",
+		"iss":      "warehouse-api",
+		"aud":      "evil-audience",
+		"exp":      time.Now().Add(1 * time.Hour).Unix(),
+	}
+	badAudToken := jwt.NewWithClaims(jwt.SigningMethodHS256, badAudClaims)
+	badAudStr, err := badAudToken.SignedString(jwtSecret)
+	if err != nil {
+		t.Fatalf("Failed to sign bad audience token: %v", err)
+	}
+
+	badAudClient := newClient(badAudStr)
+	respBadAud, _, _ := badAudClient.request(http.MethodGet, "/api/user/profile", nil)
+	if respBadAud.StatusCode != http.StatusUnauthorized {
+		t.Errorf("Expected 401 Unauthorized for bad audience, got %d", respBadAud.StatusCode)
+	}
+
+	// 4. Test password length & complexity during user creation
+	adminToken, code := login(t, "/api/admin/login", "admin", "admin123")
+	if code != http.StatusOK {
+		t.Fatalf("Admin login failed: %d", code)
+	}
+	adminClient := newClient(adminToken)
+
+	// 4a. Short password (< 8 chars)
+	respShort, _, _ := adminClient.request(http.MethodPost, "/api/admin/users", domain.CreateUserRequest{
+		Username: fmt.Sprintf("short_%d", time.Now().UnixNano()),
+		Password: "pass12", // 6 chars
+		Role:     "user",
+		Balance:  100.0,
+	})
+	if respShort.StatusCode != http.StatusBadRequest {
+		t.Errorf("Expected 400 for password < 8 chars, got %d", respShort.StatusCode)
+	}
+
+	// 4b. Letters only (no digits)
+	respNoDigits, _, _ := adminClient.request(http.MethodPost, "/api/admin/users", domain.CreateUserRequest{
+		Username: fmt.Sprintf("nodigits_%d", time.Now().UnixNano()),
+		Password: "passwordonly", // >= 8 chars, but no digits
+		Role:     "user",
+		Balance:  100.0,
+	})
+	if respNoDigits.StatusCode != http.StatusBadRequest {
+		t.Errorf("Expected 400 for password without digits, got %d", respNoDigits.StatusCode)
+	}
+
+	// 4c. Digits only (no letters)
+	respNoLetters, _, _ := adminClient.request(http.MethodPost, "/api/admin/users", domain.CreateUserRequest{
+		Username: fmt.Sprintf("noletters_%d", time.Now().UnixNano()),
+		Password: "1234567890", // >= 8 chars, but no letters
+		Role:     "user",
+		Balance:  100.0,
+	})
+	if respNoLetters.StatusCode != http.StatusBadRequest {
+		t.Errorf("Expected 400 for password without letters, got %d", respNoLetters.StatusCode)
+	}
+
+	// 4d. Valid password meeting length and complexity
+	validUsername := fmt.Sprintf("validuser_%d", time.Now().UnixNano())
+	respValid, _, _ := adminClient.request(http.MethodPost, "/api/admin/users", domain.CreateUserRequest{
+		Username: validUsername,
+		Password: "ValidPass123", // letters + digits, length >= 8
+		Role:     "user",
+		Balance:  500.0,
+	})
+	if respValid.StatusCode != http.StatusCreated {
+		t.Errorf("Expected 201 Created for valid password, got %d", respValid.StatusCode)
+	}
+}
+
 
 
 

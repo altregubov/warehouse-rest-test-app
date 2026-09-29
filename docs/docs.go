@@ -1905,7 +1905,7 @@ const docTemplate = `{
                 },
                 "password": {
                     "type": "string",
-                    "minLength": 4,
+                    "minLength": 8,
                     "example": "secret123"
                 },
                 "role": {
@@ -1992,7 +1992,7 @@ const docTemplate = `{
             "properties": {
                 "password": {
                     "type": "string",
-                    "minLength": 4,
+                    "minLength": 8,
                     "example": "admin123"
                 },
                 "username": {

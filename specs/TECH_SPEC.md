@@ -118,8 +118,8 @@ To ensure client SDK predictability and prevent unhandled database violations:
   - `increment_amount`: `minimum: 0.01`
 - **String Length Constraints**:
   - `username`: `minLength: 1`
-  - `password`: `minLength: 4`
-All boundary or type violations are caught at the HTTP handler layer and rejected with `400 Bad Request` (`INVALID_INPUT` / `INVALID_REQUEST`) before invoking backend services or touching the database.
+  - `password`: `minLength: 8`, requires at least one letter and one number
+All boundary, complexity, or type violations are caught at the HTTP handler layer and rejected with `400 Bad Request` (`INVALID_INPUT` / `INVALID_REQUEST`) before invoking backend services or touching the database.
 
 ---
 
@@ -134,7 +134,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE TABLE IF NOT EXISTS users (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     username VARCHAR(100) UNIQUE NOT NULL,
-    password_hash VARCHAR(255) NOT NULL,
+    password_hash VARCHAR(255) NOT NULL, -- bcrypt hash (work factor >= 12)
     role VARCHAR(20) NOT NULL CHECK (role IN ('admin', 'user')),
     balance NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
     allowed_categories TEXT[] DEFAULT '{}',
@@ -197,17 +197,42 @@ CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id);
 
 ---
 
-## 4. Authentication, Authorization & RBAC
+## 4. Authentication, Authorization & Security Architecture
 
-### 4.1 JWT Authentication
-- Standard JWT (JSON Web Token) with claims:
-  - `sub`: User ID (UUID)
-  - `username`: Username
-  - `role`: Role (`admin` | `user`)
-  - `exp`: Expiration timestamp
-- Header format: `Authorization: Bearer <token>`
+### 4.1 JWT Specification & Algorithm Pinning
+- **Signing Algorithm:** Explicitly pinned to **HS256** (HMAC-SHA256). Token parser rejects any unexpected or insecure algorithm headers (including `alg: none` or asymmetric public key substitution attacks) using `jwt.WithValidMethods([]string{"HS256"})`.
+- **Standard Claims:**
+  - `iss` (Issuer): Strictly validated as `"warehouse-api"` across all incoming requests.
+  - `aud` (Audience): Strictly validated as `"warehouse-clients"` across all incoming requests.
+  - `sub` (Subject): Authenticated User ID (UUID string).
+  - `username`: Commercial account identifier handle.
+  - `role`: System authorization role (`admin` or `user`).
+  - `exp` (Expiration): Unix timestamp representing expiration (strictly bounded to 24 hours from issuance).
+  - `iat` (Issued At): Unix timestamp representing creation time.
+- **Authorization Header:** `Authorization: Bearer <token>`
+- **Token Verification Lifecycle:** Middleware extracts the token, verifies the cryptographic signature against the active `JWT_SECRET`, confirms issuer, audience, and expiration boundaries, and injects user claims into `r.Context()`.
 
-### 4.2 Segregated Login Endpoints & Authentication Oracle Elimination
+### 4.2 Secret Key Provisioning & Zero-Downtime Rotation Policy
+- **Key Entropy & Generation:** The HMAC signing key must possess at least 256 bits (32 bytes) of cryptographic entropy. Production secrets must be provisioned via the `JWT_SECRET` environment variable (never hardcoded in source control). Generate production keys using:
+  ```bash
+  openssl rand -hex 32
+  ```
+- **Zero-Downtime Rotation Protocol:**
+  1. **Dual-Key Verification Window:** In distributed environments, API gateways or verification middleware can accept a comma-separated key pair (`JWT_SECRET_PRIMARY,JWT_SECRET_SECONDARY`).
+  2. **Issuance vs. Verification:** New JWTs are exclusively signed using the primary secret, while existing active tokens signed by the previous secondary secret continue to validate during their remaining 24-hour validity lifetime.
+  3. **Retirement:** After 24 hours (all previous tokens expired), the secondary secret is decommissioned, completing the key rotation cycle with zero client interruption.
+
+### 4.3 Password Hashing & Storage Architecture
+- **Hashing Algorithm:** Secure, salted password hashing using **bcrypt** with a minimum computational work factor of **12** (`BcryptCost = 12`).
+- **Salt Generation:** Cryptographically random, unique per-user salt automatically embedded within each hash string (`$2a$12$...`).
+- **Anti-Enumeration Protection:** Login authentication employs constant-time dummy bcrypt verification on non-existent usernames, defeating timing side-channel attacks and eliminating user existence oracles.
+
+### 4.4 Password Complexity & Lifecycle Policies
+- **Minimum Length:** Passwords must contain a minimum of 8 characters (`minLength: 8`).
+- **Complexity Requirement:** Passwords must contain a combination of alphabetic letters (`[a-zA-Z]`) and numeric digits (`[0-9]`).
+- **Validation Failure:** Any registration or account creation violating complexity rules is rejected with `400 Bad Request` (`INVALID_INPUT`) before password hashing or database interaction occurs.
+
+### 4.5 Segregated Login Endpoints & RBAC Enforcement
 1. `POST /api/admin/login`
    - Accepts: `{ "username": "...", "password": "..." }`
    - Verifies credentials and strictly enforces `role == 'admin'`.
@@ -217,7 +242,7 @@ CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id);
    - Verifies credentials and strictly enforces `role == 'user'`.
    - **Unified Failure Response:** Returns uniform `401 Unauthorized` (`{"success": false, "error": {"code": "INVALID_CREDENTIALS", "message": "Invalid username or password"}}`) on non-existent users, bad passwords, and role mismatches.
 
-### 4.3 Route RBAC Middleware
+### 4.6 Route RBAC Middleware
 - `/api/admin/*`: Restricted to valid JWTs with `role == 'admin'`.
 - `/api/user/*`: Restricted to valid JWTs with `role == 'user'`.
 

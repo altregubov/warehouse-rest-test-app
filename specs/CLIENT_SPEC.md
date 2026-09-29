@@ -293,7 +293,7 @@ Client applications and automated SDK generators rely on strict, machine-readabl
 - **Mandatory Fields**: Request payloads enforce non-empty requirements across core identifiers, credentials, and amounts.
 - **Identifier Format**: Path variables and identifier fields require valid RFC 4122 UUID strings (e.g. `d0000000-0000-0000-0000-000000000001`).
 - **Enumerated Types**: Role assignments are strictly constrained to `admin` or `user`. Order fulfillment transitions follow standard states (`CREATED`, `PROCESSING`, `SHIPPED`, `DELIVERED`, `CANCELLED`).
-- **Domain Boundaries**: Order quantities must be at least 1 unit; product stock quantities, unit prices, and account balances must be non-negative ($\ge 0$). User account creation requires minimum string lengths (username $\ge 1$, password $\ge 4$).
+- **Domain Boundaries**: Order quantities must be at least 1 unit; product stock quantities, unit prices, and account balances must be non-negative ($\ge 0$). User account creation requires minimum string lengths and password complexity (username $\ge 1$, password $\ge 8$ characters containing both letters and numbers).
 - **Native Schema Examples**: Schema definitions for array properties (`allowed_categories`, `allowed_manufacturers`) specify native array examples (`["laptop"]`, `["Apple", "Dell"]`) without escaped brackets or string quotes, providing turn-key valid payloads in interactive API documentation and developer sandboxes.
 
 Violations of input formats or domain boundaries trigger immediate `400 Bad Request` or `422 Unprocessable Entity` responses containing typed field violation details prior to downstream processing.
@@ -306,6 +306,16 @@ To accelerate end-to-end troubleshooting across integrated client applications a
 - **Correlation Header (`X-Request-ID`)**: Clients may supply a unique tracing ID via the `X-Request-ID` HTTP header. If omitted, the API gateway automatically generates an RFC 4122 UUID v4.
 - **Response Propagation**: The correlation ID is echoed in the `X-Request-ID` response header and encapsulated directly within every response payload as top-level `requestId`.
 - **Structured Error Details**: Schema and domain validation errors provide an array of machine-readable field violation objects under `error.details` (e.g., `{"field": "increment_amount", "issue": "must be at least 0.01"}`), enabling automated form highlighting and localized client error presentation.
+
+---
+
+### 2.7 Security Architecture, JWT Standards & Secret Lifecycle
+
+Integration partners and client applications operate under standardized cryptographic constraints:
+- **Pinned Token Algorithm**: All Bearer tokens use HMAC-SHA256 (`HS256`). Verification middleware rejects unapproved signing algorithms (such as `alg: none` or algorithm confusion attempts).
+- **Audience & Issuer Enforcement**: Tokens are stamped with `iss: "warehouse-api"` and `aud: "warehouse-clients"`. Replay or cross-service substitution attempts are rejected with `401 Unauthorized`.
+- **Password Protection**: Passwords are never stored in plaintext and are hashed using **bcrypt** with work factor 12 (`cost: 12`). Timing side-channel attacks and username enumeration are mitigated via constant-time dummy hashing.
+- **Secret Provisioning & Rotation**: Production signing keys require at least 256 bits of entropy generated via cryptographically secure random sources (`openssl rand -hex 32`). Zero-downtime key rotation is supported through phased rollover with 24-hour overlapping expiration windows.
 
 ---
 

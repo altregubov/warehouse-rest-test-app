@@ -69,7 +69,7 @@ type Order struct {
 
 type LoginRequest struct {
 	Username string `json:"username" binding:"required" example:"admin" minLength:"1"`
-	Password string `json:"password" binding:"required" example:"admin123" minLength:"4"`
+	Password string `json:"password" binding:"required" example:"admin123" minLength:"8"`
 }
 
 // DollarsToCents converts dollar amount to integer cents, rounding to avoid floating-point drift
@@ -100,7 +100,7 @@ type LoginResponse struct {
 
 type CreateUserRequest struct {
 	Username             string   `json:"username" binding:"required" example:"john_doe" minLength:"1"`
-	Password             string   `json:"password" binding:"required" example:"secret123" minLength:"4"`
+	Password             string   `json:"password" binding:"required" example:"secret123" minLength:"8"`
 	Role                 string   `json:"role" binding:"required" example:"user" enums:"admin,user"`
 	Balance              float64  `json:"balance" binding:"required" example:"1000.00" format:"double" minimum:"0"`
 	AllowedCategories   []string `json:"allowed_categories" example:"laptop"`

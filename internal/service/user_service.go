@@ -85,10 +85,30 @@ func normalizeStringSlice(items []string) []string {
 	return result
 }
 
+const BcryptCost = 12
+
+func isValidPassword(p string) bool {
+	if len(p) < 8 {
+		return false
+	}
+	var hasLetter, hasDigit bool
+	for _, ch := range p {
+		if (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') {
+			hasLetter = true
+		} else if ch >= '0' && ch <= '9' {
+			hasDigit = true
+		}
+	}
+	return hasLetter && hasDigit
+}
+
 func (s *userService) CreateUser(ctx context.Context, req *domain.CreateUserRequest) (*domain.UserSummary, error) {
 	username := strings.TrimSpace(req.Username)
-	if username == "" || len(req.Password) < 4 {
-		return nil, fmt.Errorf("%w: username must not be empty and password must be at least 4 characters", domain.ErrInvalidInput)
+	if username == "" {
+		return nil, fmt.Errorf("%w: username must not be empty", domain.ErrInvalidInput)
+	}
+	if !isValidPassword(req.Password) {
+		return nil, fmt.Errorf("%w: password must be at least 8 characters long and contain both letters and digits", domain.ErrInvalidInput)
 	}
 
 	role := strings.ToLower(strings.TrimSpace(req.Role))
@@ -127,7 +147,7 @@ func (s *userService) CreateUser(ctx context.Context, req *domain.CreateUserRequ
 		}
 	}
 
-	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), BcryptCost)
 	if err != nil {
 		return nil, fmt.Errorf("failed to hash password: %w", err)
 	}
