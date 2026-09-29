@@ -16,9 +16,7 @@ type UserService interface {
 	GetUserByID(ctx context.Context, userID uuid.UUID) (*domain.UserSummary, error)
 	ListUsers(ctx context.Context, role string, page, pageSize int) ([]*domain.UserSummary, int, error)
 	CreateUser(ctx context.Context, req *domain.CreateUserRequest) (*domain.UserSummary, error)
-	UpdateBalance(ctx context.Context, userID uuid.UUID, amount float64) (*domain.UserSummary, error)
 	TopUpBalance(ctx context.Context, userID uuid.UUID, incrementAmount float64) (*domain.UserSummary, error)
-	SetBalance(ctx context.Context, userID uuid.UUID, newBalance float64) (*domain.UserSummary, error)
 	UpdateFilters(ctx context.Context, userID uuid.UUID, req *domain.UpdateFiltersRequest) (*domain.UserSummary, error)
 	DeleteUser(ctx context.Context, id uuid.UUID) error
 }
@@ -157,28 +155,6 @@ func (s *userService) CreateUser(ctx context.Context, req *domain.CreateUserRequ
 	return toUserSummary(user), nil
 }
 
-func (s *userService) UpdateBalance(ctx context.Context, userID uuid.UUID, amount float64) (*domain.UserSummary, error) {
-	user, err := s.userRepo.GetByID(ctx, userID)
-	if err != nil {
-		return nil, err
-	}
-
-	currBalCents := domain.DollarsToCents(user.Balance)
-	amtCents := domain.DollarsToCents(amount)
-	newBalCents := currBalCents + amtCents
-	if newBalCents < 0 {
-		return nil, fmt.Errorf("%w: resulting balance cannot be negative", domain.ErrInvalidInput)
-	}
-
-	newBalance := domain.CentsToDollars(newBalCents)
-	updatedUser, err := s.userRepo.UpdateBalance(ctx, userID, newBalance)
-	if err != nil {
-		return nil, err
-	}
-
-	return toUserSummary(updatedUser), nil
-}
-
 func (s *userService) TopUpBalance(ctx context.Context, userID uuid.UUID, incrementAmount float64) (*domain.UserSummary, error) {
 	if incrementAmount < 0.01 {
 		return nil, fmt.Errorf("%w: increment amount must be at least 0.01", domain.ErrInvalidInput)
@@ -195,27 +171,6 @@ func (s *userService) TopUpBalance(ctx context.Context, userID uuid.UUID, increm
 
 	newBalance := domain.CentsToDollars(newBalCents)
 	updatedUser, err := s.userRepo.UpdateBalance(ctx, userID, newBalance)
-	if err != nil {
-		return nil, err
-	}
-
-	return toUserSummary(updatedUser), nil
-}
-
-func (s *userService) SetBalance(ctx context.Context, userID uuid.UUID, newBalance float64) (*domain.UserSummary, error) {
-	if newBalance < 0 {
-		return nil, fmt.Errorf("%w: balance cannot be negative", domain.ErrInvalidInput)
-	}
-
-	_, err := s.userRepo.GetByID(ctx, userID)
-	if err != nil {
-		return nil, err
-	}
-
-	newBalCents := domain.DollarsToCents(newBalance)
-	roundedBalance := domain.CentsToDollars(newBalCents)
-
-	updatedUser, err := s.userRepo.UpdateBalance(ctx, userID, roundedBalance)
 	if err != nil {
 		return nil, err
 	}

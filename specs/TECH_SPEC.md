@@ -344,36 +344,16 @@ CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id);
    - Failure (409 Conflict): `{ "code": "USERNAME_TAKEN", "message": "Username already exists" }`.
    - Failure (500 Internal Server Error): Database persistence failure.
 
-2. Balance Management Operations
-   - **Top-Up Balance (Relative Increment):** `POST /api/admin/users/{id}/balance/top-up`
-     - Increases customer balance by a specified positive increment (`increment_amount >= 0.01`).
-     - Request: `{ "increment_amount": 500.00 }`
-     - Response (200 OK): `{ "success": true, "data": { "id": "...", "username": "...", "balance": 5500.00 } }`
-     - Failure (400 Bad Request): Invalid user ID format (`INVALID_ID`) or malformed JSON (`INVALID_REQUEST`).
-     - Failure (401 Unauthorized): Missing or invalid token.
-     - Failure (403 Forbidden): Insufficient admin privileges.
-     - Failure (404 Not Found): Target user account does not exist or has been deactivated (`NOT_FOUND`).
-     - Failure (422 Unprocessable Entity): `{ "code": "INVALID_INPUT", "message": "increment_amount must be at least 0.01" }`.
-     - Failure (500 Internal Server Error): Server or persistence failure.
-   - **Set Absolute Balance:** `PUT /api/admin/users/{id}/balance`
-     - Sets customer balance to an absolute new amount (`new_balance >= 0.00`).
-     - Request: `{ "new_balance": 5000.00 }`
-     - Response (200 OK): `{ "success": true, "data": { "id": "...", "username": "...", "balance": 5000.00 } }`
-     - Failure (400 Bad Request): Invalid user ID format (`INVALID_ID`) or malformed JSON (`INVALID_REQUEST`).
-     - Failure (401 Unauthorized): Missing or invalid token.
-     - Failure (403 Forbidden): Insufficient admin privileges.
-     - Failure (404 Not Found): Target user account does not exist or has been deactivated (`NOT_FOUND`).
-     - Failure (422 Unprocessable Entity): `{ "code": "INVALID_INPUT", "message": "balance cannot be negative" }`.
-     - Failure (500 Internal Server Error): Server or persistence failure.
-   - **Legacy Balance Adjustment:** `PATCH /api/admin/users/{id}/balance`
-     - Maintained for backward compatibility. Accepts `{ "amount": 500.00 }`.
-     - Response (200 OK): Updated user details.
-     - Failure (400 Bad Request): Invalid user ID format or malformed request.
-     - Failure (401 Unauthorized): Missing or invalid token.
-     - Failure (403 Forbidden): Insufficient admin privileges.
-     - Failure (404 Not Found): Target user does not exist (`NOT_FOUND`).
-     - Failure (422 Unprocessable Entity): Input validation failure.
-     - Failure (500 Internal Server Error): Persistence failure.
+2. `POST /api/admin/users/{id}/balance/top-up`
+   - Dedicated financial credit operation that increases customer balance by a positive increment (`increment_amount >= 0.01`).
+   - Request: `{ "increment_amount": 500.00 }`
+   - Response (200 OK): `{ "success": true, "data": { "id": "...", "username": "...", "balance": 5500.00 } }`
+   - Failure (400 Bad Request): Invalid user ID format (`INVALID_ID`) or malformed JSON (`INVALID_REQUEST`).
+   - Failure (401 Unauthorized): Missing or invalid token.
+   - Failure (403 Forbidden): Insufficient admin privileges.
+   - Failure (404 Not Found): Target user account does not exist or has been deactivated (`NOT_FOUND`).
+   - Failure (422 Unprocessable Entity): `{ "code": "INVALID_INPUT", "message": "increment_amount must be at least 0.01" }`.
+   - Failure (500 Internal Server Error): Server or persistence failure.
 
 3. `PUT /api/admin/users/{id}/filters`
    - Configures catalog visibility rules and access tier for a user.

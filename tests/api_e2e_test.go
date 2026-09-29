@@ -293,10 +293,7 @@ func TestAtomicOrderPlacement(t *testing.T) {
 	}
 	_ = json.Unmarshal(bodyProf, &profA)
 
-	_, _, _ = adminClient.request(http.MethodPut, fmt.Sprintf("/api/admin/users/%s/balance", profA.Data.ID), domain.SetBalanceRequest{
-		NewBalance: 5000.00,
-	})
-	initialBalance := 5000.00
+	initialBalance := profA.Data.Balance
 
 	// Fetch available products
 	_, bodyProds, _ := clientA.request(http.MethodGet, "/api/user/products?category=laptop", nil)
@@ -367,14 +364,20 @@ func TestAtomicOrderPlacement(t *testing.T) {
 		}
 	}
 
-	// 3. Insufficient balance: set low balance with valid in-stock quantity -> 422 INSUFFICIENT_FUNDS
+	// 3. Insufficient balance: user with balance lower than product price -> 422 INSUFFICIENT_FUNDS
 	_, _, _ = adminClient.request(http.MethodPatch, fmt.Sprintf("/api/admin/products/%s/stock", testProduct.ID), domain.UpdateStockRequest{
 		StockQuantity: 10,
 	})
-	_, _, _ = adminClient.request(http.MethodPut, fmt.Sprintf("/api/admin/users/%s/balance", profA.Data.ID), domain.SetBalanceRequest{
-		NewBalance: 10.00,
+	lowBalUsername := fmt.Sprintf("lowbal_%d", time.Now().UnixNano())
+	_, _, _ = adminClient.request(http.MethodPost, "/api/admin/users", domain.CreateUserRequest{
+		Username: lowBalUsername,
+		Password: "Password123!",
+		Role:     "user",
+		Balance:  10.00,
 	})
-	respInsufficientFunds, bodyFunds, _ := clientA.request(http.MethodPost, "/api/user/orders", domain.CreateOrderRequest{
+	lowToken, _ := login(t, "/api/user/login", lowBalUsername, "Password123!")
+	clientLow := newClient(lowToken)
+	respInsufficientFunds, bodyFunds, _ := clientLow.request(http.MethodPost, "/api/user/orders", domain.CreateOrderRequest{
 		ProductID: testProduct.ID,
 		Quantity:  1, // price is > 10.00, stock is available
 	})
@@ -388,10 +391,6 @@ func TestAtomicOrderPlacement(t *testing.T) {
 	}
 
 	// 4. Insufficient stock: attempt to purchase quantity exceeding warehouse stock -> 422 INSUFFICIENT_STOCK
-	// Top up balance first so balance check passes
-	_, _, _ = adminClient.request(http.MethodPut, fmt.Sprintf("/api/admin/users/%s/balance", profA.Data.ID), domain.SetBalanceRequest{
-		NewBalance: 5000000.00,
-	})
 	respInsufficientStock, bodyStock, _ := clientA.request(http.MethodPost, "/api/user/orders", domain.CreateOrderRequest{
 		ProductID: testProduct.ID,
 		Quantity:  999999, // exceeds stock
@@ -473,21 +472,14 @@ func TestAdminManagementEndpoints(t *testing.T) {
 	}
 	_ = json.Unmarshal(bodyCreateUser, &newUser)
 
-	// 4. Update user balance (+500 via legacy PATCH)
-	respBalance, bodyBalance, _ := adminClient.request(
+	// 4. Verify legacy PATCH /api/admin/users/{id}/balance is rejected (404/405)
+	respBalance, _, _ := adminClient.request(
 		http.MethodPatch,
 		fmt.Sprintf("/api/admin/users/%s/balance", newUser.Data.ID),
-		domain.UpdateBalanceRequest{Amount: 500.00},
+		map[string]float64{"amount": 500.00},
 	)
-	if respBalance.StatusCode != http.StatusOK {
-		t.Fatalf("Expected 200 for balance topup, got %d: %s", respBalance.StatusCode, string(bodyBalance))
-	}
-	var updatedUserBalance struct {
-		Data domain.UserSummary `json:"data"`
-	}
-	_ = json.Unmarshal(bodyBalance, &updatedUserBalance)
-	if updatedUserBalance.Data.Balance != 600.00 {
-		t.Errorf("Expected balance 600.00, got %f", updatedUserBalance.Data.Balance)
+	if respBalance.StatusCode != http.StatusNotFound && respBalance.StatusCode != http.StatusMethodNotAllowed {
+		t.Fatalf("Expected 404 or 405 for removed PATCH balance endpoint, got %d", respBalance.StatusCode)
 	}
 
 	// 4a. Dedicated TopUpBalance POST /api/admin/users/{id}/balance/top-up (+250)
@@ -503,8 +495,8 @@ func TestAdminManagementEndpoints(t *testing.T) {
 		Data domain.UserSummary `json:"data"`
 	}
 	_ = json.Unmarshal(bodyTopUp, &topUpResult)
-	if topUpResult.Data.Balance != 850.00 {
-		t.Errorf("Expected balance 850.00, got %f", topUpResult.Data.Balance)
+	if topUpResult.Data.Balance != 350.00 {
+		t.Errorf("Expected balance 350.00, got %f", topUpResult.Data.Balance)
 	}
 
 	// 4b. Invalid TopUpBalance (< 0.01) -> 422
@@ -517,31 +509,14 @@ func TestAdminManagementEndpoints(t *testing.T) {
 		t.Errorf("Expected 422 for invalid top-up amount, got %d", respInvalidTopUp.StatusCode)
 	}
 
-	// 4c. Dedicated SetBalance PUT /api/admin/users/{id}/balance (new_balance = 1500)
-	respSetBalance, bodySetBalance, _ := adminClient.request(
+	// 4c. Verify removed PUT /api/admin/users/{id}/balance is rejected (404/405)
+	respSetBalance, _, _ := adminClient.request(
 		http.MethodPut,
 		fmt.Sprintf("/api/admin/users/%s/balance", newUser.Data.ID),
-		domain.SetBalanceRequest{NewBalance: 1500.00},
+		map[string]float64{"new_balance": 1500.00},
 	)
-	if respSetBalance.StatusCode != http.StatusOK {
-		t.Fatalf("Expected 200 for dedicated set balance, got %d: %s", respSetBalance.StatusCode, string(bodySetBalance))
-	}
-	var setResult struct {
-		Data domain.UserSummary `json:"data"`
-	}
-	_ = json.Unmarshal(bodySetBalance, &setResult)
-	if setResult.Data.Balance != 1500.00 {
-		t.Errorf("Expected balance 1500.00, got %f", setResult.Data.Balance)
-	}
-
-	// 4d. Invalid SetBalance (< 0) -> 422
-	respInvalidSet, _, _ := adminClient.request(
-		http.MethodPut,
-		fmt.Sprintf("/api/admin/users/%s/balance", newUser.Data.ID),
-		domain.SetBalanceRequest{NewBalance: -50.00},
-	)
-	if respInvalidSet.StatusCode != 422 {
-		t.Errorf("Expected 422 for negative balance set, got %d", respInvalidSet.StatusCode)
+	if respSetBalance.StatusCode != http.StatusNotFound && respSetBalance.StatusCode != http.StatusMethodNotAllowed {
+		t.Fatalf("Expected 404 or 405 for removed PUT balance endpoint, got %d", respSetBalance.StatusCode)
 	}
 
 	// 5. Update user filters
@@ -1146,8 +1121,8 @@ func TestHistoricalOrderSnapshotImmutability(t *testing.T) {
 		Data domain.UserSummary `json:"data"`
 	}
 	_ = json.Unmarshal(bodyProf, &profA)
-	_, _, _ = adminClient.request(http.MethodPut, fmt.Sprintf("/api/admin/users/%s/balance", profA.Data.ID), domain.SetBalanceRequest{
-		NewBalance: 10000.00,
+	_, _, _ = adminClient.request(http.MethodPost, fmt.Sprintf("/api/admin/users/%s/balance/top-up", profA.Data.ID), domain.TopUpBalanceRequest{
+		IncrementAmount: 10000.00,
 	})
 
 	// Place order for 2 units
@@ -1433,15 +1408,6 @@ func TestStatusCodesAlignment404And409(t *testing.T) {
 	)
 	if respTopUp.StatusCode != http.StatusNotFound {
 		t.Errorf("Expected 404 for top-up of non-existent user, got %d: %s", respTopUp.StatusCode, string(bodyTopUp))
-	}
-
-	respSetBal, bodySetBal, _ := adminClient.request(
-		http.MethodPut,
-		fmt.Sprintf("/api/admin/users/%s/balance", randomUUID),
-		domain.SetBalanceRequest{NewBalance: 100.0},
-	)
-	if respSetBal.StatusCode != http.StatusNotFound {
-		t.Errorf("Expected 404 for set balance of non-existent user, got %d: %s", respSetBal.StatusCode, string(bodySetBal))
 	}
 
 	// 3. 404 on filters endpoint for non-existent user
@@ -2201,7 +2167,6 @@ func TestCleanSwaggerSchemaDefinitionNames(t *testing.T) {
 		"LoginResponse",
 		"OrderResponse",
 		"Product",
-		"SetBalanceRequest",
 		"TopUpBalanceRequest",
 		"UpdateStockRequest",
 		"UserSummary",
@@ -2289,22 +2254,10 @@ func TestOrderThreeStatusesAndCancellationRefund(t *testing.T) {
 		Username: username,
 		Password: "Password123!",
 		Role:     "user",
+		Balance:  1000.00,
 	})
 	if respCreateUser.StatusCode != http.StatusCreated {
 		t.Fatalf("Failed to create user: %d: %s", respCreateUser.StatusCode, string(bodyCreateUser))
-	}
-	var createdUser struct {
-		Data domain.UserSummary `json:"data"`
-	}
-	_ = json.Unmarshal(bodyCreateUser, &createdUser)
-	userID := createdUser.Data.ID
-
-	// Top up balance to 1000.00
-	respTopUp, _, _ := adminClient.request(http.MethodPut, fmt.Sprintf("/api/admin/users/%s/balance", userID), domain.SetBalanceRequest{
-		NewBalance: 1000.00,
-	})
-	if respTopUp.StatusCode != http.StatusOK {
-		t.Fatalf("Failed to set user balance")
 	}
 
 	// 2. Create a dedicated product with 10 stock and 150.00 price

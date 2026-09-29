@@ -109,16 +109,8 @@ type CreateUserRequest struct {
 	CatalogAccessEnabled *bool    `json:"catalog_access_enabled,omitempty" example:"true"`
 }
 
-type UpdateBalanceRequest struct {
-	Amount float64 `json:"amount" binding:"required" example:"500.00" format:"double"`
-}
-
 type TopUpBalanceRequest struct {
 	IncrementAmount float64 `json:"increment_amount" binding:"required" example:"500.00" format:"double" minimum:"0.01"`
-}
-
-type SetBalanceRequest struct {
-	NewBalance float64 `json:"new_balance" binding:"required" example:"5000.00" format:"double" minimum:"0"`
 }
 
 type UpdateFiltersRequest struct {
