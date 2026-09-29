@@ -38,22 +38,24 @@ func NewAuthService(userRepo repository.UserRepository, jwtSecret string) AuthSe
 	}
 }
 
+const dummyPasswordHash = "$2a$10$RUP6Lknor1aYWPyngT8WjOkiwFpkibEmguyv7e5gTbKae/hn5OAKW"
+
 func (s *authService) Login(ctx context.Context, username, password, expectedRole string) (*domain.LoginResponse, error) {
 	user, err := s.userRepo.GetByUsername(ctx, username)
 	if err != nil {
 		if errors.Is(err, domain.ErrNotFound) {
+			// Perform dummy hash comparison to ensure constant-time execution and prevent user enumeration
+			_ = bcrypt.CompareHashAndPassword([]byte(dummyPasswordHash), []byte(password))
 			return nil, domain.ErrInvalidCredentials
 		}
 		return nil, err
 	}
 
-	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password)); err != nil {
+	// Always evaluate bcrypt hash comparison
+	pwdErr := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password))
+	// Unify wrong password and unauthorized role into identical ErrInvalidCredentials
+	if pwdErr != nil || user.Role != expectedRole {
 		return nil, domain.ErrInvalidCredentials
-	}
-
-	// Strictly verify that the user's role matches the required role of the login endpoint
-	if user.Role != expectedRole {
-		return nil, domain.ErrForbiddenRole
 	}
 
 	token, err := s.GenerateToken(user)
@@ -74,12 +76,19 @@ func (s *authService) Login(ctx context.Context, username, password, expectedRol
 	}, nil
 }
 
+const (
+	JWTIssuer   = "warehouse-api"
+	JWTAudience = "warehouse-clients"
+)
+
 func (s *authService) GenerateToken(user *domain.User) (string, error) {
 	claims := JWTClaims{
 		UserID:   user.ID,
 		Username: user.Username,
 		Role:     user.Role,
 		RegisteredClaims: jwt.RegisteredClaims{
+			Issuer:    JWTIssuer,
+			Audience:  jwt.ClaimStrings{JWTAudience},
 			Subject:   user.ID.String(),
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
@@ -91,12 +100,19 @@ func (s *authService) GenerateToken(user *domain.User) (string, error) {
 }
 
 func (s *authService) ValidateToken(tokenString string) (*JWTClaims, error) {
-	token, err := jwt.ParseWithClaims(tokenString, &JWTClaims{}, func(token *jwt.Token) (any, error) {
-		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
-		}
-		return s.jwtSecret, nil
-	})
+	token, err := jwt.ParseWithClaims(
+		tokenString,
+		&JWTClaims{},
+		func(token *jwt.Token) (any, error) {
+			if token.Method != jwt.SigningMethodHS256 {
+				return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+			}
+			return s.jwtSecret, nil
+		},
+		jwt.WithValidMethods([]string{"HS256"}),
+		jwt.WithIssuer(JWTIssuer),
+		jwt.WithAudience(JWTAudience),
+	)
 
 	if err != nil {
 		return nil, fmt.Errorf("invalid token: %w", err)

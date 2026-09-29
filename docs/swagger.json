@@ -1,4 +1,8 @@
 {
+    "schemes": [
+        "http",
+        "https"
+    ],
     "swagger": "2.0",
     "info": {
         "description": "Clean, lightweight, and idiomatic Go backend for warehouse inventory and transactional ordering.",
@@ -22,6 +26,7 @@
                     "Auth"
                 ],
                 "summary": "Admin authentication",
+                "operationId": "adminLogin",
                 "parameters": [
                     {
                         "description": "Admin credentials",
@@ -29,7 +34,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.LoginRequest"
+                            "$ref": "#/definitions/LoginRequest"
                         }
                     }
                 ],
@@ -39,13 +44,13 @@
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.SuccessEnvelope"
+                                    "$ref": "#/definitions/SuccessEnvelope"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.LoginResponse"
+                                            "$ref": "#/definitions/LoginResponse"
                                         }
                                     }
                                 }
@@ -55,25 +60,261 @@
                     "400": {
                         "description": "Invalid request payload",
                         "schema": {
-                            "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorEnvelope"
+                            "$ref": "#/definitions/ErrorEnvelope"
                         }
                     },
                     "401": {
-                        "description": "Invalid credentials",
+                        "description": "Invalid username or password",
                         "schema": {
-                            "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorEnvelope"
+                            "$ref": "#/definitions/ErrorEnvelope"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorEnvelope"
+                        }
+                    },
+                    "503": {
+                        "description": "Service unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorEnvelope"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/orders": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Retrieve all orders across the system for administrative auditing and fulfillment",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "List all orders (Admin)",
+                "operationId": "listAdminOrders",
+                "responses": {
+                    "200": {
+                        "description": "List of all orders",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/OrderResponse"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorEnvelope"
                         }
                     },
                     "403": {
-                        "description": "Forbidden: user is not an admin",
+                        "description": "Forbidden",
                         "schema": {
-                            "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorEnvelope"
+                            "$ref": "#/definitions/ErrorEnvelope"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorEnvelope"
+                        }
+                    },
+                    "503": {
+                        "description": "Service unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorEnvelope"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/orders/{id}/status": {
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Update the fulfillment status of an order (e.g. PROCESSING, SHIPPED, DELIVERED, CANCELLED)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "Update order fulfillment status",
+                "operationId": "updateOrderStatus",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Order ID (UUID)",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Order status payload",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/UpdateOrderStatusRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Order status updated",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/OrderResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid input",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorEnvelope"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorEnvelope"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorEnvelope"
+                        }
+                    },
+                    "404": {
+                        "description": "Order not found",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorEnvelope"
+                        }
+                    },
+                    "422": {
+                        "description": "Invalid status transition",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorEnvelope"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorEnvelope"
+                        }
+                    },
+                    "503": {
+                        "description": "Service unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorEnvelope"
                         }
                     }
                 }
             }
         },
         "/api/admin/products": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Retrieve full unrestricted product inventory for administrators",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "List all warehouse products (Admin)",
+                "operationId": "listAdminProducts",
+                "responses": {
+                    "200": {
+                        "description": "List of all products",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/Product"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorEnvelope"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorEnvelope"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorEnvelope"
+                        }
+                    },
+                    "503": {
+                        "description": "Service unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorEnvelope"
+                        }
+                    }
+                }
+            },
             "post": {
                 "security": [
                     {
@@ -91,6 +332,7 @@
                     "Admin"
                 ],
                 "summary": "Add a new product to warehouse",
+                "operationId": "createProduct",
                 "parameters": [
                     {
                         "description": "Product details",
@@ -98,7 +340,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.CreateProductRequest"
+                            "$ref": "#/definitions/CreateProductRequest"
                         }
                     }
                 ],
@@ -108,13 +350,13 @@
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.SuccessEnvelope"
+                                    "$ref": "#/definitions/SuccessEnvelope"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.Product"
+                                            "$ref": "#/definitions/Product"
                                         }
                                     }
                                 }
@@ -124,19 +366,31 @@
                     "400": {
                         "description": "Invalid input",
                         "schema": {
-                            "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorEnvelope"
+                            "$ref": "#/definitions/ErrorEnvelope"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorEnvelope"
+                            "$ref": "#/definitions/ErrorEnvelope"
                         }
                     },
                     "403": {
                         "description": "Forbidden",
                         "schema": {
-                            "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorEnvelope"
+                            "$ref": "#/definitions/ErrorEnvelope"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorEnvelope"
+                        }
+                    },
+                    "503": {
+                        "description": "Service unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorEnvelope"
                         }
                     }
                 }
@@ -160,9 +414,11 @@
                     "Admin"
                 ],
                 "summary": "Update product stock quantity",
+                "operationId": "updateProductStock",
                 "parameters": [
                     {
                         "type": "string",
+                        "format": "uuid",
                         "description": "Product ID (UUID)",
                         "name": "id",
                         "in": "path",
@@ -174,7 +430,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.UpdateStockRequest"
+                            "$ref": "#/definitions/UpdateStockRequest"
                         }
                     }
                 ],
@@ -184,13 +440,13 @@
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.SuccessEnvelope"
+                                    "$ref": "#/definitions/SuccessEnvelope"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.Product"
+                                            "$ref": "#/definitions/Product"
                                         }
                                     }
                                 }
@@ -200,31 +456,132 @@
                     "400": {
                         "description": "Invalid input",
                         "schema": {
-                            "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorEnvelope"
+                            "$ref": "#/definitions/ErrorEnvelope"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorEnvelope"
+                            "$ref": "#/definitions/ErrorEnvelope"
                         }
                     },
                     "403": {
                         "description": "Forbidden",
                         "schema": {
-                            "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorEnvelope"
+                            "$ref": "#/definitions/ErrorEnvelope"
                         }
                     },
                     "404": {
                         "description": "Product not found",
                         "schema": {
-                            "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorEnvelope"
+                            "$ref": "#/definitions/ErrorEnvelope"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorEnvelope"
+                        }
+                    },
+                    "503": {
+                        "description": "Service unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorEnvelope"
                         }
                     }
                 }
             }
         },
         "/api/admin/users": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Query paginated list of users with optional role filtering",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "List users",
+                "operationId": "listAdminUsers",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Filter by role (admin or user)",
+                        "name": "role",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page number (default 1)",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Items per page (default 20, max 100)",
+                        "name": "page_size",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "List of users",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/UserSummary"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid query parameters",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorEnvelope"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorEnvelope"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorEnvelope"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorEnvelope"
+                        }
+                    },
+                    "503": {
+                        "description": "Service unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorEnvelope"
+                        }
+                    }
+                }
+            },
             "post": {
                 "security": [
                     {
@@ -242,6 +599,7 @@
                     "Admin"
                 ],
                 "summary": "Create a user account",
+                "operationId": "createAdminUser",
                 "parameters": [
                     {
                         "description": "User details",
@@ -249,7 +607,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.CreateUserRequest"
+                            "$ref": "#/definitions/CreateUserRequest"
                         }
                     }
                 ],
@@ -259,13 +617,13 @@
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.SuccessEnvelope"
+                                    "$ref": "#/definitions/SuccessEnvelope"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.UserSummary"
+                                            "$ref": "#/definitions/UserSummary"
                                         }
                                     }
                                 }
@@ -275,31 +633,309 @@
                     "400": {
                         "description": "Invalid input",
                         "schema": {
-                            "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorEnvelope"
+                            "$ref": "#/definitions/ErrorEnvelope"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorEnvelope"
+                            "$ref": "#/definitions/ErrorEnvelope"
                         }
                     },
                     "403": {
                         "description": "Forbidden",
                         "schema": {
-                            "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorEnvelope"
+                            "$ref": "#/definitions/ErrorEnvelope"
                         }
                     },
                     "409": {
                         "description": "Username already exists",
                         "schema": {
-                            "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorEnvelope"
+                            "$ref": "#/definitions/ErrorEnvelope"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorEnvelope"
+                        }
+                    },
+                    "503": {
+                        "description": "Service unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorEnvelope"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/users/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Retrieve a specific user account by UUID",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "Get user by ID",
+                "operationId": "getAdminUserById",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "User ID (UUID)",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "User details",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/UserSummary"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid ID",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorEnvelope"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorEnvelope"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorEnvelope"
+                        }
+                    },
+                    "404": {
+                        "description": "User not found",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorEnvelope"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorEnvelope"
+                        }
+                    },
+                    "503": {
+                        "description": "Service unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorEnvelope"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Marks user as deactivated/deleted while preserving immutable historical order records",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "Soft-delete a user account",
+                "operationId": "deleteAdminUser",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "User ID (UUID)",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "User deactivated successfully",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid ID",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorEnvelope"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorEnvelope"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorEnvelope"
+                        }
+                    },
+                    "404": {
+                        "description": "User not found",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorEnvelope"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorEnvelope"
+                        }
+                    },
+                    "503": {
+                        "description": "Service unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorEnvelope"
                         }
                     }
                 }
             }
         },
         "/api/admin/users/{id}/balance": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Replaces the user account balance with a specified new balance (minimum 0.00)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "Set absolute user balance",
+                "operationId": "setUserBalance",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "User ID (UUID)",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Absolute balance payload",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/SetBalanceRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Balance set",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/UserSummary"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid input",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorEnvelope"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorEnvelope"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorEnvelope"
+                        }
+                    },
+                    "404": {
+                        "description": "User not found",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorEnvelope"
+                        }
+                    },
+                    "422": {
+                        "description": "Unprocessable entity / validation failure",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorEnvelope"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorEnvelope"
+                        }
+                    },
+                    "503": {
+                        "description": "Service unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorEnvelope"
+                        }
+                    }
+                }
+            },
             "patch": {
                 "security": [
                     {
@@ -316,10 +952,12 @@
                 "tags": [
                     "Admin"
                 ],
-                "summary": "Update or top up user balance",
+                "summary": "Update or top up user balance (Legacy)",
+                "operationId": "adjustUserBalance",
                 "parameters": [
                     {
                         "type": "string",
+                        "format": "uuid",
                         "description": "User ID (UUID)",
                         "name": "id",
                         "in": "path",
@@ -331,7 +969,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.UpdateBalanceRequest"
+                            "$ref": "#/definitions/UpdateBalanceRequest"
                         }
                     }
                 ],
@@ -341,13 +979,13 @@
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.SuccessEnvelope"
+                                    "$ref": "#/definitions/SuccessEnvelope"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.UserSummary"
+                                            "$ref": "#/definitions/UserSummary"
                                         }
                                     }
                                 }
@@ -357,25 +995,145 @@
                     "400": {
                         "description": "Invalid input or negative balance",
                         "schema": {
-                            "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorEnvelope"
+                            "$ref": "#/definitions/ErrorEnvelope"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorEnvelope"
+                            "$ref": "#/definitions/ErrorEnvelope"
                         }
                     },
                     "403": {
                         "description": "Forbidden",
                         "schema": {
-                            "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorEnvelope"
+                            "$ref": "#/definitions/ErrorEnvelope"
                         }
                     },
                     "404": {
                         "description": "User not found",
                         "schema": {
-                            "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorEnvelope"
+                            "$ref": "#/definitions/ErrorEnvelope"
+                        }
+                    },
+                    "422": {
+                        "description": "Unprocessable entity / validation failure",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorEnvelope"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorEnvelope"
+                        }
+                    },
+                    "503": {
+                        "description": "Service unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorEnvelope"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/users/{id}/balance/top-up": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Increases the user account balance by a specified increment amount (minimum 0.01)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "Top up user balance by an increment",
+                "operationId": "topUpUserBalance",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "User ID (UUID)",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Balance top-up payload",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/TopUpBalanceRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Balance topped up",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/UserSummary"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid input",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorEnvelope"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorEnvelope"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorEnvelope"
+                        }
+                    },
+                    "404": {
+                        "description": "User not found",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorEnvelope"
+                        }
+                    },
+                    "422": {
+                        "description": "Unprocessable entity / validation failure",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorEnvelope"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorEnvelope"
+                        }
+                    },
+                    "503": {
+                        "description": "Service unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorEnvelope"
                         }
                     }
                 }
@@ -399,9 +1157,11 @@
                     "Admin"
                 ],
                 "summary": "Configure catalog access filters for a user",
+                "operationId": "updateUserFilters",
                 "parameters": [
                     {
                         "type": "string",
+                        "format": "uuid",
                         "description": "User ID (UUID)",
                         "name": "id",
                         "in": "path",
@@ -413,7 +1173,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.UpdateFiltersRequest"
+                            "$ref": "#/definitions/UpdateFiltersRequest"
                         }
                     }
                 ],
@@ -423,13 +1183,13 @@
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.SuccessEnvelope"
+                                    "$ref": "#/definitions/SuccessEnvelope"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.UserSummary"
+                                            "$ref": "#/definitions/UserSummary"
                                         }
                                     }
                                 }
@@ -439,25 +1199,37 @@
                     "400": {
                         "description": "Invalid input",
                         "schema": {
-                            "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorEnvelope"
+                            "$ref": "#/definitions/ErrorEnvelope"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorEnvelope"
+                            "$ref": "#/definitions/ErrorEnvelope"
                         }
                     },
                     "403": {
                         "description": "Forbidden",
                         "schema": {
-                            "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorEnvelope"
+                            "$ref": "#/definitions/ErrorEnvelope"
                         }
                     },
                     "404": {
                         "description": "User not found",
                         "schema": {
-                            "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorEnvelope"
+                            "$ref": "#/definitions/ErrorEnvelope"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorEnvelope"
+                        }
+                    },
+                    "503": {
+                        "description": "Service unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorEnvelope"
                         }
                     }
                 }
@@ -476,6 +1248,7 @@
                     "Auth"
                 ],
                 "summary": "User authentication",
+                "operationId": "userLogin",
                 "parameters": [
                     {
                         "description": "User credentials",
@@ -483,7 +1256,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.LoginRequest"
+                            "$ref": "#/definitions/LoginRequest"
                         }
                     }
                 ],
@@ -493,13 +1266,13 @@
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.SuccessEnvelope"
+                                    "$ref": "#/definitions/SuccessEnvelope"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.LoginResponse"
+                                            "$ref": "#/definitions/LoginResponse"
                                         }
                                     }
                                 }
@@ -509,25 +1282,94 @@
                     "400": {
                         "description": "Invalid request payload",
                         "schema": {
-                            "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorEnvelope"
+                            "$ref": "#/definitions/ErrorEnvelope"
                         }
                     },
                     "401": {
-                        "description": "Invalid credentials",
+                        "description": "Invalid username or password",
                         "schema": {
-                            "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorEnvelope"
+                            "$ref": "#/definitions/ErrorEnvelope"
                         }
                     },
-                    "403": {
-                        "description": "Forbidden: user is an admin attempting regular login",
+                    "500": {
+                        "description": "Internal server error",
                         "schema": {
-                            "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorEnvelope"
+                            "$ref": "#/definitions/ErrorEnvelope"
+                        }
+                    },
+                    "503": {
+                        "description": "Service unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorEnvelope"
                         }
                     }
                 }
             }
         },
         "/api/user/orders": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns all orders placed by the authenticated user",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "User"
+                ],
+                "summary": "List customer purchase history",
+                "operationId": "listUserOrders",
+                "responses": {
+                    "200": {
+                        "description": "List of orders",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/OrderResponse"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorEnvelope"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorEnvelope"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorEnvelope"
+                        }
+                    },
+                    "503": {
+                        "description": "Service unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorEnvelope"
+                        }
+                    }
+                }
+            },
             "post": {
                 "security": [
                     {
@@ -545,6 +1387,7 @@
                     "User"
                 ],
                 "summary": "Purchase product from warehouse",
+                "operationId": "createOrder",
                 "parameters": [
                     {
                         "description": "Purchase order request",
@@ -552,7 +1395,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.CreateOrderRequest"
+                            "$ref": "#/definitions/CreateOrderRequest"
                         }
                     }
                 ],
@@ -562,13 +1405,13 @@
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.SuccessEnvelope"
+                                    "$ref": "#/definitions/SuccessEnvelope"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.OrderResponse"
+                                            "$ref": "#/definitions/OrderResponse"
                                         }
                                     }
                                 }
@@ -576,27 +1419,129 @@
                         }
                     },
                     "400": {
-                        "description": "Invalid input, insufficient stock or balance",
+                        "description": "Malformed JSON syntax or schema validation failure",
                         "schema": {
-                            "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorEnvelope"
+                            "$ref": "#/definitions/ErrorEnvelope"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorEnvelope"
+                            "$ref": "#/definitions/ErrorEnvelope"
                         }
                     },
                     "403": {
-                        "description": "Product disallowed by user filters",
+                        "description": "Forbidden",
                         "schema": {
-                            "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorEnvelope"
+                            "$ref": "#/definitions/ErrorEnvelope"
                         }
                     },
                     "404": {
                         "description": "Product or user not found",
                         "schema": {
-                            "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorEnvelope"
+                            "$ref": "#/definitions/ErrorEnvelope"
+                        }
+                    },
+                    "422": {
+                        "description": "Domain business rule violation (INSUFFICIENT_FUNDS, INSUFFICIENT_STOCK, FILTER_RESTRICTION)",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorEnvelope"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorEnvelope"
+                        }
+                    },
+                    "503": {
+                        "description": "Service unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorEnvelope"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/user/orders/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns details for a specific order placed by the authenticated user",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "User"
+                ],
+                "summary": "Get customer order details",
+                "operationId": "getUserOrderById",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Order ID (UUID)",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Order details",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/OrderResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid order ID format",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorEnvelope"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorEnvelope"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorEnvelope"
+                        }
+                    },
+                    "404": {
+                        "description": "Order not found",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorEnvelope"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorEnvelope"
+                        }
+                    },
+                    "503": {
+                        "description": "Service unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorEnvelope"
                         }
                     }
                 }
@@ -609,10 +1554,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Browse warehouse items with optional category query filter and strict permission filtering",
-                "consumes": [
-                    "application/json"
-                ],
+                "description": "Browse warehouse items with optional category/manufacturer filters, sorting, and pagination",
                 "produces": [
                     "application/json"
                 ],
@@ -620,21 +1562,66 @@
                     "User"
                 ],
                 "summary": "Browse warehouse catalog",
+                "operationId": "listUserProducts",
                 "parameters": [
                     {
                         "type": "string",
                         "description": "Filter by category (e.g. laptop, smartphone)",
                         "name": "category",
                         "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by manufacturer (e.g. Apple, Dell)",
+                        "name": "manufacturer",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "price",
+                            "created_at",
+                            "model"
+                        ],
+                        "type": "string",
+                        "description": "Sort field (price, created_at, model)",
+                        "name": "sort_by",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "asc",
+                            "desc"
+                        ],
+                        "type": "string",
+                        "description": "Sort order (asc, desc)",
+                        "name": "order",
+                        "in": "query"
+                    },
+                    {
+                        "minimum": 1,
+                        "type": "integer",
+                        "default": 1,
+                        "description": "Page number (default: 1, min: 1)",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "maximum": 100,
+                        "minimum": 1,
+                        "type": "integer",
+                        "default": 20,
+                        "description": "Page size (default: 20, min: 1, max: 100)",
+                        "name": "page_size",
+                        "in": "query"
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "List of allowed products",
+                        "description": "List of allowed products with pagination",
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.SuccessEnvelope"
+                                    "$ref": "#/definitions/SuccessEnvelope"
                                 },
                                 {
                                     "type": "object",
@@ -642,7 +1629,7 @@
                                         "data": {
                                             "type": "array",
                                             "items": {
-                                                "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.Product"
+                                                "$ref": "#/definitions/Product"
                                             }
                                         }
                                     }
@@ -650,16 +1637,40 @@
                             ]
                         }
                     },
+                    "400": {
+                        "description": "Invalid pagination, sorting, or filter parameters",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorEnvelope"
+                        }
+                    },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorEnvelope"
+                            "$ref": "#/definitions/ErrorEnvelope"
                         }
                     },
                     "403": {
                         "description": "Forbidden",
                         "schema": {
-                            "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorEnvelope"
+                            "$ref": "#/definitions/ErrorEnvelope"
+                        }
+                    },
+                    "404": {
+                        "description": "User not found",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorEnvelope"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorEnvelope"
+                        }
+                    },
+                    "503": {
+                        "description": "Service unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorEnvelope"
                         }
                     }
                 }
@@ -673,9 +1684,6 @@
                     }
                 ],
                 "description": "Returns the profile, current balance, and assigned filter permissions for the logged in user",
-                "consumes": [
-                    "application/json"
-                ],
                 "produces": [
                     "application/json"
                 ],
@@ -683,19 +1691,20 @@
                     "User"
                 ],
                 "summary": "Get authenticated user profile",
+                "operationId": "getUserProfile",
                 "responses": {
                     "200": {
                         "description": "User profile",
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.SuccessEnvelope"
+                                    "$ref": "#/definitions/SuccessEnvelope"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.UserSummary"
+                                            "$ref": "#/definitions/UserSummary"
                                         }
                                     }
                                 }
@@ -705,19 +1714,31 @@
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorEnvelope"
+                            "$ref": "#/definitions/ErrorEnvelope"
                         }
                     },
                     "403": {
                         "description": "Forbidden",
                         "schema": {
-                            "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorEnvelope"
+                            "$ref": "#/definitions/ErrorEnvelope"
                         }
                     },
                     "404": {
                         "description": "User not found",
                         "schema": {
-                            "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorEnvelope"
+                            "$ref": "#/definitions/ErrorEnvelope"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorEnvelope"
+                        }
+                    },
+                    "503": {
+                        "description": "Service unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorEnvelope"
                         }
                     }
                 }
@@ -725,21 +1746,34 @@
         }
     },
     "definitions": {
-        "github_com_altregubov_warehouse-rest-test-app_internal_domain.CreateOrderRequest": {
+        "CreateOrderRequest": {
             "type": "object",
+            "required": [
+                "product_id",
+                "quantity"
+            ],
             "properties": {
                 "product_id": {
                     "type": "string",
+                    "format": "uuid",
                     "example": "c0000000-0000-0000-0000-000000000001"
                 },
                 "quantity": {
                     "type": "integer",
+                    "minimum": 1,
                     "example": 1
                 }
             }
         },
-        "github_com_altregubov_warehouse-rest-test-app_internal_domain.CreateProductRequest": {
+        "CreateProductRequest": {
             "type": "object",
+            "required": [
+                "category",
+                "manufacturer",
+                "model",
+                "price",
+                "stock_quantity"
+            ],
             "properties": {
                 "category": {
                     "type": "string",
@@ -755,24 +1789,42 @@
                 },
                 "price": {
                     "type": "number",
+                    "format": "double",
+                    "minimum": 0,
                     "example": 1099
                 },
                 "stock_quantity": {
                     "type": "integer",
+                    "minimum": 0,
                     "example": 10
                 }
             }
         },
-        "github_com_altregubov_warehouse-rest-test-app_internal_domain.CreateUserRequest": {
+        "CreateUserRequest": {
             "type": "object",
+            "required": [
+                "balance",
+                "password",
+                "role",
+                "username"
+            ],
             "properties": {
+                "access_level": {
+                    "type": "string",
+                    "enum": [
+                        "ALL",
+                        "FILTERED",
+                        "NONE"
+                    ],
+                    "example": "FILTERED"
+                },
                 "allowed_categories": {
                     "type": "array",
                     "items": {
                         "type": "string"
                     },
                     "example": [
-                        "[\"laptop\"]"
+                        "laptop"
                     ]
                 },
                 "allowed_manufacturers": {
@@ -781,46 +1833,75 @@
                         "type": "string"
                     },
                     "example": [
-                        "[\"Dell\"]"
+                        "Dell"
                     ]
                 },
                 "balance": {
                     "type": "number",
+                    "format": "double",
+                    "minimum": 0,
                     "example": 1000
+                },
+                "catalog_access_enabled": {
+                    "type": "boolean",
+                    "example": true
                 },
                 "password": {
                     "type": "string",
+                    "minLength": 8,
                     "example": "secret123"
                 },
                 "role": {
                     "type": "string",
+                    "enum": [
+                        "admin",
+                        "user"
+                    ],
                     "example": "user"
                 },
                 "username": {
                     "type": "string",
+                    "minLength": 1,
                     "example": "john_doe"
                 }
             }
         },
-        "github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorDetails": {
+        "ErrorDetails": {
             "type": "object",
+            "required": [
+                "code",
+                "message"
+            ],
             "properties": {
                 "code": {
                     "type": "string",
                     "example": "BAD_REQUEST"
                 },
-                "details": {},
+                "details": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/FieldViolation"
+                    }
+                },
                 "message": {
                     "type": "string",
                     "example": "Detailed error description"
                 }
             }
         },
-        "github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorEnvelope": {
+        "ErrorEnvelope": {
             "type": "object",
+            "required": [
+                "error",
+                "success"
+            ],
             "properties": {
                 "error": {
-                    "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.ErrorDetails"
+                    "$ref": "#/definitions/ErrorDetails"
+                },
+                "requestId": {
+                    "type": "string",
+                    "example": "c56a4180-65aa-42ec-a945-5fd21dec0538"
                 },
                 "success": {
                     "type": "boolean",
@@ -828,166 +1909,430 @@
                 }
             }
         },
-        "github_com_altregubov_warehouse-rest-test-app_internal_domain.LoginRequest": {
+        "FieldViolation": {
             "type": "object",
+            "required": [
+                "field",
+                "issue"
+            ],
+            "properties": {
+                "field": {
+                    "type": "string",
+                    "example": "quantity"
+                },
+                "issue": {
+                    "type": "string",
+                    "example": "quantity must be greater than 0"
+                }
+            }
+        },
+        "LoginRequest": {
+            "type": "object",
+            "required": [
+                "password",
+                "username"
+            ],
             "properties": {
                 "password": {
                     "type": "string",
+                    "minLength": 8,
                     "example": "admin123"
                 },
                 "username": {
                     "type": "string",
+                    "minLength": 1,
                     "example": "admin"
                 }
             }
         },
-        "github_com_altregubov_warehouse-rest-test-app_internal_domain.LoginResponse": {
+        "LoginResponse": {
             "type": "object",
+            "required": [
+                "token",
+                "user"
+            ],
             "properties": {
                 "token": {
                     "type": "string"
                 },
                 "user": {
-                    "$ref": "#/definitions/github_com_altregubov_warehouse-rest-test-app_internal_domain.UserSummary"
+                    "$ref": "#/definitions/UserSummary"
                 }
             }
         },
-        "github_com_altregubov_warehouse-rest-test-app_internal_domain.OrderResponse": {
+        "OrderResponse": {
             "type": "object",
+            "required": [
+                "created_at",
+                "order_id",
+                "product_id",
+                "product_model",
+                "quantity",
+                "status",
+                "total_price",
+                "unit_price"
+            ],
             "properties": {
                 "created_at": {
-                    "type": "string"
+                    "type": "string",
+                    "format": "date-time"
                 },
                 "order_id": {
-                    "type": "string"
+                    "type": "string",
+                    "format": "uuid",
+                    "example": "d0000000-0000-0000-0000-000000000001"
                 },
                 "product_id": {
-                    "type": "string"
+                    "type": "string",
+                    "format": "uuid",
+                    "example": "c0000000-0000-0000-0000-000000000001"
                 },
                 "product_model": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "MacBook Pro 16 M3"
                 },
                 "quantity": {
-                    "type": "integer"
+                    "type": "integer",
+                    "minimum": 1,
+                    "example": 1
                 },
                 "remaining_balance": {
-                    "type": "number"
+                    "type": "number",
+                    "format": "double",
+                    "minimum": 0,
+                    "example": 500
+                },
+                "status": {
+                    "type": "string",
+                    "enum": [
+                        "CREATED",
+                        "PROCESSING",
+                        "SHIPPED",
+                        "DELIVERED",
+                        "CANCELLED"
+                    ],
+                    "example": "CREATED"
                 },
                 "total_price": {
-                    "type": "number"
+                    "type": "number",
+                    "format": "double",
+                    "minimum": 0,
+                    "example": 4998
                 },
                 "unit_price": {
-                    "type": "number"
+                    "type": "number",
+                    "format": "double",
+                    "minimum": 0,
+                    "example": 2499
+                },
+                "user_id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "example": "b0000000-0000-0000-0000-000000000002"
                 }
             }
         },
-        "github_com_altregubov_warehouse-rest-test-app_internal_domain.Product": {
+        "PaginationMetadata": {
             "type": "object",
+            "required": [
+                "page",
+                "page_size",
+                "total_count",
+                "total_pages"
+            ],
+            "properties": {
+                "page": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "example": 1
+                },
+                "page_size": {
+                    "type": "integer",
+                    "maximum": 100,
+                    "minimum": 1,
+                    "example": 20
+                },
+                "total_count": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "example": 45
+                },
+                "total_pages": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "example": 3
+                }
+            }
+        },
+        "Product": {
+            "type": "object",
+            "required": [
+                "category",
+                "created_at",
+                "id",
+                "manufacturer",
+                "model",
+                "price",
+                "stock_quantity",
+                "updated_at"
+            ],
             "properties": {
                 "category": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "laptop"
                 },
                 "created_at": {
-                    "type": "string"
+                    "type": "string",
+                    "format": "date-time"
                 },
                 "id": {
-                    "type": "string"
+                    "type": "string",
+                    "format": "uuid",
+                    "example": "c0000000-0000-0000-0000-000000000001"
                 },
                 "manufacturer": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "Apple"
                 },
                 "model": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "MacBook Pro 16 M3"
                 },
                 "price": {
-                    "type": "number"
+                    "type": "number",
+                    "format": "double",
+                    "minimum": 0,
+                    "example": 2499
                 },
                 "stock_quantity": {
-                    "type": "integer"
+                    "type": "integer",
+                    "minimum": 0,
+                    "example": 15
                 },
                 "updated_at": {
-                    "type": "string"
+                    "type": "string",
+                    "format": "date-time"
                 }
             }
         },
-        "github_com_altregubov_warehouse-rest-test-app_internal_domain.SuccessEnvelope": {
+        "SetBalanceRequest": {
             "type": "object",
+            "required": [
+                "new_balance"
+            ],
+            "properties": {
+                "new_balance": {
+                    "type": "number",
+                    "format": "double",
+                    "minimum": 0,
+                    "example": 5000
+                }
+            }
+        },
+        "SuccessEnvelope": {
+            "type": "object",
+            "required": [
+                "data",
+                "success"
+            ],
             "properties": {
                 "data": {},
+                "page": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "page_size": {
+                    "type": "integer",
+                    "example": 20
+                },
+                "pagination": {
+                    "$ref": "#/definitions/PaginationMetadata"
+                },
+                "requestId": {
+                    "type": "string",
+                    "example": "c56a4180-65aa-42ec-a945-5fd21dec0538"
+                },
                 "success": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "total_count": {
+                    "type": "integer",
+                    "example": 45
+                },
+                "total_pages": {
+                    "type": "integer",
+                    "example": 3
+                }
+            }
+        },
+        "TopUpBalanceRequest": {
+            "type": "object",
+            "required": [
+                "increment_amount"
+            ],
+            "properties": {
+                "increment_amount": {
+                    "type": "number",
+                    "format": "double",
+                    "minimum": 0.01,
+                    "example": 500
+                }
+            }
+        },
+        "UpdateBalanceRequest": {
+            "type": "object",
+            "required": [
+                "amount"
+            ],
+            "properties": {
+                "amount": {
+                    "type": "number",
+                    "format": "double",
+                    "example": 500
+                }
+            }
+        },
+        "UpdateFiltersRequest": {
+            "type": "object",
+            "required": [
+                "allowed_categories",
+                "allowed_manufacturers"
+            ],
+            "properties": {
+                "access_level": {
+                    "type": "string",
+                    "enum": [
+                        "ALL",
+                        "FILTERED",
+                        "NONE"
+                    ],
+                    "example": "FILTERED"
+                },
+                "allowed_categories": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "example": [
+                        "laptop"
+                    ]
+                },
+                "allowed_manufacturers": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "example": [
+                        "Apple",
+                        "Dell"
+                    ]
+                },
+                "catalog_access_enabled": {
                     "type": "boolean",
                     "example": true
                 }
             }
         },
-        "github_com_altregubov_warehouse-rest-test-app_internal_domain.UpdateBalanceRequest": {
+        "UpdateOrderStatusRequest": {
             "type": "object",
+            "required": [
+                "status"
+            ],
             "properties": {
-                "amount": {
-                    "type": "number",
-                    "example": 500
+                "status": {
+                    "type": "string",
+                    "enum": [
+                        "CREATED",
+                        "PROCESSING",
+                        "SHIPPED",
+                        "DELIVERED",
+                        "CANCELLED"
+                    ],
+                    "example": "SHIPPED"
                 }
             }
         },
-        "github_com_altregubov_warehouse-rest-test-app_internal_domain.UpdateFiltersRequest": {
+        "UpdateStockRequest": {
             "type": "object",
-            "properties": {
-                "allowed_categories": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    },
-                    "example": [
-                        "[\"laptop\"]"
-                    ]
-                },
-                "allowed_manufacturers": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    },
-                    "example": [
-                        "[\"Apple\"",
-                        " \"Dell\"]"
-                    ]
-                }
-            }
-        },
-        "github_com_altregubov_warehouse-rest-test-app_internal_domain.UpdateStockRequest": {
-            "type": "object",
+            "required": [
+                "stock_quantity"
+            ],
             "properties": {
                 "stock_quantity": {
                     "type": "integer",
+                    "maximum": 2147483647,
+                    "minimum": 0,
                     "example": 25
                 }
             }
         },
-        "github_com_altregubov_warehouse-rest-test-app_internal_domain.UserSummary": {
+        "UserSummary": {
             "type": "object",
+            "required": [
+                "access_level",
+                "allowed_categories",
+                "allowed_manufacturers",
+                "balance",
+                "id",
+                "role",
+                "username"
+            ],
             "properties": {
+                "access_level": {
+                    "type": "string",
+                    "enum": [
+                        "ALL",
+                        "FILTERED",
+                        "NONE"
+                    ],
+                    "example": "FILTERED"
+                },
                 "allowed_categories": {
                     "type": "array",
                     "items": {
                         "type": "string"
-                    }
+                    },
+                    "example": [
+                        "laptop"
+                    ]
                 },
                 "allowed_manufacturers": {
                     "type": "array",
                     "items": {
                         "type": "string"
-                    }
+                    },
+                    "example": [
+                        "Dell"
+                    ]
                 },
                 "balance": {
-                    "type": "number"
+                    "type": "number",
+                    "format": "double",
+                    "minimum": 0,
+                    "example": 1000
+                },
+                "catalog_access_enabled": {
+                    "type": "boolean",
+                    "example": true
                 },
                 "id": {
-                    "type": "string"
+                    "type": "string",
+                    "format": "uuid",
+                    "example": "b0000000-0000-0000-0000-000000000002"
                 },
                 "role": {
-                    "type": "string"
+                    "type": "string",
+                    "enum": [
+                        "admin",
+                        "user"
+                    ],
+                    "example": "user"
                 },
                 "username": {
-                    "type": "string"
+                    "type": "string",
+                    "minLength": 1,
+                    "example": "userA"
                 }
             }
         }

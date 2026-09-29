@@ -14,7 +14,8 @@ import (
 
 type ProductRepository interface {
 	GetByID(ctx context.Context, id uuid.UUID) (*domain.Product, error)
-	List(ctx context.Context, filterCategory string, allowedCategories, allowedManufacturers []string) ([]domain.Product, error)
+	List(ctx context.Context, filterCategory string, allowedCategories, allowedManufacturers []string, accessLevel string, catalogAccessEnabled bool) ([]domain.Product, error)
+	ListPaginated(ctx context.Context, params domain.ProductFilterParams, allowedCategories, allowedManufacturers []string, accessLevel string, catalogAccessEnabled bool) ([]domain.Product, int, error)
 	Create(ctx context.Context, product *domain.Product) error
 	UpdateStock(ctx context.Context, id uuid.UUID, newStock int) (*domain.Product, error)
 }
@@ -56,11 +57,15 @@ func (r *sqlProductRepository) GetByID(ctx context.Context, id uuid.UUID) (*doma
 	return &p, nil
 }
 
-func (r *sqlProductRepository) List(ctx context.Context, filterCategory string, allowedCategories, allowedManufacturers []string) ([]domain.Product, error) {
+func (r *sqlProductRepository) List(ctx context.Context, filterCategory string, allowedCategories, allowedManufacturers []string, accessLevel string, catalogAccessEnabled bool) ([]domain.Product, error) {
+	if !catalogAccessEnabled || accessLevel == "NONE" {
+		return []domain.Product{}, nil
+	}
+
 	filterCategory = strings.TrimSpace(filterCategory)
 
 	// If user is restricted to specific categories, and requested a category not in their whitelist, return empty list
-	if len(allowedCategories) > 0 && filterCategory != "" {
+	if accessLevel == "FILTERED" && len(allowedCategories) > 0 && filterCategory != "" {
 		allowed := false
 		for _, cat := range allowedCategories {
 			if strings.EqualFold(cat, filterCategory) {
@@ -82,18 +87,26 @@ func (r *sqlProductRepository) List(ctx context.Context, filterCategory string, 
 	argIdx := 1
 
 	if filterCategory != "" {
-		query += fmt.Sprintf(" AND LOWER(category) = LOWER($%d)", argIdx)
+		query += fmt.Sprintf(" AND LOWER(TRIM(category)) = LOWER(TRIM($%d))", argIdx)
 		args = append(args, filterCategory)
 		argIdx++
-	} else if len(allowedCategories) > 0 {
-		query += fmt.Sprintf(" AND category = ANY($%d)", argIdx)
-		args = append(args, pq.Array(allowedCategories))
+	} else if accessLevel == "FILTERED" && len(allowedCategories) > 0 {
+		normCats := make([]string, len(allowedCategories))
+		for i, c := range allowedCategories {
+			normCats[i] = strings.ToLower(strings.TrimSpace(c))
+		}
+		query += fmt.Sprintf(" AND LOWER(TRIM(category)) = ANY($%d)", argIdx)
+		args = append(args, pq.Array(normCats))
 		argIdx++
 	}
 
-	if len(allowedManufacturers) > 0 {
-		query += fmt.Sprintf(" AND manufacturer = ANY($%d)", argIdx)
-		args = append(args, pq.Array(allowedManufacturers))
+	if accessLevel == "FILTERED" && len(allowedManufacturers) > 0 {
+		normMfgs := make([]string, len(allowedManufacturers))
+		for i, m := range allowedManufacturers {
+			normMfgs[i] = strings.ToLower(strings.TrimSpace(m))
+		}
+		query += fmt.Sprintf(" AND LOWER(TRIM(manufacturer)) = ANY($%d)", argIdx)
+		args = append(args, pq.Array(normMfgs))
 		argIdx++
 	}
 
@@ -128,6 +141,159 @@ func (r *sqlProductRepository) List(ctx context.Context, filterCategory string, 
 	}
 
 	return products, nil
+}
+
+func (r *sqlProductRepository) ListPaginated(ctx context.Context, params domain.ProductFilterParams, allowedCategories, allowedManufacturers []string, accessLevel string, catalogAccessEnabled bool) ([]domain.Product, int, error) {
+	if !catalogAccessEnabled || accessLevel == "NONE" {
+		return []domain.Product{}, 0, nil
+	}
+
+	filterCategory := strings.TrimSpace(params.Category)
+	if accessLevel == "FILTERED" && len(allowedCategories) > 0 && filterCategory != "" {
+		allowed := false
+		for _, cat := range allowedCategories {
+			if strings.EqualFold(cat, filterCategory) {
+				allowed = true
+				break
+			}
+		}
+		if !allowed {
+			return []domain.Product{}, 0, nil
+		}
+	}
+
+	filterManufacturer := strings.TrimSpace(params.Manufacturer)
+	if accessLevel == "FILTERED" && len(allowedManufacturers) > 0 && filterManufacturer != "" {
+		allowed := false
+		for _, m := range allowedManufacturers {
+			if strings.EqualFold(m, filterManufacturer) {
+				allowed = true
+				break
+			}
+		}
+		if !allowed {
+			return []domain.Product{}, 0, nil
+		}
+	}
+
+	whereClause := " WHERE 1=1"
+	args := []any{}
+	argIdx := 1
+
+	if filterCategory != "" {
+		whereClause += fmt.Sprintf(" AND LOWER(TRIM(category)) = LOWER(TRIM($%d))", argIdx)
+		args = append(args, filterCategory)
+		argIdx++
+	} else if accessLevel == "FILTERED" && len(allowedCategories) > 0 {
+		normCats := make([]string, len(allowedCategories))
+		for i, c := range allowedCategories {
+			normCats[i] = strings.ToLower(strings.TrimSpace(c))
+		}
+		whereClause += fmt.Sprintf(" AND LOWER(TRIM(category)) = ANY($%d)", argIdx)
+		args = append(args, pq.Array(normCats))
+		argIdx++
+	}
+
+	if filterManufacturer != "" {
+		whereClause += fmt.Sprintf(" AND LOWER(TRIM(manufacturer)) = LOWER(TRIM($%d))", argIdx)
+		args = append(args, filterManufacturer)
+		argIdx++
+	} else if accessLevel == "FILTERED" && len(allowedManufacturers) > 0 {
+		normMfgs := make([]string, len(allowedManufacturers))
+		for i, m := range allowedManufacturers {
+			normMfgs[i] = strings.ToLower(strings.TrimSpace(m))
+		}
+		whereClause += fmt.Sprintf(" AND LOWER(TRIM(manufacturer)) = ANY($%d)", argIdx)
+		args = append(args, pq.Array(normMfgs))
+		argIdx++
+	}
+
+	countQuery := "SELECT COUNT(*) FROM products" + whereClause
+	var totalCount int
+	if err := r.db.QueryRowContext(ctx, countQuery, args...).Scan(&totalCount); err != nil {
+		return nil, 0, fmt.Errorf("failed to count products: %w", err)
+	}
+	if totalCount == 0 {
+		return []domain.Product{}, 0, nil
+	}
+
+	var orderClause string
+	switch strings.ToLower(strings.TrimSpace(params.SortBy)) {
+	case "price":
+		if strings.EqualFold(params.Order, "desc") {
+			orderClause = "price DESC, id ASC"
+		} else {
+			orderClause = "price ASC, id ASC"
+		}
+	case "model":
+		if strings.EqualFold(params.Order, "desc") {
+			orderClause = "model DESC, id ASC"
+		} else {
+			orderClause = "model ASC, id ASC"
+		}
+	case "created_at":
+		if strings.EqualFold(params.Order, "desc") {
+			orderClause = "created_at DESC, id ASC"
+		} else {
+			orderClause = "created_at ASC, id ASC"
+		}
+	default:
+		if strings.EqualFold(params.Order, "desc") {
+			orderClause = "created_at DESC, id ASC"
+		} else {
+			orderClause = "created_at ASC, id ASC"
+		}
+	}
+
+	page := params.Page
+	if page < 1 {
+		page = 1
+	}
+	pageSize := params.PageSize
+	if pageSize < 1 || pageSize > 100 {
+		pageSize = 20
+	}
+	offset := (page - 1) * pageSize
+
+	selectQuery := fmt.Sprintf(`
+		SELECT id, category, manufacturer, model, price, stock_quantity, created_at, updated_at
+		FROM products
+		%s
+		ORDER BY %s
+		LIMIT $%d OFFSET $%d
+	`, whereClause, orderClause, argIdx, argIdx+1)
+
+	queryArgs := append(args, pageSize, offset)
+
+	rows, err := r.db.QueryContext(ctx, selectQuery, queryArgs...)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to query products: %w", err)
+	}
+	defer rows.Close()
+
+	products := []domain.Product{}
+	for rows.Next() {
+		var p domain.Product
+		if err := rows.Scan(
+			&p.ID,
+			&p.Category,
+			&p.Manufacturer,
+			&p.Model,
+			&p.Price,
+			&p.StockQuantity,
+			&p.CreatedAt,
+			&p.UpdatedAt,
+		); err != nil {
+			return nil, 0, fmt.Errorf("failed to scan product row: %w", err)
+		}
+		products = append(products, p)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, 0, fmt.Errorf("error reading products: %w", err)
+	}
+
+	return products, totalCount, nil
 }
 
 func (r *sqlProductRepository) Create(ctx context.Context, p *domain.Product) error {

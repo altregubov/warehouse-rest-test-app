@@ -10,9 +10,17 @@ CREATE TABLE IF NOT EXISTS users (
     balance NUMERIC(12, 2) NOT NULL DEFAULT 0.00 CHECK (balance >= 0),
     allowed_categories TEXT[] DEFAULT '{}',
     allowed_manufacturers TEXT[] DEFAULT '{}',
+    access_level VARCHAR(20) NOT NULL DEFAULT 'ALL' CHECK (access_level IN ('ALL', 'FILTERED', 'NONE')),
+    catalog_access_enabled BOOLEAN NOT NULL DEFAULT true,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    deleted_at TIMESTAMP WITH TIME ZONE NULL
 );
+
+ALTER TABLE users ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP WITH TIME ZONE NULL;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS catalog_access_enabled BOOLEAN NOT NULL DEFAULT true;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS access_level VARCHAR(20) NOT NULL DEFAULT 'ALL';
+UPDATE users SET access_level = 'FILTERED' WHERE (array_length(allowed_categories, 1) > 0 OR array_length(allowed_manufacturers, 1) > 0) AND access_level = 'ALL';
 
 -- 2. Products Table
 CREATE TABLE IF NOT EXISTS products (
@@ -29,28 +37,39 @@ CREATE TABLE IF NOT EXISTS products (
 -- 3. Orders Table
 CREATE TABLE IF NOT EXISTS orders (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
     product_id UUID NOT NULL REFERENCES products(id) ON DELETE RESTRICT,
+    product_model VARCHAR(150) NOT NULL,
+    unit_price NUMERIC(12, 2) NOT NULL CHECK (unit_price >= 0),
     quantity INTEGER NOT NULL CHECK (quantity > 0),
     total_price NUMERIC(12, 2) NOT NULL CHECK (total_price >= 0),
+    status VARCHAR(50) NOT NULL DEFAULT 'CREATED',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
+
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS status VARCHAR(50) NOT NULL DEFAULT 'CREATED';
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS product_model VARCHAR(150);
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS unit_price NUMERIC(12, 2);
+UPDATE orders o SET product_model = p.model, unit_price = p.price FROM products p WHERE o.product_id = p.id AND (o.product_model IS NULL OR o.unit_price IS NULL);
+ALTER TABLE orders DROP CONSTRAINT IF EXISTS orders_user_id_fkey;
+ALTER TABLE orders ADD CONSTRAINT orders_user_id_fkey FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE RESTRICT;
 
 CREATE INDEX IF NOT EXISTS idx_products_category ON products(category);
 CREATE INDEX IF NOT EXISTS idx_products_manufacturer ON products(manufacturer);
 CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id);
+CREATE INDEX IF NOT EXISTS idx_users_deleted_at ON users(deleted_at);
 
 -- 4. Seed Data
 -- Passwords:
 -- admin123: $2a$10$RUP6Lknor1aYWPyngT8WjOkiwFpkibEmguyv7e5gTbKae/hn5OAKW
 -- user123:  $2a$10$pp.NmQ27Jz1aeJiA2fPJTu79LQhY9v/Pxh02nSJvQ5k1cpq7BFAD2
 
-INSERT INTO users (id, username, password_hash, role, balance, allowed_categories, allowed_manufacturers)
+INSERT INTO users (id, username, password_hash, role, balance, allowed_categories, allowed_manufacturers, access_level, catalog_access_enabled)
 VALUES
-    ('a0000000-0000-0000-0000-000000000001', 'admin', '$2a$10$RUP6Lknor1aYWPyngT8WjOkiwFpkibEmguyv7e5gTbKae/hn5OAKW', 'admin', 0.00, '{}', '{}'),
-    ('b0000000-0000-0000-0000-000000000002', 'userA', '$2a$10$pp.NmQ27Jz1aeJiA2fPJTu79LQhY9v/Pxh02nSJvQ5k1cpq7BFAD2', 'user', 5000.00, '{}', '{}'),
-    ('b0000000-0000-0000-0000-000000000003', 'userB', '$2a$10$pp.NmQ27Jz1aeJiA2fPJTu79LQhY9v/Pxh02nSJvQ5k1cpq7BFAD2', 'user', 3000.00, '{"laptop"}', '{}'),
-    ('b0000000-0000-0000-0000-000000000004', 'userC', '$2a$10$pp.NmQ27Jz1aeJiA2fPJTu79LQhY9v/Pxh02nSJvQ5k1cpq7BFAD2', 'user', 4000.00, '{}', '{"Apple"}')
+    ('a0000000-0000-0000-0000-000000000001', 'admin', '$2a$10$RUP6Lknor1aYWPyngT8WjOkiwFpkibEmguyv7e5gTbKae/hn5OAKW', 'admin', 0.00, '{}', '{}', 'ALL', true),
+    ('b0000000-0000-0000-0000-000000000002', 'userA', '$2a$10$pp.NmQ27Jz1aeJiA2fPJTu79LQhY9v/Pxh02nSJvQ5k1cpq7BFAD2', 'user', 5000.00, '{}', '{}', 'ALL', true),
+    ('b0000000-0000-0000-0000-000000000003', 'userB', '$2a$10$pp.NmQ27Jz1aeJiA2fPJTu79LQhY9v/Pxh02nSJvQ5k1cpq7BFAD2', 'user', 3000.00, '{"laptop"}', '{}', 'FILTERED', true),
+    ('b0000000-0000-0000-0000-000000000004', 'userC', '$2a$10$pp.NmQ27Jz1aeJiA2fPJTu79LQhY9v/Pxh02nSJvQ5k1cpq7BFAD2', 'user', 4000.00, '{}', '{"Apple"}', 'FILTERED', true)
 ON CONFLICT (username) DO NOTHING;
 
 INSERT INTO products (id, category, manufacturer, model, price, stock_quantity)

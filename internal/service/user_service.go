@@ -13,9 +13,14 @@ import (
 
 type UserService interface {
 	GetProfile(ctx context.Context, userID uuid.UUID) (*domain.UserSummary, error)
+	GetUserByID(ctx context.Context, userID uuid.UUID) (*domain.UserSummary, error)
+	ListUsers(ctx context.Context, role string, page, pageSize int) ([]*domain.UserSummary, int, error)
 	CreateUser(ctx context.Context, req *domain.CreateUserRequest) (*domain.UserSummary, error)
 	UpdateBalance(ctx context.Context, userID uuid.UUID, amount float64) (*domain.UserSummary, error)
-	UpdateFilters(ctx context.Context, userID uuid.UUID, categories, manufacturers []string) (*domain.UserSummary, error)
+	TopUpBalance(ctx context.Context, userID uuid.UUID, incrementAmount float64) (*domain.UserSummary, error)
+	SetBalance(ctx context.Context, userID uuid.UUID, newBalance float64) (*domain.UserSummary, error)
+	UpdateFilters(ctx context.Context, userID uuid.UUID, req *domain.UpdateFiltersRequest) (*domain.UserSummary, error)
+	DeleteUser(ctx context.Context, id uuid.UUID) error
 }
 
 type userService struct {
@@ -35,10 +40,75 @@ func (s *userService) GetProfile(ctx context.Context, userID uuid.UUID) (*domain
 	return toUserSummary(user), nil
 }
 
+func (s *userService) GetUserByID(ctx context.Context, userID uuid.UUID) (*domain.UserSummary, error) {
+	user, err := s.userRepo.GetByID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	return toUserSummary(user), nil
+}
+
+func (s *userService) ListUsers(ctx context.Context, role string, page, pageSize int) ([]*domain.UserSummary, int, error) {
+	if page < 1 {
+		page = 1
+	}
+	if pageSize < 1 || pageSize > 100 {
+		pageSize = 20
+	}
+	offset := (page - 1) * pageSize
+
+	users, total, err := s.userRepo.List(ctx, role, pageSize, offset)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	summaries := make([]*domain.UserSummary, len(users))
+	for i, u := range users {
+		summaries[i] = toUserSummary(u)
+	}
+	return summaries, total, nil
+}
+
+func normalizeStringSlice(items []string) []string {
+	if items == nil {
+		return []string{}
+	}
+	result := make([]string, 0, len(items))
+	seen := make(map[string]bool)
+	for _, item := range items {
+		norm := strings.ToLower(strings.TrimSpace(item))
+		if norm != "" && !seen[norm] {
+			seen[norm] = true
+			result = append(result, norm)
+		}
+	}
+	return result
+}
+
+const BcryptCost = 12
+
+func isValidPassword(p string) bool {
+	if len(p) < 8 {
+		return false
+	}
+	var hasLetter, hasDigit bool
+	for _, ch := range p {
+		if (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') {
+			hasLetter = true
+		} else if ch >= '0' && ch <= '9' {
+			hasDigit = true
+		}
+	}
+	return hasLetter && hasDigit
+}
+
 func (s *userService) CreateUser(ctx context.Context, req *domain.CreateUserRequest) (*domain.UserSummary, error) {
 	username := strings.TrimSpace(req.Username)
-	if username == "" || len(req.Password) < 4 {
-		return nil, fmt.Errorf("%w: username must not be empty and password must be at least 4 characters", domain.ErrInvalidInput)
+	if username == "" {
+		return nil, fmt.Errorf("%w: username must not be empty", domain.ErrInvalidInput)
+	}
+	if !isValidPassword(req.Password) {
+		return nil, fmt.Errorf("%w: password must be at least 8 characters long and contain both letters and digits", domain.ErrInvalidInput)
 	}
 
 	role := strings.ToLower(strings.TrimSpace(req.Role))
@@ -50,19 +120,49 @@ func (s *userService) CreateUser(ctx context.Context, req *domain.CreateUserRequ
 		return nil, fmt.Errorf("%w: balance cannot be negative", domain.ErrInvalidInput)
 	}
 
-	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+	normCats := normalizeStringSlice(req.AllowedCategories)
+	normMfgs := normalizeStringSlice(req.AllowedManufacturers)
+
+	accessLevel := strings.ToUpper(strings.TrimSpace(req.AccessLevel))
+	catalogAccessEnabled := true
+	if req.CatalogAccessEnabled != nil {
+		catalogAccessEnabled = *req.CatalogAccessEnabled
+	}
+
+	if accessLevel != "" {
+		if accessLevel != "ALL" && accessLevel != "FILTERED" && accessLevel != "NONE" {
+			return nil, fmt.Errorf("%w: invalid access_level (must be ALL, FILTERED, or NONE)", domain.ErrInvalidInput)
+		}
+		if accessLevel == "NONE" {
+			catalogAccessEnabled = false
+		}
+	} else if req.CatalogAccessEnabled != nil && !*req.CatalogAccessEnabled {
+		accessLevel = "NONE"
+		catalogAccessEnabled = false
+	} else {
+		if len(normCats) > 0 || len(normMfgs) > 0 {
+			accessLevel = "FILTERED"
+		} else {
+			accessLevel = "ALL"
+		}
+	}
+
+	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), BcryptCost)
 	if err != nil {
 		return nil, fmt.Errorf("failed to hash password: %w", err)
 	}
 
+	balCents := domain.DollarsToCents(req.Balance)
 	user := &domain.User{
 		ID:                   uuid.New(),
 		Username:             username,
 		PasswordHash:         string(hash),
 		Role:                 role,
-		Balance:              req.Balance,
-		AllowedCategories:   req.AllowedCategories,
-		AllowedManufacturers: req.AllowedManufacturers,
+		Balance:              domain.CentsToDollars(balCents),
+		AllowedCategories:   normCats,
+		AllowedManufacturers: normMfgs,
+		AccessLevel:          accessLevel,
+		CatalogAccessEnabled: catalogAccessEnabled,
 	}
 
 	if err := s.userRepo.Create(ctx, user); err != nil {
@@ -78,11 +178,14 @@ func (s *userService) UpdateBalance(ctx context.Context, userID uuid.UUID, amoun
 		return nil, err
 	}
 
-	newBalance := user.Balance + amount
-	if newBalance < 0 {
+	currBalCents := domain.DollarsToCents(user.Balance)
+	amtCents := domain.DollarsToCents(amount)
+	newBalCents := currBalCents + amtCents
+	if newBalCents < 0 {
 		return nil, fmt.Errorf("%w: resulting balance cannot be negative", domain.ErrInvalidInput)
 	}
 
+	newBalance := domain.CentsToDollars(newBalCents)
 	updatedUser, err := s.userRepo.UpdateBalance(ctx, userID, newBalance)
 	if err != nil {
 		return nil, err
@@ -91,20 +194,88 @@ func (s *userService) UpdateBalance(ctx context.Context, userID uuid.UUID, amoun
 	return toUserSummary(updatedUser), nil
 }
 
-func (s *userService) UpdateFilters(ctx context.Context, userID uuid.UUID, categories, manufacturers []string) (*domain.UserSummary, error) {
-	if categories == nil {
-		categories = []string{}
-	}
-	if manufacturers == nil {
-		manufacturers = []string{}
+func (s *userService) TopUpBalance(ctx context.Context, userID uuid.UUID, incrementAmount float64) (*domain.UserSummary, error) {
+	if incrementAmount < 0.01 {
+		return nil, fmt.Errorf("%w: increment amount must be at least 0.01", domain.ErrInvalidInput)
 	}
 
-	updatedUser, err := s.userRepo.UpdateFilters(ctx, userID, categories, manufacturers)
+	user, err := s.userRepo.GetByID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	currBalCents := domain.DollarsToCents(user.Balance)
+	incCents := domain.DollarsToCents(incrementAmount)
+	newBalCents := currBalCents + incCents
+
+	newBalance := domain.CentsToDollars(newBalCents)
+	updatedUser, err := s.userRepo.UpdateBalance(ctx, userID, newBalance)
 	if err != nil {
 		return nil, err
 	}
 
 	return toUserSummary(updatedUser), nil
+}
+
+func (s *userService) SetBalance(ctx context.Context, userID uuid.UUID, newBalance float64) (*domain.UserSummary, error) {
+	if newBalance < 0 {
+		return nil, fmt.Errorf("%w: balance cannot be negative", domain.ErrInvalidInput)
+	}
+
+	_, err := s.userRepo.GetByID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	newBalCents := domain.DollarsToCents(newBalance)
+	roundedBalance := domain.CentsToDollars(newBalCents)
+
+	updatedUser, err := s.userRepo.UpdateBalance(ctx, userID, roundedBalance)
+	if err != nil {
+		return nil, err
+	}
+
+	return toUserSummary(updatedUser), nil
+}
+
+func (s *userService) UpdateFilters(ctx context.Context, userID uuid.UUID, req *domain.UpdateFiltersRequest) (*domain.UserSummary, error) {
+	normCats := normalizeStringSlice(req.AllowedCategories)
+	normMfgs := normalizeStringSlice(req.AllowedManufacturers)
+
+	accessLevel := strings.ToUpper(strings.TrimSpace(req.AccessLevel))
+	catalogAccessEnabled := true
+	if req.CatalogAccessEnabled != nil {
+		catalogAccessEnabled = *req.CatalogAccessEnabled
+	}
+
+	if accessLevel != "" {
+		if accessLevel != "ALL" && accessLevel != "FILTERED" && accessLevel != "NONE" {
+			return nil, fmt.Errorf("%w: invalid access_level (must be ALL, FILTERED, or NONE)", domain.ErrInvalidInput)
+		}
+		if accessLevel == "NONE" {
+			catalogAccessEnabled = false
+		}
+	} else if req.CatalogAccessEnabled != nil && !*req.CatalogAccessEnabled {
+		accessLevel = "NONE"
+		catalogAccessEnabled = false
+	} else {
+		if len(normCats) > 0 || len(normMfgs) > 0 {
+			accessLevel = "FILTERED"
+		} else {
+			accessLevel = "ALL"
+		}
+	}
+
+	updatedUser, err := s.userRepo.UpdateFilters(ctx, userID, normCats, normMfgs, accessLevel, catalogAccessEnabled)
+	if err != nil {
+		return nil, err
+	}
+
+	return toUserSummary(updatedUser), nil
+}
+
+func (s *userService) DeleteUser(ctx context.Context, id uuid.UUID) error {
+	return s.userRepo.SoftDelete(ctx, id)
 }
 
 func toUserSummary(u *domain.User) *domain.UserSummary {
@@ -119,6 +290,14 @@ func toUserSummary(u *domain.User) *domain.UserSummary {
 	if allowedManufacturers == nil {
 		allowedManufacturers = []string{}
 	}
+	accessLevel := u.AccessLevel
+	if accessLevel == "" {
+		if len(allowedCategories) > 0 || len(allowedManufacturers) > 0 {
+			accessLevel = "FILTERED"
+		} else {
+			accessLevel = "ALL"
+		}
+	}
 	return &domain.UserSummary{
 		ID:                   u.ID,
 		Username:             u.Username,
@@ -126,5 +305,7 @@ func toUserSummary(u *domain.User) *domain.UserSummary {
 		Balance:              u.Balance,
 		AllowedCategories:   allowedCategories,
 		AllowedManufacturers: allowedManufacturers,
+		AccessLevel:          accessLevel,
+		CatalogAccessEnabled: u.CatalogAccessEnabled,
 	}
 }
