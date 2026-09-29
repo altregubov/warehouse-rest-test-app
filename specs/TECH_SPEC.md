@@ -31,7 +31,7 @@ The project follows a standard modular layered architecture ensuring clean separ
 ├── scripts/             # Database initialization and seed scripts
 ├── docker-compose.yml   # Docker composition with healthchecks
 ├── Dockerfile           # Multi-stage Go production container build
-├── SPEC.md              # System specification (this document)
+├── specs/               # System and client specifications
 └── README.md            # Setup, execution instructions, test credentials
 ```
 
