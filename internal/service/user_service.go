@@ -87,28 +87,13 @@ func normalizeStringSlice(items []string) []string {
 
 const BcryptCost = 12
 
-func isValidPassword(p string) bool {
-	if len(p) < 8 {
-		return false
-	}
-	var hasLetter, hasDigit bool
-	for _, ch := range p {
-		if (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') {
-			hasLetter = true
-		} else if ch >= '0' && ch <= '9' {
-			hasDigit = true
-		}
-	}
-	return hasLetter && hasDigit
-}
-
 func (s *userService) CreateUser(ctx context.Context, req *domain.CreateUserRequest) (*domain.UserSummary, error) {
 	username := strings.TrimSpace(req.Username)
 	if username == "" {
 		return nil, fmt.Errorf("%w: username must not be empty", domain.ErrInvalidInput)
 	}
-	if !isValidPassword(req.Password) {
-		return nil, fmt.Errorf("%w: password must be at least 8 characters long and contain both letters and digits", domain.ErrInvalidInput)
+	if strings.TrimSpace(req.Password) == "" {
+		return nil, fmt.Errorf("%w: password must not be empty", domain.ErrInvalidInput)
 	}
 
 	role := strings.ToLower(strings.TrimSpace(req.Role))

@@ -1030,15 +1030,15 @@ func TestSchemaValidationAndOpenAPIContracts(t *testing.T) {
 		t.Errorf("Expected 400 for invalid role enum, got %d", respInvalidRole.StatusCode)
 	}
 
-	// 3. String length constraints: empty username or short password rejected as 400
-	respShortPass, _, _ := adminClient.request(http.MethodPost, "/api/admin/users", map[string]any{
-		"username": "valid_user_short_pass",
-		"password": "12",
+	// 3. String length constraints: empty password rejected as 400
+	respEmptyPass, _, _ := adminClient.request(http.MethodPost, "/api/admin/users", map[string]any{
+		"username": "valid_user_empty_pass",
+		"password": "",
 		"role":     "user",
 		"balance":  100.0,
 	})
-	if respShortPass.StatusCode != http.StatusBadRequest {
-		t.Errorf("Expected 400 for password length < 4, got %d", respShortPass.StatusCode)
+	if respEmptyPass.StatusCode != http.StatusBadRequest {
+		t.Errorf("Expected 400 for empty password, got %d", respEmptyPass.StatusCode)
 	}
 
 	// 4. Numeric boundary violations: negative balance rejected as 400
@@ -1875,7 +1875,7 @@ func TestCleanOpenAPIArrayExamples(t *testing.T) {
 // TestJWTSecurityAndComplexityPolicy tests Issue #19:
 // 1. JWT verification explicitly validates algorithm (HS256 pinned), issuer, and audience
 // 2. Rejecting tokens signed with alg:none, wrong issuer, or wrong audience
-// 3. User creation enforces password minLength: 8 and complexity (letters and digits)
+// 3. User creation accepts passwords without minLength 8 or complexity constraints
 func TestJWTSecurityAndComplexityPolicy(t *testing.T) {
 	jwtSecret := []byte("warehouse-secret-key-change-in-production")
 	validUserID := "b0000000-0000-0000-0000-000000000002"
@@ -1943,56 +1943,55 @@ func TestJWTSecurityAndComplexityPolicy(t *testing.T) {
 		t.Errorf("Expected 401 Unauthorized for bad audience, got %d", respBadAud.StatusCode)
 	}
 
-	// 4. Test password length & complexity during user creation
+	// 4. Test that passwords without minLength: 8 or complexity constraints are accepted
 	adminToken, code := login(t, "/api/admin/login", "admin", "admin123")
 	if code != http.StatusOK {
 		t.Fatalf("Admin login failed: %d", code)
 	}
 	adminClient := newClient(adminToken)
 
-	// 4a. Short password (< 8 chars)
+	// 4a. Short password (< 8 chars) accepted
 	respShort, _, _ := adminClient.request(http.MethodPost, "/api/admin/users", domain.CreateUserRequest{
 		Username: fmt.Sprintf("short_%d", time.Now().UnixNano()),
 		Password: "pass12", // 6 chars
 		Role:     "user",
 		Balance:  100.0,
 	})
-	if respShort.StatusCode != http.StatusBadRequest {
-		t.Errorf("Expected 400 for password < 8 chars, got %d", respShort.StatusCode)
+	if respShort.StatusCode != http.StatusCreated {
+		t.Errorf("Expected 201 for password < 8 chars, got %d", respShort.StatusCode)
 	}
 
-	// 4b. Letters only (no digits)
+	// 4b. Letters only (no digits) accepted
 	respNoDigits, _, _ := adminClient.request(http.MethodPost, "/api/admin/users", domain.CreateUserRequest{
 		Username: fmt.Sprintf("nodigits_%d", time.Now().UnixNano()),
-		Password: "passwordonly", // >= 8 chars, but no digits
+		Password: "passwordonly", // no digits
 		Role:     "user",
 		Balance:  100.0,
 	})
-	if respNoDigits.StatusCode != http.StatusBadRequest {
-		t.Errorf("Expected 400 for password without digits, got %d", respNoDigits.StatusCode)
+	if respNoDigits.StatusCode != http.StatusCreated {
+		t.Errorf("Expected 201 for password without digits, got %d", respNoDigits.StatusCode)
 	}
 
-	// 4c. Digits only (no letters)
+	// 4c. Digits only (no letters) accepted
 	respNoLetters, _, _ := adminClient.request(http.MethodPost, "/api/admin/users", domain.CreateUserRequest{
 		Username: fmt.Sprintf("noletters_%d", time.Now().UnixNano()),
-		Password: "1234567890", // >= 8 chars, but no letters
+		Password: "12345678", // no letters
 		Role:     "user",
 		Balance:  100.0,
 	})
-	if respNoLetters.StatusCode != http.StatusBadRequest {
-		t.Errorf("Expected 400 for password without letters, got %d", respNoLetters.StatusCode)
+	if respNoLetters.StatusCode != http.StatusCreated {
+		t.Errorf("Expected 201 for password without letters, got %d", respNoLetters.StatusCode)
 	}
 
-	// 4d. Valid password meeting length and complexity
-	validUsername := fmt.Sprintf("validuser_%d", time.Now().UnixNano())
-	respValid, _, _ := adminClient.request(http.MethodPost, "/api/admin/users", domain.CreateUserRequest{
-		Username: validUsername,
-		Password: "ValidPass123", // letters + digits, length >= 8
-		Role:     "user",
-		Balance:  500.0,
+	// 4d. Empty password rejected as 400
+	respEmpty, _, _ := adminClient.request(http.MethodPost, "/api/admin/users", map[string]any{
+		"username": fmt.Sprintf("empty_%d", time.Now().UnixNano()),
+		"password": "",
+		"role":     "user",
+		"balance":  100.0,
 	})
-	if respValid.StatusCode != http.StatusCreated {
-		t.Errorf("Expected 201 Created for valid password, got %d", respValid.StatusCode)
+	if respEmpty.StatusCode != http.StatusBadRequest {
+		t.Errorf("Expected 400 for empty password, got %d", respEmpty.StatusCode)
 	}
 }
 

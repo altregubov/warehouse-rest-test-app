@@ -163,7 +163,7 @@ To ensure client SDK predictability and prevent unhandled database violations:
   - `increment_amount`: `minimum: 0.01`
 - **String Length Constraints**:
   - `username`: `minLength: 1`
-  - `password`: `minLength: 8`, requires at least one letter and one number
+  - `password`: Non-empty string required (`binding:"required"`). No minLength or complexity restrictions in schemas.
 All boundary, complexity, or type violations are caught at the HTTP handler layer and rejected with `400 Bad Request` (`INVALID_INPUT` / `INVALID_REQUEST`) before invoking backend services or touching the database.
 
 ---
@@ -280,10 +280,8 @@ CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id);
 - **Salt Generation:** Cryptographically random, unique per-user salt automatically embedded within each hash string (`$2a$12$...`).
 - **Anti-Enumeration Protection:** Login authentication employs constant-time dummy bcrypt verification on non-existent usernames, defeating timing side-channel attacks and eliminating user existence oracles.
 
-### 4.4 Password Complexity & Lifecycle Policies
-- **Minimum Length:** Passwords must contain a minimum of 8 characters (`minLength: 8`).
-- **Complexity Requirement:** Passwords must contain a combination of alphabetic letters (`[a-zA-Z]`) and numeric digits (`[0-9]`).
-- **Validation Failure:** Any registration or account creation violating complexity rules is rejected with `400 Bad Request` (`INVALID_INPUT`) before password hashing or database interaction occurs.
+### 4.4 Password Storage & Policies
+- **Storage & Security:** Passwords are required upon account creation and are securely hashed using bcrypt (cost 12). Schema and complexity restrictions (`minLength: 8` and character set rules) are removed to support flexible client credential schemes.
 
 ### 4.5 Segregated Login Endpoints & RBAC Enforcement
 1. `POST /api/admin/login`
