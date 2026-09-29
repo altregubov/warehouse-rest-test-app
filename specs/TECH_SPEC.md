@@ -210,7 +210,7 @@ CREATE TABLE IF NOT EXISTS orders (
     unit_price NUMERIC(12, 2) NOT NULL CHECK (unit_price >= 0),
     quantity INTEGER NOT NULL CHECK (quantity > 0),
     total_price NUMERIC(12, 2) NOT NULL CHECK (total_price >= 0),
-    status VARCHAR(50) NOT NULL DEFAULT 'CREATED',
+    status VARCHAR(50) NOT NULL DEFAULT 'CREATED' CHECK (status IN ('CREATED', 'PROCESSED', 'CANCELLED')),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -239,6 +239,14 @@ CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id);
 5. **Historical Snapshot Immutability:**
    - When an order is placed, the product's current model and unit price are permanently snapshotted into `orders.product_model` and `orders.unit_price`.
    - Subsequent modifications to product prices or catalog descriptions do not alter historical orders, ensuring immutable receipts for financial audits.
+6. **Order Lifecycle & Cancellation Refund Invariants:**
+   - **Allowed Statuses:** Order status strictly accepts only three values: `CREATED`, `PROCESSED`, and `CANCELLED`.
+   - **Automatic Processing:** When a customer submits an order (`POST /api/user/orders`), the transaction creates the order with initial status `CREATED`. Once balance debit, inventory decrement, and validation succeed, the status automatically updates to `PROCESSED` as the transaction commits. The API responds with `status: "PROCESSED"`.
+   - **Admin Cancellation with Restocking & Refund:** An administrator can transition an active order to `CANCELLED` (`PATCH /api/admin/orders/{id}/status`). This operation runs in a deterministic serializable transaction that:
+     - Restores ordered quantities to `products.stock_quantity`.
+     - Refunds the order's `total_price` back to the customer's `users.balance` in exact integer cents.
+     - Sets order status to `CANCELLED`.
+     - Rejects any subsequent modification or re-cancellation of an already cancelled order with `422 Unprocessable Entity` (`INVALID_STATUS`) to protect against duplicate refunds.
 
 ---
 
@@ -447,14 +455,15 @@ CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id);
    - Failure (500 Internal Server Error): Persistence failure.
 
 10. `PATCH /api/admin/orders/{id}/status`
-    - Updates order fulfillment lifecycle status.
-    - Body: `{ "status": "SHIPPED" }` (Valid: `CREATED`, `PROCESSING`, `SHIPPED`, `DELIVERED`, `CANCELLED`).
+    - Updates order lifecycle status.
+    - Body: `{ "status": "CANCELLED" }` (Valid: `CREATED`, `PROCESSED`, `CANCELLED`).
+    - Transitioning to `CANCELLED` atomically returns ordered units to product stock and refunds order total to user balance. Re-cancelling or modifying a cancelled order is rejected.
     - Response (200 OK): Updated `OrderResponse` object.
     - Failure (400 Bad Request): Invalid order UUID (`INVALID_ID`) or malformed JSON (`INVALID_REQUEST`).
     - Failure (401 Unauthorized): Missing or invalid token.
     - Failure (403 Forbidden): Insufficient admin privileges.
     - Failure (404 Not Found): Target order not found (`NOT_FOUND`).
-    - Failure (422 Unprocessable Entity): Invalid status transition (`INVALID_STATUS`).
+    - Failure (422 Unprocessable Entity): Invalid status transition or order already cancelled (`INVALID_STATUS`).
     - Failure (500 Internal Server Error): Persistence failure.
 
 11. `DELETE /api/admin/users/{id}`
@@ -558,6 +567,7 @@ CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id);
          "quantity": 2,
          "unit_price": 2499.00,
          "total_price": 4998.00,
+         "status": "PROCESSED",
          "remaining_balance": 2.00,
          "created_at": "2026-09-23T20:40:00Z"
        }

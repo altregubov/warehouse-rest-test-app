@@ -43,11 +43,13 @@ CREATE TABLE IF NOT EXISTS orders (
     unit_price NUMERIC(12, 2) NOT NULL CHECK (unit_price >= 0),
     quantity INTEGER NOT NULL CHECK (quantity > 0),
     total_price NUMERIC(12, 2) NOT NULL CHECK (total_price >= 0),
-    status VARCHAR(50) NOT NULL DEFAULT 'CREATED',
+    status VARCHAR(50) NOT NULL DEFAULT 'CREATED' CHECK (status IN ('CREATED', 'PROCESSED', 'CANCELLED')),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS status VARCHAR(50) NOT NULL DEFAULT 'CREATED';
+ALTER TABLE orders DROP CONSTRAINT IF EXISTS orders_status_check;
+ALTER TABLE orders ADD CONSTRAINT orders_status_check CHECK (status IN ('CREATED', 'PROCESSED', 'CANCELLED'));
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS product_model VARCHAR(150);
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS unit_price NUMERIC(12, 2);
 UPDATE orders o SET product_model = p.model, unit_price = p.price FROM products p WHERE o.product_id = p.id AND (o.product_model IS NULL OR o.unit_price IS NULL);

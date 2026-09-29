@@ -158,7 +158,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Update the fulfillment status of an order (e.g. PROCESSING, SHIPPED, DELIVERED, CANCELLED)",
+                "description": "Update the lifecycle status of an order (Valid: CREATED, PROCESSED, CANCELLED). Setting CANCELLED automatically refunds the customer balance and restores product stock.",
                 "consumes": [
                     "application/json"
                 ],
@@ -168,7 +168,7 @@ const docTemplate = `{
                 "tags": [
                     "Admin"
                 ],
-                "summary": "Update order fulfillment status",
+                "summary": "Update order status",
                 "operationId": "updateOrderStatus",
                 "parameters": [
                     {
@@ -2008,12 +2008,10 @@ const docTemplate = `{
                     "type": "string",
                     "enum": [
                         "CREATED",
-                        "PROCESSING",
-                        "SHIPPED",
-                        "DELIVERED",
+                        "PROCESSED",
                         "CANCELLED"
                     ],
-                    "example": "CREATED"
+                    "example": "PROCESSED"
                 },
                 "total_price": {
                     "type": "number",
@@ -2246,12 +2244,10 @@ const docTemplate = `{
                     "type": "string",
                     "enum": [
                         "CREATED",
-                        "PROCESSING",
-                        "SHIPPED",
-                        "DELIVERED",
+                        "PROCESSED",
                         "CANCELLED"
                     ],
-                    "example": "SHIPPED"
+                    "example": "CANCELLED"
                 }
             }
         },

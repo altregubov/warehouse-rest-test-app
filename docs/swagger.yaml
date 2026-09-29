@@ -184,11 +184,9 @@ definitions:
       status:
         enum:
         - CREATED
-        - PROCESSING
-        - SHIPPED
-        - DELIVERED
+        - PROCESSED
         - CANCELLED
-        example: CREATED
+        example: PROCESSED
         type: string
       total_price:
         example: 4998
@@ -369,11 +367,9 @@ definitions:
       status:
         enum:
         - CREATED
-        - PROCESSING
-        - SHIPPED
-        - DELIVERED
+        - PROCESSED
         - CANCELLED
-        example: SHIPPED
+        example: CANCELLED
         type: string
     required:
     - status
@@ -536,8 +532,9 @@ paths:
     patch:
       consumes:
       - application/json
-      description: Update the fulfillment status of an order (e.g. PROCESSING, SHIPPED,
-        DELIVERED, CANCELLED)
+      description: 'Update the lifecycle status of an order (Valid: CREATED, PROCESSED,
+        CANCELLED). Setting CANCELLED automatically refunds the customer balance and
+        restores product stock.'
       operationId: updateOrderStatus
       parameters:
       - description: Order ID (UUID)
@@ -594,7 +591,7 @@ paths:
             $ref: '#/definitions/ErrorEnvelope'
       security:
       - BearerAuth: []
-      summary: Update order fulfillment status
+      summary: Update order status
       tags:
       - Admin
   /api/admin/products:

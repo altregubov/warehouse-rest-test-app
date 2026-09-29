@@ -155,7 +155,7 @@ func (r *sqlOrderRepository) CreateOrderTx(ctx context.Context, userID, productI
 		return nil, fmt.Errorf("failed to update user balance: %w", err)
 	}
 
-	// 8. Insert order
+	// 8. Insert order with initial status 'CREATED'
 	orderID := uuid.New()
 	createdAt := time.Now().UTC()
 	orderQuery := `
@@ -165,6 +165,12 @@ func (r *sqlOrderRepository) CreateOrderTx(ctx context.Context, userID, productI
 	_, err = tx.ExecContext(ctx, orderQuery, orderID, user.ID, product.ID, product.Model, unitPrice, quantity, totalCost, createdAt)
 	if err != nil {
 		return nil, fmt.Errorf("failed to insert order: %w", err)
+	}
+
+	// 9. When transaction finishes, automatically transition status to 'PROCESSED'
+	_, err = tx.ExecContext(ctx, "UPDATE orders SET status = 'PROCESSED' WHERE id = $1", orderID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update order status to PROCESSED: %w", err)
 	}
 
 	if err := tx.Commit(); err != nil {
@@ -179,7 +185,7 @@ func (r *sqlOrderRepository) CreateOrderTx(ctx context.Context, userID, productI
 		Quantity:         quantity,
 		UnitPrice:        unitPrice,
 		TotalPrice:       totalCost,
-		Status:           "CREATED",
+		Status:           "PROCESSED",
 		RemainingBalance: newBalance,
 		CreatedAt:        createdAt,
 	}, nil
@@ -279,7 +285,109 @@ func (r *sqlOrderRepository) ListAll(ctx context.Context) ([]*domain.OrderRespon
 	return orders, nil
 }
 
+func (r *sqlOrderRepository) cancelOrderTx(ctx context.Context, orderID uuid.UUID) (*domain.OrderResponse, error) {
+	tx, err := r.db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
+	if err != nil {
+		return nil, fmt.Errorf("failed to begin cancel order tx: %w", err)
+	}
+	defer tx.Rollback()
+
+	var o domain.OrderResponse
+	query := `
+		SELECT id, user_id, product_id, product_model, unit_price, quantity, total_price, status, created_at
+		FROM orders
+		WHERE id = $1
+		FOR UPDATE
+	`
+	err = tx.QueryRowContext(ctx, query, orderID).Scan(
+		&o.OrderID,
+		&o.UserID,
+		&o.ProductID,
+		&o.ProductModel,
+		&o.UnitPrice,
+		&o.Quantity,
+		&o.TotalPrice,
+		&o.Status,
+		&o.CreatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, domain.ErrNotFound
+		}
+		return nil, fmt.Errorf("failed to fetch order for cancellation: %w", err)
+	}
+
+	if o.Status == "CANCELLED" {
+		return nil, fmt.Errorf("%w: order is already cancelled", domain.ErrInvalidInput)
+	}
+
+	// Deterministic locking between User and Product based on UUID string comparison
+	lockOrder := []string{"USER", "PRODUCT"}
+	if o.UserID.String() > o.ProductID.String() {
+		lockOrder = []string{"PRODUCT", "USER"}
+	}
+
+	for _, target := range lockOrder {
+		if target == "USER" {
+			var userBalance float64
+			err = tx.QueryRowContext(ctx, "SELECT balance FROM users WHERE id = $1 FOR UPDATE", o.UserID).Scan(&userBalance)
+			if err != nil {
+				return nil, fmt.Errorf("failed to lock user for balance refund: %w", err)
+			}
+			userBalanceCents := domain.DollarsToCents(userBalance)
+			refundCents := domain.DollarsToCents(o.TotalPrice)
+			newBalanceCents := userBalanceCents + refundCents
+			newBalance := domain.CentsToDollars(newBalanceCents)
+
+			_, err = tx.ExecContext(ctx, "UPDATE users SET balance = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2", newBalance, o.UserID)
+			if err != nil {
+				return nil, fmt.Errorf("failed to refund user balance: %w", err)
+			}
+		} else {
+			var stockQuantity int
+			err = tx.QueryRowContext(ctx, "SELECT stock_quantity FROM products WHERE id = $1 FOR UPDATE", o.ProductID).Scan(&stockQuantity)
+			if err != nil {
+				return nil, fmt.Errorf("failed to lock product for restocking: %w", err)
+			}
+			newStock := stockQuantity + o.Quantity
+			_, err = tx.ExecContext(ctx, "UPDATE products SET stock_quantity = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2", newStock, o.ProductID)
+			if err != nil {
+				return nil, fmt.Errorf("failed to restock product: %w", err)
+			}
+		}
+	}
+
+	_, err = tx.ExecContext(ctx, "UPDATE orders SET status = 'CANCELLED' WHERE id = $1", orderID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update order status to CANCELLED: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("failed to commit order cancellation: %w", err)
+	}
+
+	o.Status = "CANCELLED"
+	return &o, nil
+}
+
 func (r *sqlOrderRepository) UpdateStatus(ctx context.Context, orderID uuid.UUID, status string) (*domain.OrderResponse, error) {
+	if status == "CANCELLED" {
+		return r.cancelOrderTx(ctx, orderID)
+	}
+
+	// Verify order is not already cancelled
+	var currentStatus string
+	err := r.db.QueryRowContext(ctx, "SELECT status FROM orders WHERE id = $1", orderID).Scan(&currentStatus)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, domain.ErrNotFound
+		}
+		return nil, fmt.Errorf("failed to check order status: %w", err)
+	}
+	if currentStatus == "CANCELLED" {
+		return nil, fmt.Errorf("%w: cannot transition from CANCELLED status", domain.ErrInvalidInput)
+	}
+
 	query := `
 		UPDATE orders
 		SET status = $1
@@ -287,7 +395,7 @@ func (r *sqlOrderRepository) UpdateStatus(ctx context.Context, orderID uuid.UUID
 		RETURNING id, user_id, product_id, product_model, unit_price, quantity, total_price, status, created_at
 	`
 	var o domain.OrderResponse
-	err := r.db.QueryRowContext(ctx, query, status, orderID).Scan(
+	err = r.db.QueryRowContext(ctx, query, status, orderID).Scan(
 		&o.OrderID,
 		&o.UserID,
 		&o.ProductID,
