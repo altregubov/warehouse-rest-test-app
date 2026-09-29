@@ -59,6 +59,14 @@ http://localhost:8080/swagger/index.html
 
 Use the **Authorize** button in Swagger UI to paste your Bearer token (`Bearer <token>`) for interactive endpoint testing.
 
+### 4. Recreation
+```bash
+# 1. Stop containers and destroy the persistent volume
+docker compose down -v
+
+# 2. Start services fresh (PostgreSQL will automatically execute scripts/init.sql)
+docker compose up -d
+```
 ---
 
 ## Pre-seeded Test Credentials
