@@ -137,7 +137,7 @@ type CreateProductRequest struct {
 }
 
 type UpdateStockRequest struct {
-	StockQuantity int `json:"stock_quantity" binding:"required" example:"25" minimum:"0"`
+	StockQuantity int `json:"stock_quantity" binding:"required,gte=0" example:"25" minimum:"0" maximum:"2147483647"`
 }
 
 type CreateOrderRequest struct {

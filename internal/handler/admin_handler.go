@@ -371,6 +371,11 @@ func (h *AdminHandler) UpdateStock(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if req.StockQuantity < 0 {
+		Error(w, http.StatusBadRequest, "INVALID_INPUT", "stock_quantity cannot be negative")
+		return
+	}
+
 	product, err := h.productService.UpdateStock(r.Context(), prodID, req.StockQuantity)
 	if err != nil {
 		if errors.Is(err, domain.ErrNotFound) {

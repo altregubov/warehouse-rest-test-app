@@ -2150,6 +2150,113 @@ func TestJWTSecurityAndComplexityPolicy(t *testing.T) {
 	}
 }
 
+// TestUpdateStockQuantityBoundaryValidation tests Issue #20:
+// 1. Negative stock updates return 400 Bad Request instead of 500
+// 2. Non-negative stock update (e.g. 0 or positive) succeeds with 200 OK
+// 3. OpenAPI schema domain.UpdateStockRequest defines minimum: 0 and maximum: 2147483647
+func TestUpdateStockQuantityBoundaryValidation(t *testing.T) {
+	adminToken, code := login(t, "/api/admin/login", "admin", "admin123")
+	if code != http.StatusOK {
+		t.Fatalf("Admin login failed: %d", code)
+	}
+	adminClient := newClient(adminToken)
+
+	// Create a test product
+	createProdReq := domain.CreateProductRequest{
+		Category:      "laptop",
+		Manufacturer:  "TestMfg",
+		Model:         fmt.Sprintf("StockTestModel_%d", time.Now().UnixNano()),
+		Price:         999.00,
+		StockQuantity: 10,
+	}
+	respCreate, bodyCreate, err := adminClient.request(http.MethodPost, "/api/admin/products", createProdReq)
+	if err != nil {
+		t.Fatalf("Failed to create product: %v", err)
+	}
+	if respCreate.StatusCode != http.StatusCreated {
+		t.Fatalf("Expected 201 Created, got %d: %s", respCreate.StatusCode, string(bodyCreate))
+	}
+
+	var prodEnvelope domain.SuccessEnvelope
+	if err := json.Unmarshal(bodyCreate, &prodEnvelope); err != nil {
+		t.Fatalf("Failed to unmarshal product response: %v", err)
+	}
+	prodData, ok := prodEnvelope.Data.(map[string]any)
+	if !ok {
+		t.Fatalf("Failed to extract product data from envelope")
+	}
+	prodID := prodData["id"].(string)
+
+	// 1. Negative stock update (-1) must return 400 Bad Request (NOT 500)
+	respNeg, bodyNeg, _ := adminClient.request(http.MethodPatch, fmt.Sprintf("/api/admin/products/%s/stock", prodID), map[string]int{
+		"stock_quantity": -1,
+	})
+	if respNeg.StatusCode != http.StatusBadRequest {
+		t.Errorf("Expected 400 Bad Request for stock_quantity: -1, got %d. Body: %s", respNeg.StatusCode, string(bodyNeg))
+	}
+
+	// 2. Negative stock update (-100) must return 400 Bad Request
+	respNeg100, bodyNeg100, _ := adminClient.request(http.MethodPatch, fmt.Sprintf("/api/admin/products/%s/stock", prodID), map[string]int{
+		"stock_quantity": -100,
+	})
+	if respNeg100.StatusCode != http.StatusBadRequest {
+		t.Errorf("Expected 400 Bad Request for stock_quantity: -100, got %d. Body: %s", respNeg100.StatusCode, string(bodyNeg100))
+	}
+
+	// 3. Stock update to 0 must succeed (200 OK)
+	respZero, bodyZero, _ := adminClient.request(http.MethodPatch, fmt.Sprintf("/api/admin/products/%s/stock", prodID), map[string]int{
+		"stock_quantity": 0,
+	})
+	if respZero.StatusCode != http.StatusOK {
+		t.Errorf("Expected 200 OK for stock_quantity: 0, got %d. Body: %s", respZero.StatusCode, string(bodyZero))
+	}
+
+	// 4. Stock update to positive 50 must succeed (200 OK)
+	respPos, bodyPos, _ := adminClient.request(http.MethodPatch, fmt.Sprintf("/api/admin/products/%s/stock", prodID), map[string]int{
+		"stock_quantity": 50,
+	})
+	if respPos.StatusCode != http.StatusOK {
+		t.Errorf("Expected 200 OK for stock_quantity: 50, got %d. Body: %s", respPos.StatusCode, string(bodyPos))
+	}
+
+	// 5. Verify OpenAPI spec defines minimum: 0 and maximum: 2147483647 for stock_quantity
+	respDoc, bodyDoc, err := adminClient.request(http.MethodGet, "/swagger/doc.json", nil)
+	if err != nil {
+		t.Fatalf("Failed to fetch Swagger JSON: %v", err)
+	}
+	if respDoc.StatusCode != http.StatusOK {
+		t.Fatalf("Expected 200 OK from Swagger doc endpoint, got %d", respDoc.StatusCode)
+	}
+
+	var specDoc struct {
+		Definitions map[string]struct {
+			Properties map[string]struct {
+				Minimum *float64 `json:"minimum"`
+				Maximum *float64 `json:"maximum"`
+			} `json:"properties"`
+		} `json:"definitions"`
+	}
+	if err := json.Unmarshal(bodyDoc, &specDoc); err != nil {
+		t.Fatalf("Failed to parse Swagger JSON: %v", err)
+	}
+
+	updateStockDef, ok := specDoc.Definitions["domain.UpdateStockRequest"]
+	if !ok {
+		t.Fatalf("domain.UpdateStockRequest definition not found in swagger doc")
+	}
+	stockProp, ok := updateStockDef.Properties["stock_quantity"]
+	if !ok {
+		t.Fatalf("stock_quantity property not found in domain.UpdateStockRequest")
+	}
+	if stockProp.Minimum == nil || *stockProp.Minimum != 0 {
+		t.Errorf("Expected minimum: 0 on stock_quantity, got %v", stockProp.Minimum)
+	}
+	if stockProp.Maximum == nil || *stockProp.Maximum != 2147483647 {
+		t.Errorf("Expected maximum: 2147483647 on stock_quantity, got %v", stockProp.Maximum)
+	}
+}
+
+
 
 
 

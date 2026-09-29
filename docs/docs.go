@@ -2318,6 +2318,7 @@ const docTemplate = `{
             "properties": {
                 "stock_quantity": {
                     "type": "integer",
+                    "maximum": 2147483647,
                     "minimum": 0,
                     "example": 25
                 }

@@ -382,6 +382,7 @@ definitions:
     properties:
       stock_quantity:
         example: 25
+        maximum: 2147483647
         minimum: 0
         type: integer
     required:

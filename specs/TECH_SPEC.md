@@ -114,7 +114,8 @@ To ensure client SDK predictability and prevent unhandled database violations:
 - **Clean Array Examples**: Array properties (`allowed_categories`, `allowed_manufacturers`) define native JSON array examples (`["laptop"]`, `["Apple", "Dell"]`) rather than escaped string literals, ensuring Swagger UI "Try It Out" and automated contract generators populate valid request bodies out-of-the-box.
 - **Numeric Boundaries**:
   - `quantity`: `minimum: 1`
-  - `stock_quantity`, `price`, `balance`, `new_balance`: `minimum: 0`
+  - `stock_quantity`: `minimum: 0`, `maximum: 2147483647` (enforced via `binding:"required,gte=0"`)
+  - `price`, `balance`, `new_balance`: `minimum: 0`
   - `increment_amount`: `minimum: 0.01`
 - **String Length Constraints**:
   - `username`: `minLength: 1`
