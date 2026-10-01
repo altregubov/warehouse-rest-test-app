@@ -2415,73 +2415,80 @@ func TestOrderThreeStatusesAndCancellationRefund(t *testing.T) {
 		}
 	}
 
-	// 9. Place a second order and transition to 'FAILED' (when order cannot be fulfilled)
-	respOrder2, bodyOrder2, _ := userClient.request(http.MethodPost, "/api/user/orders", domain.CreateOrderRequest{
+	// 9. Verify admin CANNOT set status to FAILED (Admin can only set status Cancelled)
+	respAdminFail, _, _ := adminClient.request(http.MethodPatch, fmt.Sprintf("/api/admin/orders/%s/status", orderID), domain.UpdateOrderStatusRequest{
+		Status: "FAILED",
+	})
+	if respAdminFail.StatusCode != 422 {
+		t.Errorf("Expected 422 when admin attempts to set status FAILED, got %d", respAdminFail.StatusCode)
+	}
+
+	// 10. Verify that POST /api/user/orders pre-condition failures persist a FAILED order in the database
+	// Case A: Insufficient stock failure
+	respOrderStockFail, _, _ := userClient.request(http.MethodPost, "/api/user/orders", domain.CreateOrderRequest{
 		ProductID: productID,
-		Quantity:  2,
+		Quantity:  999999, // Exceeds available stock
 	})
-	if respOrder2.StatusCode != http.StatusCreated {
-		t.Fatalf("Failed to create second order: %d: %s", respOrder2.StatusCode, string(bodyOrder2))
-	}
-	var orderResult2 struct {
-		Data domain.OrderResponse `json:"data"`
-	}
-	_ = json.Unmarshal(bodyOrder2, &orderResult2)
-	if orderResult2.Data.Status != "PROCESSED" {
-		t.Errorf("Expected second order status 'PROCESSED', got %s", orderResult2.Data.Status)
-	}
-	orderID2 := orderResult2.Data.OrderID
-
-	// Admin transitions order to FAILED -> expect 200 OK, status FAILED
-	respFail, bodyFail, _ := adminClient.request(http.MethodPatch, fmt.Sprintf("/api/admin/orders/%s/status", orderID2), domain.UpdateOrderStatusRequest{
-		Status: "FAILED",
-	})
-	if respFail.StatusCode != http.StatusOK {
-		t.Fatalf("Expected 200 for order failure, got %d: %s", respFail.StatusCode, string(bodyFail))
-	}
-	var failResult struct {
-		Data domain.OrderResponse `json:"data"`
-	}
-	_ = json.Unmarshal(bodyFail, &failResult)
-	if failResult.Data.Status != "FAILED" {
-		t.Errorf("Expected order status 'FAILED', got '%s'", failResult.Data.Status)
+	if respOrderStockFail.StatusCode != 422 {
+		t.Errorf("Expected 422 for insufficient stock, got %d", respOrderStockFail.StatusCode)
 	}
 
-	// Verify user balance was refunded back to 1000.00 after failure
-	respProfileFail, bodyProfileFail, _ := userClient.request(http.MethodGet, "/api/user/profile", nil)
-	if respProfileFail.StatusCode == http.StatusOK {
-		_ = json.Unmarshal(bodyProfileFail, &profileResult)
-		if profileResult.Data.Balance != 1000.00 {
-			t.Errorf("Expected refunded balance 1000.00 after FAILED order, got %f", profileResult.Data.Balance)
+	// Case B: Insufficient balance failure
+	// Create user with $5.00 balance
+	lowBalUser := fmt.Sprintf("failed_order_usr_%d", time.Now().UnixNano())
+	_, _, _ = adminClient.request(http.MethodPost, "/api/admin/users", domain.CreateUserRequest{
+		Username: lowBalUser,
+		Password: "Password123!",
+		Role:     "user",
+		Balance:  5.00,
+	})
+	lowToken, _ := login(t, "/api/user/login", lowBalUser, "Password123!")
+	lowClient := newClient(lowToken)
+	respOrderBalFail, _, _ := lowClient.request(http.MethodPost, "/api/user/orders", domain.CreateOrderRequest{
+		ProductID: productID,
+		Quantity:  1, // price is 100.00, exceeds 5.00
+	})
+	if respOrderBalFail.StatusCode != 422 {
+		t.Errorf("Expected 422 for insufficient balance, got %d", respOrderBalFail.StatusCode)
+	}
+
+	// Verify that the failed order was persisted in the database for lowClient
+	respLowOrders, bodyLowOrders, _ := lowClient.request(http.MethodGet, "/api/user/orders", nil)
+	if respLowOrders.StatusCode != http.StatusOK {
+		t.Fatalf("Failed to fetch lowClient orders: %d", respLowOrders.StatusCode)
+	}
+	var lowOrdersResult struct {
+		Data []domain.OrderResponse `json:"data"`
+	}
+	_ = json.Unmarshal(bodyLowOrders, &lowOrdersResult)
+	if len(lowOrdersResult.Data) != 1 {
+		t.Fatalf("Expected 1 failed order recorded in DB, got %d", len(lowOrdersResult.Data))
+	}
+	failedOrder := lowOrdersResult.Data[0]
+	if failedOrder.Status != "FAILED" {
+		t.Errorf("Expected persisted order status 'FAILED', got '%s'", failedOrder.Status)
+	}
+	if failedOrder.Quantity != 1 {
+		t.Errorf("Expected failed order quantity 1, got %d", failedOrder.Quantity)
+	}
+
+	// Verify user balance was untouched ($5.00)
+	respLowProfile, bodyLowProfile, _ := lowClient.request(http.MethodGet, "/api/user/profile", nil)
+	if respLowProfile.StatusCode == http.StatusOK {
+		var lowProf struct {
+			Data domain.UserSummary `json:"data"`
+		}
+		_ = json.Unmarshal(bodyLowProfile, &lowProf)
+		if lowProf.Data.Balance != 5.00 {
+			t.Errorf("Expected balance to remain 5.00 after FAILED order, got %f", lowProf.Data.Balance)
 		}
 	}
 
-	// Verify product stock was restored back to 10 after failure
-	respProdFinal2, bodyProdFinal2, _ := adminClient.request(http.MethodGet, "/api/admin/products", nil)
-	if respProdFinal2.StatusCode == http.StatusOK {
-		var prods struct {
-			Data []domain.Product `json:"data"`
-		}
-		_ = json.Unmarshal(bodyProdFinal2, &prods)
-		for _, p := range prods.Data {
-			if p.ID == productID && p.StockQuantity != 10 {
-				t.Errorf("Expected restocked quantity 10 after order failure, got %d", p.StockQuantity)
-			}
-		}
-	}
-
-	// Re-failing or cancelling an already failed order must fail with 422
-	respReFail, _, _ := adminClient.request(http.MethodPatch, fmt.Sprintf("/api/admin/orders/%s/status", orderID2), domain.UpdateOrderStatusRequest{
-		Status: "FAILED",
-	})
-	if respReFail.StatusCode != 422 {
-		t.Errorf("Expected 422 when re-failing already failed order, got %d", respReFail.StatusCode)
-	}
-
-	respFailCancel, _, _ := adminClient.request(http.MethodPatch, fmt.Sprintf("/api/admin/orders/%s/status", orderID2), domain.UpdateOrderStatusRequest{
+	// 11. Admin CANNOT change the status of an order that is in status FAILED
+	respAdminCancelFailed, _, _ := adminClient.request(http.MethodPatch, fmt.Sprintf("/api/admin/orders/%s/status", failedOrder.OrderID), domain.UpdateOrderStatusRequest{
 		Status: "CANCELLED",
 	})
-	if respFailCancel.StatusCode != 422 {
-		t.Errorf("Expected 422 when cancelling already failed order, got %d", respFailCancel.StatusCode)
+	if respAdminCancelFailed.StatusCode != 422 {
+		t.Errorf("Expected 422 when admin attempts to cancel a FAILED order, got %d", respAdminCancelFailed.StatusCode)
 	}
 }

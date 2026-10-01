@@ -88,6 +88,26 @@ func (r *sqlOrderRepository) CreateOrderTx(ctx context.Context, userID, productI
 		return nil, fmt.Errorf("failed to lock product: %w", err)
 	}
 
+	// Helper to persist a failed order record before returning an error
+	recordFailedOrder := func(failureErr error) (*domain.OrderResponse, error) {
+		failOrderID := uuid.New()
+		failCreatedAt := time.Now().UTC()
+		failUnitCost := product.Price
+		failTotalCost := domain.CentsToDollars(domain.DollarsToCents(failUnitCost) * int64(quantity))
+		failQuery := `
+			INSERT INTO orders (id, user_id, product_id, product_model, unit_price, quantity, total_price, status, created_at)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, 'FAILED', $8)
+		`
+		_, execErr := tx.ExecContext(ctx, failQuery, failOrderID, user.ID, product.ID, product.Model, failUnitCost, quantity, failTotalCost, failCreatedAt)
+		if execErr != nil {
+			return nil, fmt.Errorf("failed to record FAILED order: %w", execErr)
+		}
+		if commitErr := tx.Commit(); commitErr != nil {
+			return nil, fmt.Errorf("failed to commit FAILED order transaction: %w", commitErr)
+		}
+		return nil, failureErr
+	}
+
 	// 3. Check catalog access and user filter permissions
 	if len(user.AllowedCategories) > 0 {
 		catAllowed := false
@@ -98,7 +118,7 @@ func (r *sqlOrderRepository) CreateOrderTx(ctx context.Context, userID, productI
 			}
 		}
 		if !catAllowed {
-			return nil, domain.ErrProductDisallowed
+			return recordFailedOrder(domain.ErrProductDisallowed)
 		}
 	}
 
@@ -111,13 +131,13 @@ func (r *sqlOrderRepository) CreateOrderTx(ctx context.Context, userID, productI
 			}
 		}
 		if !mfgAllowed {
-			return nil, domain.ErrProductDisallowed
+			return recordFailedOrder(domain.ErrProductDisallowed)
 		}
 	}
 
 	// 4. Verify stock
 	if product.StockQuantity < quantity {
-		return nil, domain.ErrInsufficientStock
+		return recordFailedOrder(domain.ErrInsufficientStock)
 	}
 
 	// 5. Calculate total cost and verify balance using integer cents to eliminate floating-point drift
@@ -126,7 +146,7 @@ func (r *sqlOrderRepository) CreateOrderTx(ctx context.Context, userID, productI
 	userBalanceCents := domain.DollarsToCents(user.Balance)
 
 	if userBalanceCents < totalCostCents {
-		return nil, domain.ErrInsufficientBalance
+		return recordFailedOrder(domain.ErrInsufficientBalance)
 	}
 
 	// 6. Decrement stock
@@ -271,10 +291,10 @@ func (r *sqlOrderRepository) ListAll(ctx context.Context) ([]*domain.OrderRespon
 	return orders, nil
 }
 
-func (r *sqlOrderRepository) terminateOrderTx(ctx context.Context, orderID uuid.UUID, targetStatus string) (*domain.OrderResponse, error) {
+func (r *sqlOrderRepository) cancelOrderTx(ctx context.Context, orderID uuid.UUID) (*domain.OrderResponse, error) {
 	tx, err := r.db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
 	if err != nil {
-		return nil, fmt.Errorf("failed to begin terminate order tx: %w", err)
+		return nil, fmt.Errorf("failed to begin cancel order tx: %w", err)
 	}
 	defer tx.Rollback()
 
@@ -303,8 +323,14 @@ func (r *sqlOrderRepository) terminateOrderTx(ctx context.Context, orderID uuid.
 		return nil, fmt.Errorf("failed to fetch order: %w", err)
 	}
 
-	if o.Status == "CANCELLED" || o.Status == "FAILED" {
-		return nil, fmt.Errorf("%w: order is already in terminal status %s", domain.ErrInvalidInput, o.Status)
+	if o.Status == "FAILED" {
+		return nil, fmt.Errorf("%w: status FAILED cannot be changed by admin", domain.ErrInvalidInput)
+	}
+	if o.Status == "CANCELLED" {
+		return nil, fmt.Errorf("%w: order is already cancelled", domain.ErrInvalidInput)
+	}
+	if o.Status != "PROCESSED" {
+		return nil, fmt.Errorf("%w: cannot cancel order in status %s", domain.ErrInvalidInput, o.Status)
 	}
 
 	// Deterministic locking between User and Product based on UUID string comparison
@@ -343,61 +369,22 @@ func (r *sqlOrderRepository) terminateOrderTx(ctx context.Context, orderID uuid.
 		}
 	}
 
-	_, err = tx.ExecContext(ctx, "UPDATE orders SET status = $1 WHERE id = $2", targetStatus, orderID)
+	_, err = tx.ExecContext(ctx, "UPDATE orders SET status = 'CANCELLED' WHERE id = $1", orderID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to update order status to %s: %w", targetStatus, err)
+		return nil, fmt.Errorf("failed to update order status to CANCELLED: %w", err)
 	}
 
 	if err := tx.Commit(); err != nil {
-		return nil, fmt.Errorf("failed to commit order status update: %w", err)
+		return nil, fmt.Errorf("failed to commit order cancellation: %w", err)
 	}
 
-	o.Status = targetStatus
+	o.Status = "CANCELLED"
 	return &o, nil
 }
 
 func (r *sqlOrderRepository) UpdateStatus(ctx context.Context, orderID uuid.UUID, status string) (*domain.OrderResponse, error) {
-	if status == "CANCELLED" || status == "FAILED" {
-		return r.terminateOrderTx(ctx, orderID, status)
+	if status != "CANCELLED" {
+		return nil, fmt.Errorf("%w: invalid status %s (admin can only set status to CANCELLED)", domain.ErrInvalidInput, status)
 	}
-
-	// Verify order is not already cancelled or failed
-	var currentStatus string
-	err := r.db.QueryRowContext(ctx, "SELECT status FROM orders WHERE id = $1", orderID).Scan(&currentStatus)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, domain.ErrNotFound
-		}
-		return nil, fmt.Errorf("failed to check order status: %w", err)
-	}
-	if currentStatus == "CANCELLED" || currentStatus == "FAILED" {
-		return nil, fmt.Errorf("%w: cannot transition from %s status", domain.ErrInvalidInput, currentStatus)
-	}
-
-	query := `
-		UPDATE orders
-		SET status = $1
-		WHERE id = $2
-		RETURNING id, user_id, product_id, product_model, unit_price, quantity, total_price, status, created_at
-	`
-	var o domain.OrderResponse
-	err = r.db.QueryRowContext(ctx, query, status, orderID).Scan(
-		&o.OrderID,
-		&o.UserID,
-		&o.ProductID,
-		&o.ProductModel,
-		&o.UnitPrice,
-		&o.Quantity,
-		&o.TotalPrice,
-		&o.Status,
-		&o.CreatedAt,
-	)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, domain.ErrNotFound
-		}
-		return nil, fmt.Errorf("failed to update order status: %w", err)
-	}
-
-	return &o, nil
+	return r.cancelOrderTx(ctx, orderID)
 }

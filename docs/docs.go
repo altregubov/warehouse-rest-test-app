@@ -158,7 +158,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Update the lifecycle status of an order (Valid: PROCESSED, CANCELLED, FAILED). Setting CANCELLED or FAILED automatically refunds the customer balance and restores product stock.",
+                "description": "Update the lifecycle status of an order. Administrators can only transition PROCESSED orders to CANCELLED (which automatically refunds customer balance and restores product stock). FAILED orders cannot be altered.",
                 "consumes": [
                     "application/json"
                 ],
@@ -1986,9 +1986,7 @@ const docTemplate = `{
                 "status": {
                     "type": "string",
                     "enum": [
-                        "PROCESSED",
-                        "CANCELLED",
-                        "FAILED"
+                        "CANCELLED"
                     ],
                     "example": "CANCELLED"
                 }

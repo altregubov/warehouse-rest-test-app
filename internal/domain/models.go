@@ -143,7 +143,7 @@ type OrderResponse struct {
 }
 
 type UpdateOrderStatusRequest struct {
-	Status string `json:"status" binding:"required" example:"CANCELLED" enums:"PROCESSED,CANCELLED,FAILED"`
+	Status string `json:"status" binding:"required" example:"CANCELLED" enums:"CANCELLED"`
 }
 
 type PaginationMetadata struct {

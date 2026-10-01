@@ -235,14 +235,16 @@ CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id);
 5. **Historical Snapshot Immutability:**
    - When an order is placed, the product's current model and unit price are permanently snapshotted into `orders.product_model` and `orders.unit_price`.
    - Subsequent modifications to product prices or catalog descriptions do not alter historical orders, ensuring immutable receipts for financial audits.
-6. **Order Lifecycle & Cancellation / Failure Refund Invariants:**
+6. **Order Lifecycle, Failure Recording & Cancellation Invariants:**
    - **Allowed Statuses:** Order status strictly accepts only three values: `PROCESSED`, `CANCELLED`, and `FAILED`.
-   - **Direct Processing:** When a customer submits an order (`POST /api/user/orders`), the transaction validates catalog access, inventory availability, and customer balance, decrements stock, debits balance, and creates the order directly with status `PROCESSED`.
-   - **Admin Cancellation / Fulfillment Failure with Restocking & Refund:** An administrator can transition an active order to `CANCELLED` (administrative cancellation) or `FAILED` (if the order cannot be fulfilled) via `PATCH /api/admin/orders/{id}/status`. This operation runs in a deterministic serializable transaction that:
+   - **Direct Processing:** When a customer submits an order (`POST /api/user/orders`), the transaction validates catalog access, inventory availability, and customer balance. If all validations succeed, stock is decremented, balance is debited, and the order is created with status `PROCESSED`.
+   - **Automatic FAILED Status on Pre-Condition Breach:** If order pre-conditions fail at checkout (catalog filter restriction, insufficient warehouse stock, or insufficient user balance), the transaction records the attempted order in the database with status `FAILED` prior to returning HTTP `422 Unprocessable Entity`. Neither customer balance nor warehouse stock is modified.
+   - **Admin Cancellation of PROCESSED Orders:** An administrator can transition a `PROCESSED` order to `CANCELLED` via `PATCH /api/admin/orders/{id}/status`. This operation runs in a deterministic serializable transaction that:
      - Restores ordered quantities to `products.stock_quantity`.
      - Refunds the order's `total_price` back to the customer's `users.balance` in exact integer cents.
-     - Sets order status to `CANCELLED` or `FAILED`.
-     - Rejects any subsequent modification or re-transitioning of an already cancelled or failed order with `422 Unprocessable Entity` (`INVALID_STATUS`) to protect against duplicate refunds.
+     - Sets order status to `CANCELLED`.
+   - **Immutable FAILED and CANCELLED Statuses:** Orders in `FAILED` status cannot be modified or transitioned by an administrator (or anyone). Similarly, orders in `CANCELLED` status cannot be modified or re-cancelled. Any attempt to alter `FAILED` or `CANCELLED` orders is rejected with `422 Unprocessable Entity` (`INVALID_STATUS`).
+   - **Admin Status Transition Constraint:** `PATCH /api/admin/orders/{id}/status` strictly accepts only `{ "status": "CANCELLED" }`. Any other requested status is rejected with `422 Unprocessable Entity` (`INVALID_STATUS`).
 
 ---
 
@@ -426,14 +428,15 @@ CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id);
 
 10. `PATCH /api/admin/orders/{id}/status`
     - Updates order lifecycle status.
-    - Body: `{ "status": "CANCELLED" }` (Valid: `PROCESSED`, `CANCELLED`, `FAILED`).
-    - Transitioning to `CANCELLED` or `FAILED` atomically returns ordered units to product stock and refunds order total to user balance. Re-cancelling, re-failing, or modifying a terminated order is rejected.
+    - Body: `{ "status": "CANCELLED" }` (Valid: `CANCELLED` only).
+    - Transitioning a `PROCESSED` order to `CANCELLED` atomically returns ordered units to product stock and refunds order total to user balance.
+    - Attempting to transition or cancel an order in `FAILED` or `CANCELLED` status is rejected with `422 Unprocessable Entity` (`INVALID_STATUS`).
     - Response (200 OK): Updated `OrderResponse` object.
     - Failure (400 Bad Request): Invalid order UUID (`INVALID_ID`) or malformed JSON (`INVALID_REQUEST`).
     - Failure (401 Unauthorized): Missing or invalid token.
     - Failure (403 Forbidden): Insufficient admin privileges.
     - Failure (404 Not Found): Target order not found (`NOT_FOUND`).
-    - Failure (422 Unprocessable Entity): Invalid status transition or order already cancelled (`INVALID_STATUS`).
+    - Failure (422 Unprocessable Entity): Invalid status payload or attempting to modify non-cancellable order (`INVALID_STATUS`).
     - Failure (500 Internal Server Error): Persistence failure.
 
 11. `DELETE /api/admin/users/{id}`

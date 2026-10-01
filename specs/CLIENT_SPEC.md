@@ -225,8 +225,13 @@ stateDiagram-v2
         VerifyBalance --> [*] : Balance sufficient
     }
 
-    ValidationPending --> Declined : Rule violation (Restricted item / Stock depleted / Credit shortfall)
+    ValidationPending --> Failed : Pre-condition breach (Restricted item / Stock depleted / Balance shortage)
     
+    state Failed {
+        [*] --> RecordFailedOrder : Insert order record with status FAILED
+        RecordFailedOrder --> [*] : Balance and inventory untouched
+    }
+
     ValidationPending --> Committing : All validation rules satisfied
     
     state Committing {
@@ -237,12 +242,9 @@ stateDiagram-v2
     }
 
     Committing --> Processed : Atomic transaction committed successfully
-    Committing --> Failed : System lock conflict or transaction aborted
 
     Processed --> Cancelled : Administrative cancellation (Restores balance & restocks inventory)
-    Processed --> Failed : Fulfillment failure (Restores balance & restocks inventory)
 
-    Declined --> [*]
     Failed --> [*]
     Processed --> [*]
     Cancelled --> [*]
@@ -251,11 +253,10 @@ stateDiagram-v2
 #### Lifecycle State Definitions
 - **`Draft`**: The customer is preparing the purchase intent locally prior to submission.
 - **`ValidationPending`**: The platform is validating commercial eligibility, whitelist rules, real-time warehouse inventory, and account balance.
-- **`Declined`**: A business rule was breached (item restricted by contract, insufficient stock, or balance shortage). No funds or inventory are altered.
 - **`Committing`**: The system is executing an atomic database lock, updating customer balance, and decreasing inventory units.
 - **`Processed`**: The transaction is committed and bound to the commercial ledger. An immutable price and product snapshot is recorded.
-- **`Cancelled`**: An administrator has annulled the order, releasing stock back to warehouse inventory and refunding the customer balance in full.
-- **`Failed`**: The order cannot be fulfilled (e.g. damaged goods, warehouse stock discrepancy, or fulfillment impossibility). Inventory is restored and customer balance is refunded in full.
+- **`Cancelled`**: An administrator has annulled a `Processed` order, releasing stock back to warehouse inventory and refunding the customer balance in full.
+- **`Failed`**: Pre-conditions breached at checkout (item restricted by contract, insufficient warehouse stock, or balance shortage). An immutable audit record is recorded in the ledger with status `FAILED`; neither balance nor inventory is altered. Cannot be modified or cancelled by an administrator.
 
 ---
 
@@ -266,9 +267,9 @@ Integrators can design predictable recovery workflows and client user interfaces
 | Business Condition | Trigger & Cause | System Behavior | Client Integrator Guidance |
 | :--- | :--- | :--- | :--- |
 | **Order Confirmation** | Client balance $\ge$ total cost, stock $\ge$ quantity, and product allowed by whitelist. | Balance debited, stock decremented, immutable price snapshot recorded, and confirmation issued. | Display order receipt, update account balance badge, and offer shipment tracking. |
-| **Catalog Policy Restriction** | Client attempts to order an item outside contractual category/brand whitelists. | Operation declined immediately without resource locks or state mutation. | Inform client of commercial agreement boundaries; prompt client to request whitelist updates from administrators. |
-| **Insufficient Warehouse Stock** | Requested units exceed currently available inventory for the target SKU. | Operation declined without state modification. Balance remains untouched. | Inform user of available stock; offer partial quantity purchase or notify upon restock. |
-| **Insufficient Account Balance** | Total purchase amount exceeds available purchasing balance. | Operation declined without state modification. Inventory remains untouched. | Prompt client to request balance top-up from administrator. |
+| **Catalog Policy Restriction** | Client attempts to order an item outside contractual category/brand whitelists. | Operation declined; order recorded with status FAILED. Inventory and balance untouched. | Inform client of commercial agreement boundaries; prompt client to request whitelist updates from administrators. |
+| **Insufficient Warehouse Stock** | Requested units exceed currently available inventory for the target SKU. | Operation declined; order recorded with status FAILED. Balance remains untouched. | Inform user of available stock; offer partial quantity purchase or notify upon restock. |
+| **Insufficient Account Balance** | Total purchase amount exceeds available purchasing balance. | Operation declined; order recorded with status FAILED. Inventory remains untouched. | Prompt client to request balance top-up from administrator. |
 | **Entity Not Found** | Target SKU, order reference, or account identifier does not exist or was archived. | Request rejected without data mutation. | Refresh client catalog cache and verify entity identifiers before resubmitting. |
 | **Input Boundary Violation** | Submitting non-positive quantity, negative balance, or malformed identifiers. | Request rejected at input boundary before touching database or acquiring locks. | Ensure client form validation enforces non-negative inputs and valid identifier formats. |
 | **Channel Privilege Rejection** | Missing valid session credentials or attempting administrative functions with client credentials. | Request rejected at security boundary. | Direct client to commercial login portal or check organizational role privileges. |
