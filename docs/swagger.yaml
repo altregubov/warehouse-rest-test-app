@@ -171,9 +171,9 @@ definitions:
         type: number
       status:
         enum:
-        - CREATED
         - PROCESSED
         - CANCELLED
+        - FAILED
         example: PROCESSED
         type: string
       total_price:
@@ -325,9 +325,9 @@ definitions:
     properties:
       status:
         enum:
-        - CREATED
         - PROCESSED
         - CANCELLED
+        - FAILED
         example: CANCELLED
         type: string
     required:
@@ -480,8 +480,8 @@ paths:
     patch:
       consumes:
       - application/json
-      description: 'Update the lifecycle status of an order (Valid: CREATED, PROCESSED,
-        CANCELLED). Setting CANCELLED automatically refunds the customer balance and
+      description: 'Update the lifecycle status of an order (Valid: PROCESSED, CANCELLED,
+        FAILED). Setting CANCELLED or FAILED automatically refunds the customer balance and
         restores product stock.'
       operationId: updateOrderStatus
       parameters:

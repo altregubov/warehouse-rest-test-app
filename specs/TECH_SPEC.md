@@ -210,7 +210,7 @@ CREATE TABLE IF NOT EXISTS orders (
     unit_price NUMERIC(12, 2) NOT NULL CHECK (unit_price >= 0),
     quantity INTEGER NOT NULL CHECK (quantity > 0),
     total_price NUMERIC(12, 2) NOT NULL CHECK (total_price >= 0),
-    status VARCHAR(50) NOT NULL DEFAULT 'CREATED' CHECK (status IN ('CREATED', 'PROCESSED', 'CANCELLED')),
+    status VARCHAR(50) NOT NULL DEFAULT 'PROCESSED' CHECK (status IN ('PROCESSED', 'CANCELLED', 'FAILED')),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -235,14 +235,14 @@ CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id);
 5. **Historical Snapshot Immutability:**
    - When an order is placed, the product's current model and unit price are permanently snapshotted into `orders.product_model` and `orders.unit_price`.
    - Subsequent modifications to product prices or catalog descriptions do not alter historical orders, ensuring immutable receipts for financial audits.
-6. **Order Lifecycle & Cancellation Refund Invariants:**
-   - **Allowed Statuses:** Order status strictly accepts only three values: `CREATED`, `PROCESSED`, and `CANCELLED`.
-   - **Automatic Processing:** When a customer submits an order (`POST /api/user/orders`), the transaction creates the order with initial status `CREATED`. Once balance debit, inventory decrement, and validation succeed, the status automatically updates to `PROCESSED` as the transaction commits. The API responds with `status: "PROCESSED"`.
-   - **Admin Cancellation with Restocking & Refund:** An administrator can transition an active order to `CANCELLED` (`PATCH /api/admin/orders/{id}/status`). This operation runs in a deterministic serializable transaction that:
+6. **Order Lifecycle & Cancellation / Failure Refund Invariants:**
+   - **Allowed Statuses:** Order status strictly accepts only three values: `PROCESSED`, `CANCELLED`, and `FAILED`.
+   - **Direct Processing:** When a customer submits an order (`POST /api/user/orders`), the transaction validates catalog access, inventory availability, and customer balance, decrements stock, debits balance, and creates the order directly with status `PROCESSED`.
+   - **Admin Cancellation / Fulfillment Failure with Restocking & Refund:** An administrator can transition an active order to `CANCELLED` (administrative cancellation) or `FAILED` (if the order cannot be fulfilled) via `PATCH /api/admin/orders/{id}/status`. This operation runs in a deterministic serializable transaction that:
      - Restores ordered quantities to `products.stock_quantity`.
      - Refunds the order's `total_price` back to the customer's `users.balance` in exact integer cents.
-     - Sets order status to `CANCELLED`.
-     - Rejects any subsequent modification or re-cancellation of an already cancelled order with `422 Unprocessable Entity` (`INVALID_STATUS`) to protect against duplicate refunds.
+     - Sets order status to `CANCELLED` or `FAILED`.
+     - Rejects any subsequent modification or re-transitioning of an already cancelled or failed order with `422 Unprocessable Entity` (`INVALID_STATUS`) to protect against duplicate refunds.
 
 ---
 
@@ -426,8 +426,8 @@ CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id);
 
 10. `PATCH /api/admin/orders/{id}/status`
     - Updates order lifecycle status.
-    - Body: `{ "status": "CANCELLED" }` (Valid: `CREATED`, `PROCESSED`, `CANCELLED`).
-    - Transitioning to `CANCELLED` atomically returns ordered units to product stock and refunds order total to user balance. Re-cancelling or modifying a cancelled order is rejected.
+    - Body: `{ "status": "CANCELLED" }` (Valid: `PROCESSED`, `CANCELLED`, `FAILED`).
+    - Transitioning to `CANCELLED` or `FAILED` atomically returns ordered units to product stock and refunds order total to user balance. Re-cancelling, re-failing, or modifying a terminated order is rejected.
     - Response (200 OK): Updated `OrderResponse` object.
     - Failure (400 Bad Request): Invalid order UUID (`INVALID_ID`) or malformed JSON (`INVALID_REQUEST`).
     - Failure (401 Unauthorized): Missing or invalid token.

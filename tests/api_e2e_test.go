@@ -2342,6 +2342,13 @@ func TestOrderThreeStatusesAndCancellationRefund(t *testing.T) {
 		t.Errorf("Expected 422 when updating status to obsolete 'DELIVERED', got %d", respInvalid2.StatusCode)
 	}
 
+	respInvalid3, _, _ := adminClient.request(http.MethodPatch, fmt.Sprintf("/api/admin/orders/%s/status", orderID), domain.UpdateOrderStatusRequest{
+		Status: "CREATED",
+	})
+	if respInvalid3.StatusCode != 422 {
+		t.Errorf("Expected 422 when updating status to obsolete 'CREATED', got %d", respInvalid3.StatusCode)
+	}
+
 	// 5. Admin cancels the order -> expect 200 OK, status CANCELLED
 	respCancel, bodyCancel, _ := adminClient.request(http.MethodPatch, fmt.Sprintf("/api/admin/orders/%s/status", orderID), domain.UpdateOrderStatusRequest{
 		Status: "CANCELLED",
@@ -2384,12 +2391,19 @@ func TestOrderThreeStatusesAndCancellationRefund(t *testing.T) {
 		}
 	}
 
-	// 8. Attempting to cancel an already cancelled order must fail with 422
+	// 8. Attempting to cancel or fail an already cancelled order must fail with 422
 	respReCancel, _, _ := adminClient.request(http.MethodPatch, fmt.Sprintf("/api/admin/orders/%s/status", orderID), domain.UpdateOrderStatusRequest{
 		Status: "CANCELLED",
 	})
 	if respReCancel.StatusCode != 422 {
 		t.Errorf("Expected 422 when re-cancelling already cancelled order, got %d", respReCancel.StatusCode)
+	}
+
+	respCancelToFail, _, _ := adminClient.request(http.MethodPatch, fmt.Sprintf("/api/admin/orders/%s/status", orderID), domain.UpdateOrderStatusRequest{
+		Status: "FAILED",
+	})
+	if respCancelToFail.StatusCode != 422 {
+		t.Errorf("Expected 422 when transitioning cancelled order to FAILED, got %d", respCancelToFail.StatusCode)
 	}
 
 	// Verify balance is still 1000.00 (no double refund)
@@ -2399,5 +2413,75 @@ func TestOrderThreeStatusesAndCancellationRefund(t *testing.T) {
 		if profileResult.Data.Balance != 1000.00 {
 			t.Errorf("Balance changed after rejected re-cancellation: %f", profileResult.Data.Balance)
 		}
+	}
+
+	// 9. Place a second order and transition to 'FAILED' (when order cannot be fulfilled)
+	respOrder2, bodyOrder2, _ := userClient.request(http.MethodPost, "/api/user/orders", domain.CreateOrderRequest{
+		ProductID: productID,
+		Quantity:  2,
+	})
+	if respOrder2.StatusCode != http.StatusCreated {
+		t.Fatalf("Failed to create second order: %d: %s", respOrder2.StatusCode, string(bodyOrder2))
+	}
+	var orderResult2 struct {
+		Data domain.OrderResponse `json:"data"`
+	}
+	_ = json.Unmarshal(bodyOrder2, &orderResult2)
+	if orderResult2.Data.Status != "PROCESSED" {
+		t.Errorf("Expected second order status 'PROCESSED', got %s", orderResult2.Data.Status)
+	}
+	orderID2 := orderResult2.Data.OrderID
+
+	// Admin transitions order to FAILED -> expect 200 OK, status FAILED
+	respFail, bodyFail, _ := adminClient.request(http.MethodPatch, fmt.Sprintf("/api/admin/orders/%s/status", orderID2), domain.UpdateOrderStatusRequest{
+		Status: "FAILED",
+	})
+	if respFail.StatusCode != http.StatusOK {
+		t.Fatalf("Expected 200 for order failure, got %d: %s", respFail.StatusCode, string(bodyFail))
+	}
+	var failResult struct {
+		Data domain.OrderResponse `json:"data"`
+	}
+	_ = json.Unmarshal(bodyFail, &failResult)
+	if failResult.Data.Status != "FAILED" {
+		t.Errorf("Expected order status 'FAILED', got '%s'", failResult.Data.Status)
+	}
+
+	// Verify user balance was refunded back to 1000.00 after failure
+	respProfileFail, bodyProfileFail, _ := userClient.request(http.MethodGet, "/api/user/profile", nil)
+	if respProfileFail.StatusCode == http.StatusOK {
+		_ = json.Unmarshal(bodyProfileFail, &profileResult)
+		if profileResult.Data.Balance != 1000.00 {
+			t.Errorf("Expected refunded balance 1000.00 after FAILED order, got %f", profileResult.Data.Balance)
+		}
+	}
+
+	// Verify product stock was restored back to 10 after failure
+	respProdFinal2, bodyProdFinal2, _ := adminClient.request(http.MethodGet, "/api/admin/products", nil)
+	if respProdFinal2.StatusCode == http.StatusOK {
+		var prods struct {
+			Data []domain.Product `json:"data"`
+		}
+		_ = json.Unmarshal(bodyProdFinal2, &prods)
+		for _, p := range prods.Data {
+			if p.ID == productID && p.StockQuantity != 10 {
+				t.Errorf("Expected restocked quantity 10 after order failure, got %d", p.StockQuantity)
+			}
+		}
+	}
+
+	// Re-failing or cancelling an already failed order must fail with 422
+	respReFail, _, _ := adminClient.request(http.MethodPatch, fmt.Sprintf("/api/admin/orders/%s/status", orderID2), domain.UpdateOrderStatusRequest{
+		Status: "FAILED",
+	})
+	if respReFail.StatusCode != 422 {
+		t.Errorf("Expected 422 when re-failing already failed order, got %d", respReFail.StatusCode)
+	}
+
+	respFailCancel, _, _ := adminClient.request(http.MethodPatch, fmt.Sprintf("/api/admin/orders/%s/status", orderID2), domain.UpdateOrderStatusRequest{
+		Status: "CANCELLED",
+	})
+	if respFailCancel.StatusCode != 422 {
+		t.Errorf("Expected 422 when cancelling already failed order, got %d", respFailCancel.StatusCode)
 	}
 }

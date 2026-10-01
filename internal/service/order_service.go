@@ -54,9 +54,9 @@ func (s *orderService) ListAllOrders(ctx context.Context) ([]*domain.OrderRespon
 
 func (s *orderService) UpdateOrderStatus(ctx context.Context, orderID uuid.UUID, status string) (*domain.OrderResponse, error) {
 	validStatuses := map[string]bool{
-		"CREATED":   true,
 		"PROCESSED": true,
 		"CANCELLED": true,
+		"FAILED":    true,
 	}
 	if !validStatuses[status] {
 		return nil, fmt.Errorf("%w: invalid order status %s", domain.ErrInvalidInput, status)

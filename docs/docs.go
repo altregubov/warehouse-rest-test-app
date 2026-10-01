@@ -158,7 +158,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Update the lifecycle status of an order (Valid: CREATED, PROCESSED, CANCELLED). Setting CANCELLED automatically refunds the customer balance and restores product stock.",
+                "description": "Update the lifecycle status of an order (Valid: PROCESSED, CANCELLED, FAILED). Setting CANCELLED or FAILED automatically refunds the customer balance and restores product stock.",
                 "consumes": [
                     "application/json"
                 ],
@@ -1790,9 +1790,9 @@ const docTemplate = `{
                 "status": {
                     "type": "string",
                     "enum": [
-                        "CREATED",
                         "PROCESSED",
-                        "CANCELLED"
+                        "CANCELLED",
+                        "FAILED"
                     ],
                     "example": "PROCESSED"
                 },
@@ -1986,9 +1986,9 @@ const docTemplate = `{
                 "status": {
                     "type": "string",
                     "enum": [
-                        "CREATED",
                         "PROCESSED",
-                        "CANCELLED"
+                        "CANCELLED",
+                        "FAILED"
                     ],
                     "example": "CANCELLED"
                 }

@@ -428,7 +428,7 @@ func (h *AdminHandler) ListOrders(w http.ResponseWriter, r *http.Request) {
 
 // UpdateOrderStatus godoc
 // @Summary Update order status
-// @Description Update the lifecycle status of an order (Valid: CREATED, PROCESSED, CANCELLED). Setting CANCELLED automatically refunds the customer balance and restores product stock.
+// @Description Update the lifecycle status of an order (Valid: PROCESSED, CANCELLED, FAILED). Setting CANCELLED or FAILED automatically refunds the customer balance and restores product stock.
 // @Tags Admin
 // @Accept json
 // @Produce json

@@ -59,7 +59,7 @@ type Order struct {
 	UnitPrice    float64   `json:"unit_price" binding:"required" format:"double" minimum:"0"`
 	Quantity     int       `json:"quantity" binding:"required" minimum:"1"`
 	TotalPrice   float64   `json:"total_price" binding:"required" format:"double" minimum:"0"`
-	Status       string    `json:"status" binding:"required" enums:"CREATED,PROCESSED,CANCELLED"`
+	Status       string    `json:"status" binding:"required" enums:"PROCESSED,CANCELLED,FAILED"`
 	CreatedAt    time.Time `json:"created_at" binding:"required" format:"date-time"`
 }
 
@@ -137,13 +137,13 @@ type OrderResponse struct {
 	Quantity         int       `json:"quantity" binding:"required" example:"1" minimum:"1"`
 	UnitPrice        float64   `json:"unit_price" binding:"required" example:"2499.00" format:"double" minimum:"0"`
 	TotalPrice       float64   `json:"total_price" binding:"required" example:"4998.00" format:"double" minimum:"0"`
-	Status           string    `json:"status" binding:"required" example:"PROCESSED" enums:"CREATED,PROCESSED,CANCELLED"`
+	Status           string    `json:"status" binding:"required" example:"PROCESSED" enums:"PROCESSED,CANCELLED,FAILED"`
 	RemainingBalance float64   `json:"remaining_balance,omitempty" example:"500.00" format:"double" minimum:"0"`
 	CreatedAt        time.Time `json:"created_at" binding:"required" format:"date-time"`
 }
 
 type UpdateOrderStatusRequest struct {
-	Status string `json:"status" binding:"required" example:"CANCELLED" enums:"CREATED,PROCESSED,CANCELLED"`
+	Status string `json:"status" binding:"required" example:"CANCELLED" enums:"PROCESSED,CANCELLED,FAILED"`
 }
 
 type PaginationMetadata struct {

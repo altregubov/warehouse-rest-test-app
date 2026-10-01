@@ -119,7 +119,7 @@ erDiagram
         decimal snapshotUnitPrice "Agreed unit price at time of purchase"
         integer quantity "Number of units acquired"
         decimal totalAmount "Settled order total amount"
-        string fulfillmentStatus "Lifecycle state: Created, Processed, or Cancelled"
+        string fulfillmentStatus "Lifecycle state: Processed, Cancelled, or Failed"
     }
 ```
 
@@ -232,15 +232,15 @@ stateDiagram-v2
     state Committing {
         [*] --> DebitAccount : Deduct total amount from balance
         DebitAccount --> DecrementInventory : Reserve warehouse units
-        DecrementInventory --> InsertCreatedRecord : Record order with initial status Created
-        InsertCreatedRecord --> FinalizeProcessed : Auto-transition status to Processed on completion
-        FinalizeProcessed --> [*]
+        DecrementInventory --> InsertProcessedRecord : Record order with status Processed
+        InsertProcessedRecord --> [*]
     }
 
     Committing --> Processed : Atomic transaction committed successfully
     Committing --> Failed : System lock conflict or transaction aborted
 
     Processed --> Cancelled : Administrative cancellation (Restores balance & restocks inventory)
+    Processed --> Failed : Fulfillment failure (Restores balance & restocks inventory)
 
     Declined --> [*]
     Failed --> [*]
@@ -253,9 +253,9 @@ stateDiagram-v2
 - **`ValidationPending`**: The platform is validating commercial eligibility, whitelist rules, real-time warehouse inventory, and account balance.
 - **`Declined`**: A business rule was breached (item restricted by contract, insufficient stock, or balance shortage). No funds or inventory are altered.
 - **`Committing`**: The system is executing an atomic database lock, updating customer balance, and decreasing inventory units.
-- **`Created`**: The order is initialized within the placement transaction.
 - **`Processed`**: The transaction is committed and bound to the commercial ledger. An immutable price and product snapshot is recorded.
 - **`Cancelled`**: An administrator has annulled the order, releasing stock back to warehouse inventory and refunding the customer balance in full.
+- **`Failed`**: The order cannot be fulfilled (e.g. damaged goods, warehouse stock discrepancy, or fulfillment impossibility). Inventory is restored and customer balance is refunded in full.
 
 ---
 

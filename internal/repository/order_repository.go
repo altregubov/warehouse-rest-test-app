@@ -147,22 +147,16 @@ func (r *sqlOrderRepository) CreateOrderTx(ctx context.Context, userID, productI
 		return nil, fmt.Errorf("failed to update user balance: %w", err)
 	}
 
-	// 8. Insert order with initial status 'CREATED'
+	// 8. Insert order with status 'PROCESSED'
 	orderID := uuid.New()
 	createdAt := time.Now().UTC()
 	orderQuery := `
 		INSERT INTO orders (id, user_id, product_id, product_model, unit_price, quantity, total_price, status, created_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, 'CREATED', $8)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, 'PROCESSED', $8)
 	`
 	_, err = tx.ExecContext(ctx, orderQuery, orderID, user.ID, product.ID, product.Model, unitPrice, quantity, totalCost, createdAt)
 	if err != nil {
 		return nil, fmt.Errorf("failed to insert order: %w", err)
-	}
-
-	// 9. When transaction finishes, automatically transition status to 'PROCESSED'
-	_, err = tx.ExecContext(ctx, "UPDATE orders SET status = 'PROCESSED' WHERE id = $1", orderID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to update order status to PROCESSED: %w", err)
 	}
 
 	if err := tx.Commit(); err != nil {
@@ -277,10 +271,10 @@ func (r *sqlOrderRepository) ListAll(ctx context.Context) ([]*domain.OrderRespon
 	return orders, nil
 }
 
-func (r *sqlOrderRepository) cancelOrderTx(ctx context.Context, orderID uuid.UUID) (*domain.OrderResponse, error) {
+func (r *sqlOrderRepository) terminateOrderTx(ctx context.Context, orderID uuid.UUID, targetStatus string) (*domain.OrderResponse, error) {
 	tx, err := r.db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
 	if err != nil {
-		return nil, fmt.Errorf("failed to begin cancel order tx: %w", err)
+		return nil, fmt.Errorf("failed to begin terminate order tx: %w", err)
 	}
 	defer tx.Rollback()
 
@@ -306,11 +300,11 @@ func (r *sqlOrderRepository) cancelOrderTx(ctx context.Context, orderID uuid.UUI
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, domain.ErrNotFound
 		}
-		return nil, fmt.Errorf("failed to fetch order for cancellation: %w", err)
+		return nil, fmt.Errorf("failed to fetch order: %w", err)
 	}
 
-	if o.Status == "CANCELLED" {
-		return nil, fmt.Errorf("%w: order is already cancelled", domain.ErrInvalidInput)
+	if o.Status == "CANCELLED" || o.Status == "FAILED" {
+		return nil, fmt.Errorf("%w: order is already in terminal status %s", domain.ErrInvalidInput, o.Status)
 	}
 
 	// Deterministic locking between User and Product based on UUID string comparison
@@ -349,25 +343,25 @@ func (r *sqlOrderRepository) cancelOrderTx(ctx context.Context, orderID uuid.UUI
 		}
 	}
 
-	_, err = tx.ExecContext(ctx, "UPDATE orders SET status = 'CANCELLED' WHERE id = $1", orderID)
+	_, err = tx.ExecContext(ctx, "UPDATE orders SET status = $1 WHERE id = $2", targetStatus, orderID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to update order status to CANCELLED: %w", err)
+		return nil, fmt.Errorf("failed to update order status to %s: %w", targetStatus, err)
 	}
 
 	if err := tx.Commit(); err != nil {
-		return nil, fmt.Errorf("failed to commit order cancellation: %w", err)
+		return nil, fmt.Errorf("failed to commit order status update: %w", err)
 	}
 
-	o.Status = "CANCELLED"
+	o.Status = targetStatus
 	return &o, nil
 }
 
 func (r *sqlOrderRepository) UpdateStatus(ctx context.Context, orderID uuid.UUID, status string) (*domain.OrderResponse, error) {
-	if status == "CANCELLED" {
-		return r.cancelOrderTx(ctx, orderID)
+	if status == "CANCELLED" || status == "FAILED" {
+		return r.terminateOrderTx(ctx, orderID, status)
 	}
 
-	// Verify order is not already cancelled
+	// Verify order is not already cancelled or failed
 	var currentStatus string
 	err := r.db.QueryRowContext(ctx, "SELECT status FROM orders WHERE id = $1", orderID).Scan(&currentStatus)
 	if err != nil {
@@ -376,8 +370,8 @@ func (r *sqlOrderRepository) UpdateStatus(ctx context.Context, orderID uuid.UUID
 		}
 		return nil, fmt.Errorf("failed to check order status: %w", err)
 	}
-	if currentStatus == "CANCELLED" {
-		return nil, fmt.Errorf("%w: cannot transition from CANCELLED status", domain.ErrInvalidInput)
+	if currentStatus == "CANCELLED" || currentStatus == "FAILED" {
+		return nil, fmt.Errorf("%w: cannot transition from %s status", domain.ErrInvalidInput, currentStatus)
 	}
 
 	query := `
