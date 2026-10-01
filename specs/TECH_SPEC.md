@@ -143,7 +143,7 @@ The platform adheres to strict HTTP semantic status code conventions across all 
   - `INSUFFICIENT_STOCK`: Warehouse stock is less than requested quantity.
   - `FILTER_RESTRICTION`: Product is outside user's whitelist/filter access, or user has zero-access governance.
   - `INVALID_STATUS`: Disallowed order status lifecycle transition.
-  - `INVALID_INPUT`: Domain boundary validation breach (e.g. `increment_amount < 0.01` or `new_balance < 0.00`).
+  - `INVALID_INPUT`: Domain boundary validation breach (e.g. `increment_amount < 0.01`).
 - **`500 Internal Server Error`**: Unexpected database errors, unhandled panic recovery, or persistence failures (`INTERNAL_ERROR`).
 - **`503 Service Unavailable`**: Infrastructure outages, database connectivity loss, maintenance mode, or temporary upstream dependency degradation (`SERVICE_UNAVAILABLE`).
 
@@ -159,7 +159,7 @@ To ensure client SDK predictability and prevent unhandled database violations:
 - **Numeric Boundaries**:
   - `quantity`: `minimum: 1`
   - `stock_quantity`: `minimum: 0`, `maximum: 2147483647` (enforced via `binding:"required,gte=0"`)
-  - `price`, `balance`, `new_balance`: `minimum: 0`
+  - `price`, `balance`: `minimum: 0`
   - `increment_amount`: `minimum: 0.01`
 - **String Length Constraints**:
   - `username`: `minLength: 1`
