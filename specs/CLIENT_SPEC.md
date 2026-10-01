@@ -98,8 +98,6 @@ erDiagram
     USER {
         string accountName "Commercial organization or user identity"
         string role "System role: Admin or Client"
-        string accessLevel "Catalog permission tier: All, Filtered, or None"
-        boolean catalogEnabled "Catalog browsing permission toggle"
         decimal balance "Available purchasing credit"
         list allowedCategories "Whitelisted product categories"
         list allowedManufacturers "Whitelisted brand manufacturers"
@@ -126,7 +124,7 @@ erDiagram
 ```
 
 #### Core Business Entities
-- **User / Customer:** Represents an authenticated commercial account possessing an operational balance, an access tier (`All`, `Filtered`, or `None`), and category/brand whitelist rules governing which products may be viewed or purchased.
+- **User / Customer:** Represents an authenticated commercial account possessing an operational balance and category/brand whitelist rules governing which products may be viewed or purchased (with empty whitelists granting access to all products by default).
 - **Product:** Represents warehouse merchandise available for order placement, categorized by industry type, manufacturer brand, and unit cost.
 - **Order:** Represents a legally binding transaction between a customer and the warehouse, capturing quantity, settled total amount, and immutable historical price/model snapshots.
 - **Financial Precision Standard:** All financial amounts (balances, prices, settlement totals) are calculated and reconciled to the exact cent, eliminating rounding discrepancies between customer receipts and internal accounting ledgers.
@@ -141,14 +139,13 @@ erDiagram
 1. **Credential Submission:** The client application transmits commercial credentials through the appropriate role channel (Customer or Administrator).
 2. **Timing-Safe Identity Verification:** The platform validates identity and role membership using constant-time verification, mitigating user enumeration and side-channel threats.
 3. **Session Establishment:** Upon successful verification, the system issues an authenticated commercial session.
-4. **Profile & Permission Hydration:** The client retrieves its commercial profile, including current purchasing balance, access permission tier, and approved category/brand whitelists.
+4. **Profile & Permission Hydration:** The client retrieves its commercial profile, including current purchasing balance and approved category/brand whitelists.
 
 #### Journey 2: Permission-Aware Catalog Exploration & Filtering
 1. **Catalog Query:** The client application requests the active warehouse inventory, optionally supplying category or manufacturer search filters, sorting preferences, and pagination controls.
 2. **Access Governance Evaluation:** The engine applies account-level visibility rules:
-   - **Restricted Access (`None` or Disabled):** If the account has catalog access disabled or assigned to `None`, an empty catalog is returned. Any order attempt triggers an immediate policy violation rejection.
-   - **Unrestricted Access (`All`):** The client may view all warehouse products matching optional search filters.
-   - **Filtered Access (`Filtered`):** Products are matched case-insensitively against the client's whitelisted categories and manufacturers, guaranteeing reliable matching regardless of casing variations.
+   - **Default Open Access:** All accounts have catalog access enabled by default. If `allowedCategories` and `allowedManufacturers` are empty, the client may view all warehouse products matching optional search filters.
+   - **Filtered Access:** When `allowedCategories` or `allowedManufacturers` contains entries, products are matched case-insensitively against the client's whitelisted categories and manufacturers, guaranteeing reliable matching regardless of casing variations.
 3. **Catalog Presentation:** The system presents permitted items along with live warehouse stock availability and pagination metadata.
 
 #### Journey 3: Atomic Order Placement
@@ -158,7 +155,7 @@ erDiagram
 4. **Outcome Delivery:** An order confirmation receipt containing the transaction reference, purchased units, and remaining balance is returned to the client.
 
 #### Journey 4: Administrative Balance & Fulfillment Governance
-1. **Balance Adjustment:** Administrators deposit funds into customer accounts via relative top-ups (e.g., following wire transfers) or set absolute balance limits.
+1. **Balance Adjustment:** Administrators deposit funds into customer accounts via relative top-ups (e.g., following wire transfers).
 2. **Permission Maintenance:** Administrators update category and brand whitelists as partner agreements expand.
 3. **Fulfillment Progress:** Warehouse staff progress orders through operational fulfillment stages from receipt through packing, dispatch, and delivery.
 
@@ -269,7 +266,7 @@ Integrators can design predictable recovery workflows and client user interfaces
 | Business Condition | Trigger & Cause | System Behavior | Client Integrator Guidance |
 | :--- | :--- | :--- | :--- |
 | **Order Confirmation** | Client balance $\ge$ total cost, stock $\ge$ quantity, and product allowed by whitelist. | Balance debited, stock decremented, immutable price snapshot recorded, and confirmation issued. | Display order receipt, update account balance badge, and offer shipment tracking. |
-| **Catalog Policy Restriction** | Client attempts to order an item outside contractual category/brand whitelists, or catalog access is disabled. | Operation declined immediately without resource locks or state mutation. | Inform client of commercial agreement boundaries; prompt client to request whitelist updates from administrators. |
+| **Catalog Policy Restriction** | Client attempts to order an item outside contractual category/brand whitelists. | Operation declined immediately without resource locks or state mutation. | Inform client of commercial agreement boundaries; prompt client to request whitelist updates from administrators. |
 | **Insufficient Warehouse Stock** | Requested units exceed currently available inventory for the target SKU. | Operation declined without state modification. Balance remains untouched. | Inform user of available stock; offer partial quantity purchase or notify upon restock. |
 | **Insufficient Account Balance** | Total purchase amount exceeds available purchasing balance. | Operation declined without state modification. Inventory remains untouched. | Prompt client to top up balance or request credit limit adjustment from administrator. |
 | **Entity Not Found** | Target SKU, order reference, or account identifier does not exist or was archived. | Request rejected without data mutation. | Refresh client catalog cache and verify entity identifiers before resubmitting. |

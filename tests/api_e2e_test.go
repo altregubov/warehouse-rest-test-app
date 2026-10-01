@@ -1239,7 +1239,6 @@ func TestCatalogFilterCaseSensitivityAndAccessDenial(t *testing.T) {
 		Balance:              5000.00,
 		AllowedCategories:   []string{"LAPTOP"},
 		AllowedManufacturers: []string{"apple"},
-		AccessLevel:          "FILTERED",
 	}
 	respCreate, bodyCreate, _ := adminClient.request(http.MethodPost, "/api/admin/users", createReq)
 	if respCreate.StatusCode != http.StatusCreated {
@@ -1298,46 +1297,43 @@ func TestCatalogFilterCaseSensitivityAndAccessDenial(t *testing.T) {
 		t.Errorf("Expected 201 for allowed product order, got %d: %s", respOrder.StatusCode, string(bodyOrder))
 	}
 
-	// 4. Configure user for ZERO catalog access (AccessLevel: NONE)
-	accessFalse := false
-	respZeroAccess, bodyZeroAccess, _ := adminClient.request(
+	// 4. Configure user with filters restricted to a different category (e.g. "smartphone")
+	respRestricted, bodyRestricted, _ := adminClient.request(
 		http.MethodPut,
 		fmt.Sprintf("/api/admin/users/%s/filters", userID),
 		domain.UpdateFiltersRequest{
-			AllowedCategories:    []string{},
-			AllowedManufacturers:  []string{},
-			AccessLevel:          "NONE",
-			CatalogAccessEnabled: &accessFalse,
+			AllowedCategories:   []string{"smartphone"},
+			AllowedManufacturers: []string{"Samsung"},
 		},
 	)
-	if respZeroAccess.StatusCode != http.StatusOK {
-		t.Fatalf("Failed to update filters to zero access: %s", string(bodyZeroAccess))
+	if respRestricted.StatusCode != http.StatusOK {
+		t.Fatalf("Failed to update filters: %s", string(bodyRestricted))
 	}
-	var zeroSummary struct {
+	var restrictedSummary struct {
 		Data domain.UserSummary `json:"data"`
 	}
-	_ = json.Unmarshal(bodyZeroAccess, &zeroSummary)
-	if zeroSummary.Data.AccessLevel != "NONE" || zeroSummary.Data.CatalogAccessEnabled != false {
-		t.Errorf("Expected access_level=NONE and catalog_access_enabled=false, got %s / %v", zeroSummary.Data.AccessLevel, zeroSummary.Data.CatalogAccessEnabled)
+	_ = json.Unmarshal(bodyRestricted, &restrictedSummary)
+	if len(restrictedSummary.Data.AllowedCategories) != 1 || restrictedSummary.Data.AllowedCategories[0] != "smartphone" {
+		t.Errorf("Expected allowed_categories=['smartphone'], got %v", restrictedSummary.Data.AllowedCategories)
 	}
 
-	// Verify catalog exploration returns 0 products
-	_, bodyEmptyList, _ := caseClient.request(http.MethodGet, "/api/user/products", nil)
-	var emptyProds struct {
+	// Verify catalog exploration for laptops returns 0 products
+	_, bodyCatQuery, _ := caseClient.request(http.MethodGet, "/api/user/products?category=laptop", nil)
+	var catProds struct {
 		Data []domain.Product `json:"data"`
 	}
-	_ = json.Unmarshal(bodyEmptyList, &emptyProds)
-	if len(emptyProds.Data) != 0 {
-		t.Errorf("Expected 0 products for zero-access user, got %d", len(emptyProds.Data))
+	_ = json.Unmarshal(bodyCatQuery, &catProds)
+	if len(catProds.Data) != 0 {
+		t.Errorf("Expected 0 products for disallowed category query, got %d", len(catProds.Data))
 	}
 
-	// Verify order attempt is rejected with 422 FILTER_RESTRICTION
+	// Verify order attempt for Apple laptop is rejected with 422 FILTER_RESTRICTION
 	respDeniedOrder, bodyDeniedOrder, _ := caseClient.request(http.MethodPost, "/api/user/orders", domain.CreateOrderRequest{
 		ProductID: appleLaptop.ID,
 		Quantity:  1,
 	})
 	if respDeniedOrder.StatusCode != 422 {
-		t.Errorf("Expected 422 FILTER_RESTRICTION for zero-access user order, got %d: %s", respDeniedOrder.StatusCode, string(bodyDeniedOrder))
+		t.Errorf("Expected 422 FILTER_RESTRICTION for disallowed product order, got %d: %s", respDeniedOrder.StatusCode, string(bodyDeniedOrder))
 	}
 	var errDenied domain.ErrorEnvelope
 	_ = json.Unmarshal(bodyDeniedOrder, &errDenied)
@@ -1345,25 +1341,34 @@ func TestCatalogFilterCaseSensitivityAndAccessDenial(t *testing.T) {
 		t.Errorf("Expected code FILTER_RESTRICTION, got %s", errDenied.Error.Code)
 	}
 
-	// 5. Restore user to ALL access
-	accessTrue := true
-	_, _, _ = adminClient.request(
+	// 5. Restore user to empty filters -> full access to all entries by default
+	respOpenFilters, bodyOpenFilters, _ := adminClient.request(
 		http.MethodPut,
 		fmt.Sprintf("/api/admin/users/%s/filters", userID),
 		domain.UpdateFiltersRequest{
-			AllowedCategories:    []string{},
-			AllowedManufacturers:  []string{},
-			AccessLevel:          "ALL",
-			CatalogAccessEnabled: &accessTrue,
+			AllowedCategories:   []string{},
+			AllowedManufacturers: []string{},
 		},
 	)
+	if respOpenFilters.StatusCode != http.StatusOK {
+		t.Fatalf("Failed to restore open filters: %s", string(bodyOpenFilters))
+	}
 	_, bodyFullList, _ := caseClient.request(http.MethodGet, "/api/user/products", nil)
 	var fullProds struct {
 		Data []domain.Product `json:"data"`
 	}
 	_ = json.Unmarshal(bodyFullList, &fullProds)
 	if len(fullProds.Data) < 3 {
-		t.Errorf("Expected full catalog for restored user, got %d products", len(fullProds.Data))
+		t.Errorf("Expected full catalog for user with empty filters, got %d products", len(fullProds.Data))
+	}
+
+	// Verify user can now order the Apple laptop without filter restriction
+	respAllowedOrder, bodyAllowedOrder, _ := caseClient.request(http.MethodPost, "/api/user/orders", domain.CreateOrderRequest{
+		ProductID: appleLaptop.ID,
+		Quantity:  1,
+	})
+	if respAllowedOrder.StatusCode != http.StatusCreated {
+		t.Errorf("Expected 201 Created for open access order, got %d: %s", respAllowedOrder.StatusCode, string(bodyAllowedOrder))
 	}
 }
 

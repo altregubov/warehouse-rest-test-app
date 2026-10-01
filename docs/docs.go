@@ -1609,15 +1609,6 @@ const docTemplate = `{
                 "username"
             ],
             "properties": {
-                "access_level": {
-                    "type": "string",
-                    "enum": [
-                        "ALL",
-                        "FILTERED",
-                        "NONE"
-                    ],
-                    "example": "FILTERED"
-                },
                 "allowed_categories": {
                     "type": "array",
                     "items": {
@@ -1641,10 +1632,6 @@ const docTemplate = `{
                     "format": "double",
                     "minimum": 0,
                     "example": 1000
-                },
-                "catalog_access_enabled": {
-                    "type": "boolean",
-                    "example": true
                 },
                 "password": {
                     "type": "string",
@@ -1969,15 +1956,6 @@ const docTemplate = `{
                 "allowed_manufacturers"
             ],
             "properties": {
-                "access_level": {
-                    "type": "string",
-                    "enum": [
-                        "ALL",
-                        "FILTERED",
-                        "NONE"
-                    ],
-                    "example": "FILTERED"
-                },
                 "allowed_categories": {
                     "type": "array",
                     "items": {
@@ -1996,10 +1974,6 @@ const docTemplate = `{
                         "Apple",
                         "Dell"
                     ]
-                },
-                "catalog_access_enabled": {
-                    "type": "boolean",
-                    "example": true
                 }
             }
         },
@@ -2037,7 +2011,6 @@ const docTemplate = `{
         "UserSummary": {
             "type": "object",
             "required": [
-                "access_level",
                 "allowed_categories",
                 "allowed_manufacturers",
                 "balance",
@@ -2046,15 +2019,6 @@ const docTemplate = `{
                 "username"
             ],
             "properties": {
-                "access_level": {
-                    "type": "string",
-                    "enum": [
-                        "ALL",
-                        "FILTERED",
-                        "NONE"
-                    ],
-                    "example": "FILTERED"
-                },
                 "allowed_categories": {
                     "type": "array",
                     "items": {
@@ -2078,10 +2042,6 @@ const docTemplate = `{
                     "format": "double",
                     "minimum": 0,
                     "example": 1000
-                },
-                "catalog_access_enabled": {
-                    "type": "boolean",
-                    "example": true
                 },
                 "id": {
                     "type": "string",

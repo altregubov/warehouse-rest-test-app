@@ -35,8 +35,6 @@ type User struct {
 	Balance              float64    `json:"balance" binding:"required" format:"double" minimum:"0"`
 	AllowedCategories   []string   `json:"allowed_categories"`
 	AllowedManufacturers []string   `json:"allowed_manufacturers"`
-	AccessLevel          string     `json:"access_level" binding:"required" enums:"ALL,FILTERED,NONE"`
-	CatalogAccessEnabled bool       `json:"catalog_access_enabled"`
 	CreatedAt            time.Time  `json:"created_at" binding:"required" format:"date-time"`
 	UpdatedAt            time.Time  `json:"updated_at" binding:"required" format:"date-time"`
 	DeletedAt            *time.Time `json:"deleted_at,omitempty" format:"date-time"`
@@ -89,8 +87,6 @@ type UserSummary struct {
 	Balance              float64   `json:"balance" binding:"required" example:"1000.00" format:"double" minimum:"0"`
 	AllowedCategories   []string  `json:"allowed_categories" binding:"required" example:"laptop"`
 	AllowedManufacturers []string  `json:"allowed_manufacturers" binding:"required" example:"Dell"`
-	AccessLevel          string    `json:"access_level" binding:"required" example:"FILTERED" enums:"ALL,FILTERED,NONE"`
-	CatalogAccessEnabled bool      `json:"catalog_access_enabled" example:"true"`
 }
 
 type LoginResponse struct {
@@ -105,8 +101,6 @@ type CreateUserRequest struct {
 	Balance              float64  `json:"balance" binding:"required" example:"1000.00" format:"double" minimum:"0"`
 	AllowedCategories   []string `json:"allowed_categories" example:"laptop"`
 	AllowedManufacturers []string `json:"allowed_manufacturers" example:"Dell"`
-	AccessLevel          string   `json:"access_level,omitempty" example:"FILTERED" enums:"ALL,FILTERED,NONE"`
-	CatalogAccessEnabled *bool    `json:"catalog_access_enabled,omitempty" example:"true"`
 }
 
 type TopUpBalanceRequest struct {
@@ -114,10 +108,8 @@ type TopUpBalanceRequest struct {
 }
 
 type UpdateFiltersRequest struct {
-	AllowedCategories    []string `json:"allowed_categories" binding:"required" example:"laptop"`
-	AllowedManufacturers  []string `json:"allowed_manufacturers" binding:"required" example:"Apple,Dell"`
-	AccessLevel          string   `json:"access_level,omitempty" example:"FILTERED" enums:"ALL,FILTERED,NONE"`
-	CatalogAccessEnabled *bool    `json:"catalog_access_enabled,omitempty" example:"true"`
+	AllowedCategories   []string `json:"allowed_categories" binding:"required" example:"laptop"`
+	AllowedManufacturers []string `json:"allowed_manufacturers" binding:"required" example:"Apple,Dell"`
 }
 
 type CreateProductRequest struct {

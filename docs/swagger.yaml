@@ -43,13 +43,6 @@ definitions:
     type: object
   CreateUserRequest:
     properties:
-      access_level:
-        enum:
-        - ALL
-        - FILTERED
-        - NONE
-        example: FILTERED
-        type: string
       allowed_categories:
         example:
         - laptop
@@ -67,9 +60,6 @@ definitions:
         format: double
         minimum: 0
         type: number
-      catalog_access_enabled:
-        example: true
-        type: boolean
       password:
         example: secret123
         type: string
@@ -314,13 +304,6 @@ definitions:
     type: object
   UpdateFiltersRequest:
     properties:
-      access_level:
-        enum:
-        - ALL
-        - FILTERED
-        - NONE
-        example: FILTERED
-        type: string
       allowed_categories:
         example:
         - laptop
@@ -334,9 +317,6 @@ definitions:
         items:
           type: string
         type: array
-      catalog_access_enabled:
-        example: true
-        type: boolean
     required:
     - allowed_categories
     - allowed_manufacturers
@@ -365,13 +345,6 @@ definitions:
     type: object
   UserSummary:
     properties:
-      access_level:
-        enum:
-        - ALL
-        - FILTERED
-        - NONE
-        example: FILTERED
-        type: string
       allowed_categories:
         example:
         - laptop
@@ -389,9 +362,6 @@ definitions:
         format: double
         minimum: 0
         type: number
-      catalog_access_enabled:
-        example: true
-        type: boolean
       id:
         example: b0000000-0000-0000-0000-000000000002
         format: uuid
@@ -407,7 +377,6 @@ definitions:
         minLength: 1
         type: string
     required:
-    - access_level
     - allowed_categories
     - allowed_manufacturers
     - balance

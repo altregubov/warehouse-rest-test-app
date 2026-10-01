@@ -106,30 +106,6 @@ func (s *userService) CreateUser(ctx context.Context, req *domain.CreateUserRequ
 	normCats := normalizeStringSlice(req.AllowedCategories)
 	normMfgs := normalizeStringSlice(req.AllowedManufacturers)
 
-	accessLevel := strings.ToUpper(strings.TrimSpace(req.AccessLevel))
-	catalogAccessEnabled := true
-	if req.CatalogAccessEnabled != nil {
-		catalogAccessEnabled = *req.CatalogAccessEnabled
-	}
-
-	if accessLevel != "" {
-		if accessLevel != "ALL" && accessLevel != "FILTERED" && accessLevel != "NONE" {
-			return nil, fmt.Errorf("%w: invalid access_level (must be ALL, FILTERED, or NONE)", domain.ErrInvalidInput)
-		}
-		if accessLevel == "NONE" {
-			catalogAccessEnabled = false
-		}
-	} else if req.CatalogAccessEnabled != nil && !*req.CatalogAccessEnabled {
-		accessLevel = "NONE"
-		catalogAccessEnabled = false
-	} else {
-		if len(normCats) > 0 || len(normMfgs) > 0 {
-			accessLevel = "FILTERED"
-		} else {
-			accessLevel = "ALL"
-		}
-	}
-
 	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), BcryptCost)
 	if err != nil {
 		return nil, fmt.Errorf("failed to hash password: %w", err)
@@ -144,8 +120,6 @@ func (s *userService) CreateUser(ctx context.Context, req *domain.CreateUserRequ
 		Balance:              domain.CentsToDollars(balCents),
 		AllowedCategories:   normCats,
 		AllowedManufacturers: normMfgs,
-		AccessLevel:          accessLevel,
-		CatalogAccessEnabled: catalogAccessEnabled,
 	}
 
 	if err := s.userRepo.Create(ctx, user); err != nil {
@@ -182,31 +156,7 @@ func (s *userService) UpdateFilters(ctx context.Context, userID uuid.UUID, req *
 	normCats := normalizeStringSlice(req.AllowedCategories)
 	normMfgs := normalizeStringSlice(req.AllowedManufacturers)
 
-	accessLevel := strings.ToUpper(strings.TrimSpace(req.AccessLevel))
-	catalogAccessEnabled := true
-	if req.CatalogAccessEnabled != nil {
-		catalogAccessEnabled = *req.CatalogAccessEnabled
-	}
-
-	if accessLevel != "" {
-		if accessLevel != "ALL" && accessLevel != "FILTERED" && accessLevel != "NONE" {
-			return nil, fmt.Errorf("%w: invalid access_level (must be ALL, FILTERED, or NONE)", domain.ErrInvalidInput)
-		}
-		if accessLevel == "NONE" {
-			catalogAccessEnabled = false
-		}
-	} else if req.CatalogAccessEnabled != nil && !*req.CatalogAccessEnabled {
-		accessLevel = "NONE"
-		catalogAccessEnabled = false
-	} else {
-		if len(normCats) > 0 || len(normMfgs) > 0 {
-			accessLevel = "FILTERED"
-		} else {
-			accessLevel = "ALL"
-		}
-	}
-
-	updatedUser, err := s.userRepo.UpdateFilters(ctx, userID, normCats, normMfgs, accessLevel, catalogAccessEnabled)
+	updatedUser, err := s.userRepo.UpdateFilters(ctx, userID, normCats, normMfgs)
 	if err != nil {
 		return nil, err
 	}
@@ -230,14 +180,6 @@ func toUserSummary(u *domain.User) *domain.UserSummary {
 	if allowedManufacturers == nil {
 		allowedManufacturers = []string{}
 	}
-	accessLevel := u.AccessLevel
-	if accessLevel == "" {
-		if len(allowedCategories) > 0 || len(allowedManufacturers) > 0 {
-			accessLevel = "FILTERED"
-		} else {
-			accessLevel = "ALL"
-		}
-	}
 	return &domain.UserSummary{
 		ID:                   u.ID,
 		Username:             u.Username,
@@ -245,7 +187,5 @@ func toUserSummary(u *domain.User) *domain.UserSummary {
 		Balance:              u.Balance,
 		AllowedCategories:   allowedCategories,
 		AllowedManufacturers: allowedManufacturers,
-		AccessLevel:          accessLevel,
-		CatalogAccessEnabled: u.CatalogAccessEnabled,
 	}
 }

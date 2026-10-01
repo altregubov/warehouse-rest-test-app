@@ -220,14 +220,10 @@ CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id);
 ```
 
 ### 3.2 Domain Model Invariants
-1. **User Catalog Filters & Access Level Semantics:**
+1. **User Catalog Filters Semantics:**
    - **Case-Insensitive Normalization:** Category and manufacturer filtering operates strictly case-insensitively across ingestion (`CreateUser`, `UpdateFilters`) and query evaluation (`LOWER(TRIM(...))`), preventing silent mismatches between title-cased catalog entries and lowercase whitelist queries.
-   - **Access Level Enum & Denial Semantics:**
-     - `access_level`: Explicit enumerated values (`ALL`, `FILTERED`, `NONE`).
-     - `catalog_access_enabled`: Boolean flag indicating whether the user has catalog and order placement privileges.
-     - **`ALL`**: User has full catalog visibility across all categories and manufacturers.
-     - **`FILTERED`**: Visibility and order placement are strictly constrained to whitelisted `allowed_categories` and `allowed_manufacturers`.
-     - **`NONE`**: Explicit zero-access configuration. The user sees 0 catalog items (`[]`), and order attempts are immediately rejected with `422 Unprocessable Entity` (`FILTER_RESTRICTION`), enabling suspension or onboarding holds without deleting user accounts.
+   - **Default Open Access:** By default, all users have access to the entire catalog.
+   - **Whitelist Filtering:** If `allowed_categories` or `allowed_manufacturers` is populated with entries, visibility and order placement are strictly constrained to those whitelisted values. If both arrays are empty (`[]`), the user has unrestricted access to all product categories and manufacturers.
 2. **Product Extensibility:**
    - Category is an arbitrary, non-restricted string (e.g., `laptop`, `smartphone`, `monitor`, `tablet`, `accessory`). No hardcoded enums.
 3. **Atomic Balance & Inventory Constraints:**
@@ -332,9 +328,7 @@ CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id);
        "role": "user",
        "balance": 1000.00,
        "allowed_categories": ["laptop"],
-       "allowed_manufacturers": ["Dell"],
-       "access_level": "FILTERED",
-       "catalog_access_enabled": true
+       "allowed_manufacturers": ["Dell"]
      }
      ```
    - Response (201 Created): User details (excluding `password_hash`).
@@ -356,14 +350,12 @@ CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id);
    - Failure (500 Internal Server Error): Server or persistence failure.
 
 3. `PUT /api/admin/users/{id}/filters`
-   - Configures catalog visibility rules and access tier for a user.
+   - Configures catalog visibility rules for a user.
    - Body:
      ```json
      {
        "allowed_categories": ["laptop"],
-       "allowed_manufacturers": ["Apple", "Dell"],
-       "access_level": "FILTERED",
-       "catalog_access_enabled": true
+       "allowed_manufacturers": ["Apple", "Dell"]
      }
      ```
    - Response (200 OK): Updated user filter profile.
@@ -456,7 +448,7 @@ CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id);
 ### 5.4 User Routes (`/api/user/*`, Bearer User Token Required)
 
 1. `GET /api/user/profile`
-   - Returns authenticated user details, balance, access level, and catalog filters.
+   - Returns authenticated user details, balance, and catalog filters.
    - Response (200 OK):
      ```json
      {
@@ -467,9 +459,7 @@ CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id);
          "role": "user",
          "balance": 5000.00,
          "allowed_categories": [],
-         "allowed_manufacturers": [],
-         "access_level": "ALL",
-         "catalog_access_enabled": true
+         "allowed_manufacturers": []
        }
      }
      ```
@@ -487,14 +477,15 @@ CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id);
      - `category` (optional, string): Filter by product classification.
      - `manufacturer` (optional, string): Filter by brand / manufacturer.
    - **Catalog Filter Evaluation Rules:**
-     1. If user's `access_level` is `NONE` or `catalog_access_enabled` is `false`, return empty list `[]` (`total_count: 0`, `total_pages: 0`).
-     2. If user's `access_level` is `FILTERED` and `allowed_categories` is non-empty, query matches case-insensitively using `LOWER(TRIM(...))`.
-     3. If user's `access_level` is `FILTERED` and `allowed_manufacturers` is non-empty, query matches case-insensitively using `LOWER(TRIM(...))`.
-     4. If `category` query param is provided, filter by that category case-insensitively within permitted bounds.
-     5. If `manufacturer` query param is provided, filter by that brand case-insensitively within permitted bounds.
-     6. If user has full access (`access_level: ALL`), return all products matching optional category and manufacturer.
-     7. Results are sorted deterministically by the requested field and order (with `id ASC` as tie-breaker).
-     8. Total matching count is calculated, and results are sliced by `LIMIT page_size OFFSET (page - 1) * page_size`.
+     1. By default, all users have access to the entire catalog.
+     2. If user's `allowed_categories` is non-empty, query matches permitted categories case-insensitively using `LOWER(TRIM(...))`. If `category` query param is supplied, it must match one of the allowed categories; otherwise, an empty list `[]` is returned.
+     3. If user's `allowed_manufacturers` is non-empty, query matches permitted manufacturers case-insensitively using `LOWER(TRIM(...))`. If `manufacturer` query param is supplied, it must match one of the allowed manufacturers; otherwise, an empty list `[]` is returned.
+     4. If user's `allowed_categories` is empty, the user has unrestricted access to all categories.
+     5. If user's `allowed_manufacturers` is empty, the user has unrestricted access to all manufacturers.
+     6. If `category` query param is provided, filter by that category case-insensitively within permitted bounds.
+     7. If `manufacturer` query param is provided, filter by that brand case-insensitively within permitted bounds.
+     8. Results are sorted deterministically by the requested field and order (with `id ASC` as tie-breaker).
+     9. Total matching count is calculated, and results are sliced by `LIMIT page_size OFFSET (page - 1) * page_size`.
    - **Response (200 OK):**
      ```json
      {

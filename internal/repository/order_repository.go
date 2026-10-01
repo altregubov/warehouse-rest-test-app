@@ -44,7 +44,7 @@ func (r *sqlOrderRepository) CreateOrderTx(ctx context.Context, userID, productI
 	var user domain.User
 	var allowedCategories, allowedManufacturers pq.StringArray
 	userQuery := `
-		SELECT id, username, balance, allowed_categories, allowed_manufacturers, access_level, catalog_access_enabled
+		SELECT id, username, balance, allowed_categories, allowed_manufacturers
 		FROM users
 		WHERE id = $1 AND deleted_at IS NULL
 		FOR UPDATE
@@ -55,8 +55,6 @@ func (r *sqlOrderRepository) CreateOrderTx(ctx context.Context, userID, productI
 		&user.Balance,
 		&allowedCategories,
 		&allowedManufacturers,
-		&user.AccessLevel,
-		&user.CatalogAccessEnabled,
 	)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -91,35 +89,29 @@ func (r *sqlOrderRepository) CreateOrderTx(ctx context.Context, userID, productI
 	}
 
 	// 3. Check catalog access and user filter permissions
-	if !user.CatalogAccessEnabled || user.AccessLevel == "NONE" {
-		return nil, domain.ErrProductDisallowed
-	}
-
-	if user.AccessLevel == "FILTERED" {
-		if len(user.AllowedCategories) > 0 {
-			catAllowed := false
-			for _, cat := range user.AllowedCategories {
-				if strings.EqualFold(cat, product.Category) {
-					catAllowed = true
-					break
-				}
-			}
-			if !catAllowed {
-				return nil, domain.ErrProductDisallowed
+	if len(user.AllowedCategories) > 0 {
+		catAllowed := false
+		for _, cat := range user.AllowedCategories {
+			if strings.EqualFold(cat, product.Category) {
+				catAllowed = true
+				break
 			}
 		}
+		if !catAllowed {
+			return nil, domain.ErrProductDisallowed
+		}
+	}
 
-		if len(user.AllowedManufacturers) > 0 {
-			mfgAllowed := false
-			for _, mfg := range user.AllowedManufacturers {
-				if strings.EqualFold(mfg, product.Manufacturer) {
-					mfgAllowed = true
-					break
-				}
+	if len(user.AllowedManufacturers) > 0 {
+		mfgAllowed := false
+		for _, mfg := range user.AllowedManufacturers {
+			if strings.EqualFold(mfg, product.Manufacturer) {
+				mfgAllowed = true
+				break
 			}
-			if !mfgAllowed {
-				return nil, domain.ErrProductDisallowed
-			}
+		}
+		if !mfgAllowed {
+			return nil, domain.ErrProductDisallowed
 		}
 	}
 
