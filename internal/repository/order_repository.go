@@ -44,7 +44,7 @@ func (r *sqlOrderRepository) CreateOrderTx(ctx context.Context, userID, productI
 	var user domain.User
 	var allowedCategories, allowedManufacturers pq.StringArray
 	userQuery := `
-		SELECT id, username, balance, allowed_categories, allowed_manufacturers, access_level, catalog_access_enabled
+		SELECT id, username, balance, allowed_categories, allowed_manufacturers
 		FROM users
 		WHERE id = $1 AND deleted_at IS NULL
 		FOR UPDATE
@@ -55,8 +55,6 @@ func (r *sqlOrderRepository) CreateOrderTx(ctx context.Context, userID, productI
 		&user.Balance,
 		&allowedCategories,
 		&allowedManufacturers,
-		&user.AccessLevel,
-		&user.CatalogAccessEnabled,
 	)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -90,42 +88,56 @@ func (r *sqlOrderRepository) CreateOrderTx(ctx context.Context, userID, productI
 		return nil, fmt.Errorf("failed to lock product: %w", err)
 	}
 
-	// 3. Check catalog access and user filter permissions
-	if !user.CatalogAccessEnabled || user.AccessLevel == "NONE" {
-		return nil, domain.ErrProductDisallowed
+	// Helper to persist a failed order record before returning an error
+	recordFailedOrder := func(failureErr error) (*domain.OrderResponse, error) {
+		failOrderID := uuid.New()
+		failCreatedAt := time.Now().UTC()
+		failUnitCost := product.Price
+		failTotalCost := domain.CentsToDollars(domain.DollarsToCents(failUnitCost) * int64(quantity))
+		failQuery := `
+			INSERT INTO orders (id, user_id, product_id, product_model, unit_price, quantity, total_price, status, created_at)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, 'FAILED', $8)
+		`
+		_, execErr := tx.ExecContext(ctx, failQuery, failOrderID, user.ID, product.ID, product.Model, failUnitCost, quantity, failTotalCost, failCreatedAt)
+		if execErr != nil {
+			return nil, fmt.Errorf("failed to record FAILED order: %w", execErr)
+		}
+		if commitErr := tx.Commit(); commitErr != nil {
+			return nil, fmt.Errorf("failed to commit FAILED order transaction: %w", commitErr)
+		}
+		return nil, failureErr
 	}
 
-	if user.AccessLevel == "FILTERED" {
-		if len(user.AllowedCategories) > 0 {
-			catAllowed := false
-			for _, cat := range user.AllowedCategories {
-				if strings.EqualFold(cat, product.Category) {
-					catAllowed = true
-					break
-				}
-			}
-			if !catAllowed {
-				return nil, domain.ErrProductDisallowed
+	// 3. Check catalog access and user filter permissions
+	if len(user.AllowedCategories) > 0 {
+		catAllowed := false
+		for _, cat := range user.AllowedCategories {
+			if strings.EqualFold(cat, product.Category) {
+				catAllowed = true
+				break
 			}
 		}
+		if !catAllowed {
+			return recordFailedOrder(domain.ErrProductDisallowed)
+		}
+	}
 
-		if len(user.AllowedManufacturers) > 0 {
-			mfgAllowed := false
-			for _, mfg := range user.AllowedManufacturers {
-				if strings.EqualFold(mfg, product.Manufacturer) {
-					mfgAllowed = true
-					break
-				}
+	if len(user.AllowedManufacturers) > 0 {
+		mfgAllowed := false
+		for _, mfg := range user.AllowedManufacturers {
+			if strings.EqualFold(mfg, product.Manufacturer) {
+				mfgAllowed = true
+				break
 			}
-			if !mfgAllowed {
-				return nil, domain.ErrProductDisallowed
-			}
+		}
+		if !mfgAllowed {
+			return recordFailedOrder(domain.ErrProductDisallowed)
 		}
 	}
 
 	// 4. Verify stock
 	if product.StockQuantity < quantity {
-		return nil, domain.ErrInsufficientStock
+		return recordFailedOrder(domain.ErrInsufficientStock)
 	}
 
 	// 5. Calculate total cost and verify balance using integer cents to eliminate floating-point drift
@@ -134,7 +146,7 @@ func (r *sqlOrderRepository) CreateOrderTx(ctx context.Context, userID, productI
 	userBalanceCents := domain.DollarsToCents(user.Balance)
 
 	if userBalanceCents < totalCostCents {
-		return nil, domain.ErrInsufficientBalance
+		return recordFailedOrder(domain.ErrInsufficientBalance)
 	}
 
 	// 6. Decrement stock
@@ -155,22 +167,16 @@ func (r *sqlOrderRepository) CreateOrderTx(ctx context.Context, userID, productI
 		return nil, fmt.Errorf("failed to update user balance: %w", err)
 	}
 
-	// 8. Insert order with initial status 'CREATED'
+	// 8. Insert order with status 'PROCESSED'
 	orderID := uuid.New()
 	createdAt := time.Now().UTC()
 	orderQuery := `
 		INSERT INTO orders (id, user_id, product_id, product_model, unit_price, quantity, total_price, status, created_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, 'CREATED', $8)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, 'PROCESSED', $8)
 	`
 	_, err = tx.ExecContext(ctx, orderQuery, orderID, user.ID, product.ID, product.Model, unitPrice, quantity, totalCost, createdAt)
 	if err != nil {
 		return nil, fmt.Errorf("failed to insert order: %w", err)
-	}
-
-	// 9. When transaction finishes, automatically transition status to 'PROCESSED'
-	_, err = tx.ExecContext(ctx, "UPDATE orders SET status = 'PROCESSED' WHERE id = $1", orderID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to update order status to PROCESSED: %w", err)
 	}
 
 	if err := tx.Commit(); err != nil {
@@ -314,11 +320,17 @@ func (r *sqlOrderRepository) cancelOrderTx(ctx context.Context, orderID uuid.UUI
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, domain.ErrNotFound
 		}
-		return nil, fmt.Errorf("failed to fetch order for cancellation: %w", err)
+		return nil, fmt.Errorf("failed to fetch order: %w", err)
 	}
 
+	if o.Status == "FAILED" {
+		return nil, fmt.Errorf("%w: status FAILED cannot be changed by admin", domain.ErrInvalidInput)
+	}
 	if o.Status == "CANCELLED" {
 		return nil, fmt.Errorf("%w: order is already cancelled", domain.ErrInvalidInput)
+	}
+	if o.Status != "PROCESSED" {
+		return nil, fmt.Errorf("%w: cannot cancel order in status %s", domain.ErrInvalidInput, o.Status)
 	}
 
 	// Deterministic locking between User and Product based on UUID string comparison
@@ -371,47 +383,8 @@ func (r *sqlOrderRepository) cancelOrderTx(ctx context.Context, orderID uuid.UUI
 }
 
 func (r *sqlOrderRepository) UpdateStatus(ctx context.Context, orderID uuid.UUID, status string) (*domain.OrderResponse, error) {
-	if status == "CANCELLED" {
-		return r.cancelOrderTx(ctx, orderID)
+	if status != "CANCELLED" {
+		return nil, fmt.Errorf("%w: invalid status %s (admin can only set status to CANCELLED)", domain.ErrInvalidInput, status)
 	}
-
-	// Verify order is not already cancelled
-	var currentStatus string
-	err := r.db.QueryRowContext(ctx, "SELECT status FROM orders WHERE id = $1", orderID).Scan(&currentStatus)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, domain.ErrNotFound
-		}
-		return nil, fmt.Errorf("failed to check order status: %w", err)
-	}
-	if currentStatus == "CANCELLED" {
-		return nil, fmt.Errorf("%w: cannot transition from CANCELLED status", domain.ErrInvalidInput)
-	}
-
-	query := `
-		UPDATE orders
-		SET status = $1
-		WHERE id = $2
-		RETURNING id, user_id, product_id, product_model, unit_price, quantity, total_price, status, created_at
-	`
-	var o domain.OrderResponse
-	err = r.db.QueryRowContext(ctx, query, status, orderID).Scan(
-		&o.OrderID,
-		&o.UserID,
-		&o.ProductID,
-		&o.ProductModel,
-		&o.UnitPrice,
-		&o.Quantity,
-		&o.TotalPrice,
-		&o.Status,
-		&o.CreatedAt,
-	)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, domain.ErrNotFound
-		}
-		return nil, fmt.Errorf("failed to update order status: %w", err)
-	}
-
-	return &o, nil
+	return r.cancelOrderTx(ctx, orderID)
 }

@@ -14,8 +14,8 @@ import (
 
 type ProductRepository interface {
 	GetByID(ctx context.Context, id uuid.UUID) (*domain.Product, error)
-	List(ctx context.Context, filterCategory string, allowedCategories, allowedManufacturers []string, accessLevel string, catalogAccessEnabled bool) ([]domain.Product, error)
-	ListPaginated(ctx context.Context, params domain.ProductFilterParams, allowedCategories, allowedManufacturers []string, accessLevel string, catalogAccessEnabled bool) ([]domain.Product, int, error)
+	List(ctx context.Context, filterCategory string, allowedCategories, allowedManufacturers []string) ([]domain.Product, error)
+	ListPaginated(ctx context.Context, params domain.ProductFilterParams, allowedCategories, allowedManufacturers []string) ([]domain.Product, int, error)
 	Create(ctx context.Context, product *domain.Product) error
 	UpdateStock(ctx context.Context, id uuid.UUID, newStock int) (*domain.Product, error)
 }
@@ -57,15 +57,11 @@ func (r *sqlProductRepository) GetByID(ctx context.Context, id uuid.UUID) (*doma
 	return &p, nil
 }
 
-func (r *sqlProductRepository) List(ctx context.Context, filterCategory string, allowedCategories, allowedManufacturers []string, accessLevel string, catalogAccessEnabled bool) ([]domain.Product, error) {
-	if !catalogAccessEnabled || accessLevel == "NONE" {
-		return []domain.Product{}, nil
-	}
-
+func (r *sqlProductRepository) List(ctx context.Context, filterCategory string, allowedCategories, allowedManufacturers []string) ([]domain.Product, error) {
 	filterCategory = strings.TrimSpace(filterCategory)
 
 	// If user is restricted to specific categories, and requested a category not in their whitelist, return empty list
-	if accessLevel == "FILTERED" && len(allowedCategories) > 0 && filterCategory != "" {
+	if len(allowedCategories) > 0 && filterCategory != "" {
 		allowed := false
 		for _, cat := range allowedCategories {
 			if strings.EqualFold(cat, filterCategory) {
@@ -90,7 +86,7 @@ func (r *sqlProductRepository) List(ctx context.Context, filterCategory string, 
 		query += fmt.Sprintf(" AND LOWER(TRIM(category)) = LOWER(TRIM($%d))", argIdx)
 		args = append(args, filterCategory)
 		argIdx++
-	} else if accessLevel == "FILTERED" && len(allowedCategories) > 0 {
+	} else if len(allowedCategories) > 0 {
 		normCats := make([]string, len(allowedCategories))
 		for i, c := range allowedCategories {
 			normCats[i] = strings.ToLower(strings.TrimSpace(c))
@@ -100,7 +96,7 @@ func (r *sqlProductRepository) List(ctx context.Context, filterCategory string, 
 		argIdx++
 	}
 
-	if accessLevel == "FILTERED" && len(allowedManufacturers) > 0 {
+	if len(allowedManufacturers) > 0 {
 		normMfgs := make([]string, len(allowedManufacturers))
 		for i, m := range allowedManufacturers {
 			normMfgs[i] = strings.ToLower(strings.TrimSpace(m))
@@ -143,13 +139,9 @@ func (r *sqlProductRepository) List(ctx context.Context, filterCategory string, 
 	return products, nil
 }
 
-func (r *sqlProductRepository) ListPaginated(ctx context.Context, params domain.ProductFilterParams, allowedCategories, allowedManufacturers []string, accessLevel string, catalogAccessEnabled bool) ([]domain.Product, int, error) {
-	if !catalogAccessEnabled || accessLevel == "NONE" {
-		return []domain.Product{}, 0, nil
-	}
-
+func (r *sqlProductRepository) ListPaginated(ctx context.Context, params domain.ProductFilterParams, allowedCategories, allowedManufacturers []string) ([]domain.Product, int, error) {
 	filterCategory := strings.TrimSpace(params.Category)
-	if accessLevel == "FILTERED" && len(allowedCategories) > 0 && filterCategory != "" {
+	if len(allowedCategories) > 0 && filterCategory != "" {
 		allowed := false
 		for _, cat := range allowedCategories {
 			if strings.EqualFold(cat, filterCategory) {
@@ -163,7 +155,7 @@ func (r *sqlProductRepository) ListPaginated(ctx context.Context, params domain.
 	}
 
 	filterManufacturer := strings.TrimSpace(params.Manufacturer)
-	if accessLevel == "FILTERED" && len(allowedManufacturers) > 0 && filterManufacturer != "" {
+	if len(allowedManufacturers) > 0 && filterManufacturer != "" {
 		allowed := false
 		for _, m := range allowedManufacturers {
 			if strings.EqualFold(m, filterManufacturer) {
@@ -184,7 +176,7 @@ func (r *sqlProductRepository) ListPaginated(ctx context.Context, params domain.
 		whereClause += fmt.Sprintf(" AND LOWER(TRIM(category)) = LOWER(TRIM($%d))", argIdx)
 		args = append(args, filterCategory)
 		argIdx++
-	} else if accessLevel == "FILTERED" && len(allowedCategories) > 0 {
+	} else if len(allowedCategories) > 0 {
 		normCats := make([]string, len(allowedCategories))
 		for i, c := range allowedCategories {
 			normCats[i] = strings.ToLower(strings.TrimSpace(c))
@@ -198,7 +190,7 @@ func (r *sqlProductRepository) ListPaginated(ctx context.Context, params domain.
 		whereClause += fmt.Sprintf(" AND LOWER(TRIM(manufacturer)) = LOWER(TRIM($%d))", argIdx)
 		args = append(args, filterManufacturer)
 		argIdx++
-	} else if accessLevel == "FILTERED" && len(allowedManufacturers) > 0 {
+	} else if len(allowedManufacturers) > 0 {
 		normMfgs := make([]string, len(allowedManufacturers))
 		for i, m := range allowedManufacturers {
 			normMfgs[i] = strings.ToLower(strings.TrimSpace(m))

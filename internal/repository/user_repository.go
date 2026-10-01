@@ -17,7 +17,7 @@ type UserRepository interface {
 	Create(ctx context.Context, user *domain.User) error
 	List(ctx context.Context, role string, limit, offset int) ([]*domain.User, int, error)
 	UpdateBalance(ctx context.Context, id uuid.UUID, newBalance float64) (*domain.User, error)
-	UpdateFilters(ctx context.Context, id uuid.UUID, categories, manufacturers []string, accessLevel string, catalogAccessEnabled bool) (*domain.User, error)
+	UpdateFilters(ctx context.Context, id uuid.UUID, categories, manufacturers []string) (*domain.User, error)
 	SoftDelete(ctx context.Context, id uuid.UUID) error
 }
 
@@ -31,7 +31,7 @@ func NewUserRepository(db *sql.DB) UserRepository {
 
 func (r *sqlUserRepository) GetByID(ctx context.Context, id uuid.UUID) (*domain.User, error) {
 	query := `
-		SELECT id, username, password_hash, role, balance, allowed_categories, allowed_manufacturers, access_level, catalog_access_enabled, created_at, updated_at
+		SELECT id, username, password_hash, role, balance, allowed_categories, allowed_manufacturers, created_at, updated_at
 		FROM users
 		WHERE id = $1 AND deleted_at IS NULL
 	`
@@ -48,8 +48,6 @@ func (r *sqlUserRepository) GetByID(ctx context.Context, id uuid.UUID) (*domain.
 		&u.Balance,
 		&allowedCategories,
 		&allowedManufacturers,
-		&u.AccessLevel,
-		&u.CatalogAccessEnabled,
 		&u.CreatedAt,
 		&u.UpdatedAt,
 	)
@@ -74,7 +72,7 @@ func (r *sqlUserRepository) GetByID(ctx context.Context, id uuid.UUID) (*domain.
 
 func (r *sqlUserRepository) GetByUsername(ctx context.Context, username string) (*domain.User, error) {
 	query := `
-		SELECT id, username, password_hash, role, balance, allowed_categories, allowed_manufacturers, access_level, catalog_access_enabled, created_at, updated_at
+		SELECT id, username, password_hash, role, balance, allowed_categories, allowed_manufacturers, created_at, updated_at
 		FROM users
 		WHERE username = $1 AND deleted_at IS NULL
 	`
@@ -91,8 +89,6 @@ func (r *sqlUserRepository) GetByUsername(ctx context.Context, username string) 
 		&u.Balance,
 		&allowedCategories,
 		&allowedManufacturers,
-		&u.AccessLevel,
-		&u.CatalogAccessEnabled,
 		&u.CreatedAt,
 		&u.UpdatedAt,
 	)
@@ -125,17 +121,10 @@ func (r *sqlUserRepository) Create(ctx context.Context, u *domain.User) error {
 	if u.AllowedManufacturers == nil {
 		u.AllowedManufacturers = []string{}
 	}
-	if u.AccessLevel == "" {
-		if len(u.AllowedCategories) > 0 || len(u.AllowedManufacturers) > 0 {
-			u.AccessLevel = "FILTERED"
-		} else {
-			u.AccessLevel = "ALL"
-		}
-	}
 
 	query := `
-		INSERT INTO users (id, username, password_hash, role, balance, allowed_categories, allowed_manufacturers, access_level, catalog_access_enabled)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		INSERT INTO users (id, username, password_hash, role, balance, allowed_categories, allowed_manufacturers)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
 		RETURNING created_at, updated_at
 	`
 	err := r.db.QueryRowContext(
@@ -148,8 +137,6 @@ func (r *sqlUserRepository) Create(ctx context.Context, u *domain.User) error {
 		u.Balance,
 		pq.Array(u.AllowedCategories),
 		pq.Array(u.AllowedManufacturers),
-		u.AccessLevel,
-		u.CatalogAccessEnabled,
 	).Scan(&u.CreatedAt, &u.UpdatedAt)
 
 	if err != nil {
@@ -168,7 +155,7 @@ func (r *sqlUserRepository) UpdateBalance(ctx context.Context, id uuid.UUID, new
 		UPDATE users
 		SET balance = $1, updated_at = CURRENT_TIMESTAMP
 		WHERE id = $2 AND deleted_at IS NULL
-		RETURNING id, username, password_hash, role, balance, allowed_categories, allowed_manufacturers, access_level, catalog_access_enabled, created_at, updated_at
+		RETURNING id, username, password_hash, role, balance, allowed_categories, allowed_manufacturers, created_at, updated_at
 	`
 	row := r.db.QueryRowContext(ctx, query, newBalance, id)
 
@@ -183,8 +170,6 @@ func (r *sqlUserRepository) UpdateBalance(ctx context.Context, id uuid.UUID, new
 		&u.Balance,
 		&allowedCategories,
 		&allowedManufacturers,
-		&u.AccessLevel,
-		&u.CatalogAccessEnabled,
 		&u.CreatedAt,
 		&u.UpdatedAt,
 	)
@@ -207,7 +192,7 @@ func (r *sqlUserRepository) UpdateBalance(ctx context.Context, id uuid.UUID, new
 	return &u, nil
 }
 
-func (r *sqlUserRepository) UpdateFilters(ctx context.Context, id uuid.UUID, categories, manufacturers []string, accessLevel string, catalogAccessEnabled bool) (*domain.User, error) {
+func (r *sqlUserRepository) UpdateFilters(ctx context.Context, id uuid.UUID, categories, manufacturers []string) (*domain.User, error) {
 	if categories == nil {
 		categories = []string{}
 	}
@@ -217,11 +202,11 @@ func (r *sqlUserRepository) UpdateFilters(ctx context.Context, id uuid.UUID, cat
 
 	query := `
 		UPDATE users
-		SET allowed_categories = $1, allowed_manufacturers = $2, access_level = $3, catalog_access_enabled = $4, updated_at = CURRENT_TIMESTAMP
-		WHERE id = $5 AND deleted_at IS NULL
-		RETURNING id, username, password_hash, role, balance, allowed_categories, allowed_manufacturers, access_level, catalog_access_enabled, created_at, updated_at
+		SET allowed_categories = $1, allowed_manufacturers = $2, updated_at = CURRENT_TIMESTAMP
+		WHERE id = $3 AND deleted_at IS NULL
+		RETURNING id, username, password_hash, role, balance, allowed_categories, allowed_manufacturers, created_at, updated_at
 	`
-	row := r.db.QueryRowContext(ctx, query, pq.Array(categories), pq.Array(manufacturers), accessLevel, catalogAccessEnabled, id)
+	row := r.db.QueryRowContext(ctx, query, pq.Array(categories), pq.Array(manufacturers), id)
 
 	var u domain.User
 	var allowedCategories, allowedManufacturers pq.StringArray
@@ -234,8 +219,6 @@ func (r *sqlUserRepository) UpdateFilters(ctx context.Context, id uuid.UUID, cat
 		&u.Balance,
 		&allowedCategories,
 		&allowedManufacturers,
-		&u.AccessLevel,
-		&u.CatalogAccessEnabled,
 		&u.CreatedAt,
 		&u.UpdatedAt,
 	)
@@ -274,7 +257,7 @@ func (r *sqlUserRepository) List(ctx context.Context, role string, limit, offset
 		return nil, 0, fmt.Errorf("failed to count users: %w", err)
 	}
 
-	selectQuery := "SELECT id, username, password_hash, role, balance, allowed_categories, allowed_manufacturers, access_level, catalog_access_enabled, created_at, updated_at " + baseQuery + " ORDER BY created_at ASC"
+	selectQuery := "SELECT id, username, password_hash, role, balance, allowed_categories, allowed_manufacturers, created_at, updated_at " + baseQuery + " ORDER BY created_at ASC"
 	if limit > 0 {
 		selectQuery += fmt.Sprintf(" LIMIT $%d OFFSET $%d", argIdx, argIdx+1)
 		args = append(args, limit, offset)
@@ -298,8 +281,6 @@ func (r *sqlUserRepository) List(ctx context.Context, role string, limit, offset
 			&u.Balance,
 			&allowedCategories,
 			&allowedManufacturers,
-			&u.AccessLevel,
-			&u.CatalogAccessEnabled,
 			&u.CreatedAt,
 			&u.UpdatedAt,
 		); err != nil {

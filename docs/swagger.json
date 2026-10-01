@@ -156,7 +156,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Update the lifecycle status of an order (Valid: CREATED, PROCESSED, CANCELLED). Setting CANCELLED automatically refunds the customer balance and restores product stock.",
+                "description": "Update the lifecycle status of an order. Administrators can only transition PROCESSED orders to CANCELLED (which automatically refunds customer balance and restores product stock). FAILED orders cannot be altered.",
                 "consumes": [
                     "application/json"
                 ],
@@ -1607,15 +1607,6 @@
                 "username"
             ],
             "properties": {
-                "access_level": {
-                    "type": "string",
-                    "enum": [
-                        "ALL",
-                        "FILTERED",
-                        "NONE"
-                    ],
-                    "example": "FILTERED"
-                },
                 "allowed_categories": {
                     "type": "array",
                     "items": {
@@ -1639,10 +1630,6 @@
                     "format": "double",
                     "minimum": 0,
                     "example": 1000
-                },
-                "catalog_access_enabled": {
-                    "type": "boolean",
-                    "example": true
                 },
                 "password": {
                     "type": "string",
@@ -1801,9 +1788,9 @@
                 "status": {
                     "type": "string",
                     "enum": [
-                        "CREATED",
                         "PROCESSED",
-                        "CANCELLED"
+                        "CANCELLED",
+                        "FAILED"
                     ],
                     "example": "PROCESSED"
                 },
@@ -1967,15 +1954,6 @@
                 "allowed_manufacturers"
             ],
             "properties": {
-                "access_level": {
-                    "type": "string",
-                    "enum": [
-                        "ALL",
-                        "FILTERED",
-                        "NONE"
-                    ],
-                    "example": "FILTERED"
-                },
                 "allowed_categories": {
                     "type": "array",
                     "items": {
@@ -1994,10 +1972,6 @@
                         "Apple",
                         "Dell"
                     ]
-                },
-                "catalog_access_enabled": {
-                    "type": "boolean",
-                    "example": true
                 }
             }
         },
@@ -2010,8 +1984,6 @@
                 "status": {
                     "type": "string",
                     "enum": [
-                        "CREATED",
-                        "PROCESSED",
                         "CANCELLED"
                     ],
                     "example": "CANCELLED"
@@ -2035,7 +2007,6 @@
         "UserSummary": {
             "type": "object",
             "required": [
-                "access_level",
                 "allowed_categories",
                 "allowed_manufacturers",
                 "balance",
@@ -2044,15 +2015,6 @@
                 "username"
             ],
             "properties": {
-                "access_level": {
-                    "type": "string",
-                    "enum": [
-                        "ALL",
-                        "FILTERED",
-                        "NONE"
-                    ],
-                    "example": "FILTERED"
-                },
                 "allowed_categories": {
                     "type": "array",
                     "items": {
@@ -2076,10 +2038,6 @@
                     "format": "double",
                     "minimum": 0,
                     "example": 1000
-                },
-                "catalog_access_enabled": {
-                    "type": "boolean",
-                    "example": true
                 },
                 "id": {
                     "type": "string",

@@ -35,8 +35,6 @@ type User struct {
 	Balance              float64    `json:"balance" binding:"required" format:"double" minimum:"0"`
 	AllowedCategories   []string   `json:"allowed_categories"`
 	AllowedManufacturers []string   `json:"allowed_manufacturers"`
-	AccessLevel          string     `json:"access_level" binding:"required" enums:"ALL,FILTERED,NONE"`
-	CatalogAccessEnabled bool       `json:"catalog_access_enabled"`
 	CreatedAt            time.Time  `json:"created_at" binding:"required" format:"date-time"`
 	UpdatedAt            time.Time  `json:"updated_at" binding:"required" format:"date-time"`
 	DeletedAt            *time.Time `json:"deleted_at,omitempty" format:"date-time"`
@@ -61,7 +59,7 @@ type Order struct {
 	UnitPrice    float64   `json:"unit_price" binding:"required" format:"double" minimum:"0"`
 	Quantity     int       `json:"quantity" binding:"required" minimum:"1"`
 	TotalPrice   float64   `json:"total_price" binding:"required" format:"double" minimum:"0"`
-	Status       string    `json:"status" binding:"required" enums:"CREATED,PROCESSED,CANCELLED"`
+	Status       string    `json:"status" binding:"required" enums:"PROCESSED,CANCELLED,FAILED"`
 	CreatedAt    time.Time `json:"created_at" binding:"required" format:"date-time"`
 }
 
@@ -89,8 +87,6 @@ type UserSummary struct {
 	Balance              float64   `json:"balance" binding:"required" example:"1000.00" format:"double" minimum:"0"`
 	AllowedCategories   []string  `json:"allowed_categories" binding:"required" example:"laptop"`
 	AllowedManufacturers []string  `json:"allowed_manufacturers" binding:"required" example:"Dell"`
-	AccessLevel          string    `json:"access_level" binding:"required" example:"FILTERED" enums:"ALL,FILTERED,NONE"`
-	CatalogAccessEnabled bool      `json:"catalog_access_enabled" example:"true"`
 }
 
 type LoginResponse struct {
@@ -105,8 +101,6 @@ type CreateUserRequest struct {
 	Balance              float64  `json:"balance" binding:"required" example:"1000.00" format:"double" minimum:"0"`
 	AllowedCategories   []string `json:"allowed_categories" example:"laptop"`
 	AllowedManufacturers []string `json:"allowed_manufacturers" example:"Dell"`
-	AccessLevel          string   `json:"access_level,omitempty" example:"FILTERED" enums:"ALL,FILTERED,NONE"`
-	CatalogAccessEnabled *bool    `json:"catalog_access_enabled,omitempty" example:"true"`
 }
 
 type TopUpBalanceRequest struct {
@@ -114,10 +108,8 @@ type TopUpBalanceRequest struct {
 }
 
 type UpdateFiltersRequest struct {
-	AllowedCategories    []string `json:"allowed_categories" binding:"required" example:"laptop"`
-	AllowedManufacturers  []string `json:"allowed_manufacturers" binding:"required" example:"Apple,Dell"`
-	AccessLevel          string   `json:"access_level,omitempty" example:"FILTERED" enums:"ALL,FILTERED,NONE"`
-	CatalogAccessEnabled *bool    `json:"catalog_access_enabled,omitempty" example:"true"`
+	AllowedCategories   []string `json:"allowed_categories" binding:"required" example:"laptop"`
+	AllowedManufacturers []string `json:"allowed_manufacturers" binding:"required" example:"Apple,Dell"`
 }
 
 type CreateProductRequest struct {
@@ -145,13 +137,13 @@ type OrderResponse struct {
 	Quantity         int       `json:"quantity" binding:"required" example:"1" minimum:"1"`
 	UnitPrice        float64   `json:"unit_price" binding:"required" example:"2499.00" format:"double" minimum:"0"`
 	TotalPrice       float64   `json:"total_price" binding:"required" example:"4998.00" format:"double" minimum:"0"`
-	Status           string    `json:"status" binding:"required" example:"PROCESSED" enums:"CREATED,PROCESSED,CANCELLED"`
+	Status           string    `json:"status" binding:"required" example:"PROCESSED" enums:"PROCESSED,CANCELLED,FAILED"`
 	RemainingBalance float64   `json:"remaining_balance,omitempty" example:"500.00" format:"double" minimum:"0"`
 	CreatedAt        time.Time `json:"created_at" binding:"required" format:"date-time"`
 }
 
 type UpdateOrderStatusRequest struct {
-	Status string `json:"status" binding:"required" example:"CANCELLED" enums:"CREATED,PROCESSED,CANCELLED"`
+	Status string `json:"status" binding:"required" example:"CANCELLED" enums:"CANCELLED"`
 }
 
 type PaginationMetadata struct {

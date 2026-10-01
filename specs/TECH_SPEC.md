@@ -143,7 +143,7 @@ The platform adheres to strict HTTP semantic status code conventions across all 
   - `INSUFFICIENT_STOCK`: Warehouse stock is less than requested quantity.
   - `FILTER_RESTRICTION`: Product is outside user's whitelist/filter access, or user has zero-access governance.
   - `INVALID_STATUS`: Disallowed order status lifecycle transition.
-  - `INVALID_INPUT`: Domain boundary validation breach (e.g. `increment_amount < 0.01` or `new_balance < 0.00`).
+  - `INVALID_INPUT`: Domain boundary validation breach (e.g. `increment_amount < 0.01`).
 - **`500 Internal Server Error`**: Unexpected database errors, unhandled panic recovery, or persistence failures (`INTERNAL_ERROR`).
 - **`503 Service Unavailable`**: Infrastructure outages, database connectivity loss, maintenance mode, or temporary upstream dependency degradation (`SERVICE_UNAVAILABLE`).
 
@@ -159,7 +159,7 @@ To ensure client SDK predictability and prevent unhandled database violations:
 - **Numeric Boundaries**:
   - `quantity`: `minimum: 1`
   - `stock_quantity`: `minimum: 0`, `maximum: 2147483647` (enforced via `binding:"required,gte=0"`)
-  - `price`, `balance`, `new_balance`: `minimum: 0`
+  - `price`, `balance`: `minimum: 0`
   - `increment_amount`: `minimum: 0.01`
 - **String Length Constraints**:
   - `username`: `minLength: 1`
@@ -210,7 +210,7 @@ CREATE TABLE IF NOT EXISTS orders (
     unit_price NUMERIC(12, 2) NOT NULL CHECK (unit_price >= 0),
     quantity INTEGER NOT NULL CHECK (quantity > 0),
     total_price NUMERIC(12, 2) NOT NULL CHECK (total_price >= 0),
-    status VARCHAR(50) NOT NULL DEFAULT 'CREATED' CHECK (status IN ('CREATED', 'PROCESSED', 'CANCELLED')),
+    status VARCHAR(50) NOT NULL DEFAULT 'PROCESSED' CHECK (status IN ('PROCESSED', 'CANCELLED', 'FAILED')),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -220,14 +220,10 @@ CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id);
 ```
 
 ### 3.2 Domain Model Invariants
-1. **User Catalog Filters & Access Level Semantics:**
+1. **User Catalog Filters Semantics:**
    - **Case-Insensitive Normalization:** Category and manufacturer filtering operates strictly case-insensitively across ingestion (`CreateUser`, `UpdateFilters`) and query evaluation (`LOWER(TRIM(...))`), preventing silent mismatches between title-cased catalog entries and lowercase whitelist queries.
-   - **Access Level Enum & Denial Semantics:**
-     - `access_level`: Explicit enumerated values (`ALL`, `FILTERED`, `NONE`).
-     - `catalog_access_enabled`: Boolean flag indicating whether the user has catalog and order placement privileges.
-     - **`ALL`**: User has full catalog visibility across all categories and manufacturers.
-     - **`FILTERED`**: Visibility and order placement are strictly constrained to whitelisted `allowed_categories` and `allowed_manufacturers`.
-     - **`NONE`**: Explicit zero-access configuration. The user sees 0 catalog items (`[]`), and order attempts are immediately rejected with `422 Unprocessable Entity` (`FILTER_RESTRICTION`), enabling suspension or onboarding holds without deleting user accounts.
+   - **Default Open Access:** By default, all users have access to the entire catalog.
+   - **Whitelist Filtering:** If `allowed_categories` or `allowed_manufacturers` is populated with entries, visibility and order placement are strictly constrained to those whitelisted values. If both arrays are empty (`[]`), the user has unrestricted access to all product categories and manufacturers.
 2. **Product Extensibility:**
    - Category is an arbitrary, non-restricted string (e.g., `laptop`, `smartphone`, `monitor`, `tablet`, `accessory`). No hardcoded enums.
 3. **Atomic Balance & Inventory Constraints:**
@@ -239,14 +235,16 @@ CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id);
 5. **Historical Snapshot Immutability:**
    - When an order is placed, the product's current model and unit price are permanently snapshotted into `orders.product_model` and `orders.unit_price`.
    - Subsequent modifications to product prices or catalog descriptions do not alter historical orders, ensuring immutable receipts for financial audits.
-6. **Order Lifecycle & Cancellation Refund Invariants:**
-   - **Allowed Statuses:** Order status strictly accepts only three values: `CREATED`, `PROCESSED`, and `CANCELLED`.
-   - **Automatic Processing:** When a customer submits an order (`POST /api/user/orders`), the transaction creates the order with initial status `CREATED`. Once balance debit, inventory decrement, and validation succeed, the status automatically updates to `PROCESSED` as the transaction commits. The API responds with `status: "PROCESSED"`.
-   - **Admin Cancellation with Restocking & Refund:** An administrator can transition an active order to `CANCELLED` (`PATCH /api/admin/orders/{id}/status`). This operation runs in a deterministic serializable transaction that:
+6. **Order Lifecycle, Failure Recording & Cancellation Invariants:**
+   - **Allowed Statuses:** Order status strictly accepts only three values: `PROCESSED`, `CANCELLED`, and `FAILED`.
+   - **Direct Processing:** When a customer submits an order (`POST /api/user/orders`), the transaction validates catalog access, inventory availability, and customer balance. If all validations succeed, stock is decremented, balance is debited, and the order is created with status `PROCESSED`.
+   - **Automatic FAILED Status on Pre-Condition Breach:** If order pre-conditions fail at checkout (catalog filter restriction, insufficient warehouse stock, or insufficient user balance), the transaction records the attempted order in the database with status `FAILED` prior to returning HTTP `422 Unprocessable Entity`. Neither customer balance nor warehouse stock is modified.
+   - **Admin Cancellation of PROCESSED Orders:** An administrator can transition a `PROCESSED` order to `CANCELLED` via `PATCH /api/admin/orders/{id}/status`. This operation runs in a deterministic serializable transaction that:
      - Restores ordered quantities to `products.stock_quantity`.
      - Refunds the order's `total_price` back to the customer's `users.balance` in exact integer cents.
      - Sets order status to `CANCELLED`.
-     - Rejects any subsequent modification or re-cancellation of an already cancelled order with `422 Unprocessable Entity` (`INVALID_STATUS`) to protect against duplicate refunds.
+   - **Immutable FAILED and CANCELLED Statuses:** Orders in `FAILED` status cannot be modified or transitioned by an administrator (or anyone). Similarly, orders in `CANCELLED` status cannot be modified or re-cancelled. Any attempt to alter `FAILED` or `CANCELLED` orders is rejected with `422 Unprocessable Entity` (`INVALID_STATUS`).
+   - **Admin Status Transition Constraint:** `PATCH /api/admin/orders/{id}/status` strictly accepts only `{ "status": "CANCELLED" }`. Any other requested status is rejected with `422 Unprocessable Entity` (`INVALID_STATUS`).
 
 ---
 
@@ -332,9 +330,7 @@ CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id);
        "role": "user",
        "balance": 1000.00,
        "allowed_categories": ["laptop"],
-       "allowed_manufacturers": ["Dell"],
-       "access_level": "FILTERED",
-       "catalog_access_enabled": true
+       "allowed_manufacturers": ["Dell"]
      }
      ```
    - Response (201 Created): User details (excluding `password_hash`).
@@ -356,14 +352,12 @@ CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id);
    - Failure (500 Internal Server Error): Server or persistence failure.
 
 3. `PUT /api/admin/users/{id}/filters`
-   - Configures catalog visibility rules and access tier for a user.
+   - Configures catalog visibility rules for a user.
    - Body:
      ```json
      {
        "allowed_categories": ["laptop"],
-       "allowed_manufacturers": ["Apple", "Dell"],
-       "access_level": "FILTERED",
-       "catalog_access_enabled": true
+       "allowed_manufacturers": ["Apple", "Dell"]
      }
      ```
    - Response (200 OK): Updated user filter profile.
@@ -434,14 +428,15 @@ CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id);
 
 10. `PATCH /api/admin/orders/{id}/status`
     - Updates order lifecycle status.
-    - Body: `{ "status": "CANCELLED" }` (Valid: `CREATED`, `PROCESSED`, `CANCELLED`).
-    - Transitioning to `CANCELLED` atomically returns ordered units to product stock and refunds order total to user balance. Re-cancelling or modifying a cancelled order is rejected.
+    - Body: `{ "status": "CANCELLED" }` (Valid: `CANCELLED` only).
+    - Transitioning a `PROCESSED` order to `CANCELLED` atomically returns ordered units to product stock and refunds order total to user balance.
+    - Attempting to transition or cancel an order in `FAILED` or `CANCELLED` status is rejected with `422 Unprocessable Entity` (`INVALID_STATUS`).
     - Response (200 OK): Updated `OrderResponse` object.
     - Failure (400 Bad Request): Invalid order UUID (`INVALID_ID`) or malformed JSON (`INVALID_REQUEST`).
     - Failure (401 Unauthorized): Missing or invalid token.
     - Failure (403 Forbidden): Insufficient admin privileges.
     - Failure (404 Not Found): Target order not found (`NOT_FOUND`).
-    - Failure (422 Unprocessable Entity): Invalid status transition or order already cancelled (`INVALID_STATUS`).
+    - Failure (422 Unprocessable Entity): Invalid status payload or attempting to modify non-cancellable order (`INVALID_STATUS`).
     - Failure (500 Internal Server Error): Persistence failure.
 
 11. `DELETE /api/admin/users/{id}`
@@ -456,7 +451,7 @@ CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id);
 ### 5.4 User Routes (`/api/user/*`, Bearer User Token Required)
 
 1. `GET /api/user/profile`
-   - Returns authenticated user details, balance, access level, and catalog filters.
+   - Returns authenticated user details, balance, and catalog filters.
    - Response (200 OK):
      ```json
      {
@@ -467,9 +462,7 @@ CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id);
          "role": "user",
          "balance": 5000.00,
          "allowed_categories": [],
-         "allowed_manufacturers": [],
-         "access_level": "ALL",
-         "catalog_access_enabled": true
+         "allowed_manufacturers": []
        }
      }
      ```
@@ -487,14 +480,15 @@ CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id);
      - `category` (optional, string): Filter by product classification.
      - `manufacturer` (optional, string): Filter by brand / manufacturer.
    - **Catalog Filter Evaluation Rules:**
-     1. If user's `access_level` is `NONE` or `catalog_access_enabled` is `false`, return empty list `[]` (`total_count: 0`, `total_pages: 0`).
-     2. If user's `access_level` is `FILTERED` and `allowed_categories` is non-empty, query matches case-insensitively using `LOWER(TRIM(...))`.
-     3. If user's `access_level` is `FILTERED` and `allowed_manufacturers` is non-empty, query matches case-insensitively using `LOWER(TRIM(...))`.
-     4. If `category` query param is provided, filter by that category case-insensitively within permitted bounds.
-     5. If `manufacturer` query param is provided, filter by that brand case-insensitively within permitted bounds.
-     6. If user has full access (`access_level: ALL`), return all products matching optional category and manufacturer.
-     7. Results are sorted deterministically by the requested field and order (with `id ASC` as tie-breaker).
-     8. Total matching count is calculated, and results are sliced by `LIMIT page_size OFFSET (page - 1) * page_size`.
+     1. By default, all users have access to the entire catalog.
+     2. If user's `allowed_categories` is non-empty, query matches permitted categories case-insensitively using `LOWER(TRIM(...))`. If `category` query param is supplied, it must match one of the allowed categories; otherwise, an empty list `[]` is returned.
+     3. If user's `allowed_manufacturers` is non-empty, query matches permitted manufacturers case-insensitively using `LOWER(TRIM(...))`. If `manufacturer` query param is supplied, it must match one of the allowed manufacturers; otherwise, an empty list `[]` is returned.
+     4. If user's `allowed_categories` is empty, the user has unrestricted access to all categories.
+     5. If user's `allowed_manufacturers` is empty, the user has unrestricted access to all manufacturers.
+     6. If `category` query param is provided, filter by that category case-insensitively within permitted bounds.
+     7. If `manufacturer` query param is provided, filter by that brand case-insensitively within permitted bounds.
+     8. Results are sorted deterministically by the requested field and order (with `id ASC` as tie-breaker).
+     9. Total matching count is calculated, and results are sliced by `LIMIT page_size OFFSET (page - 1) * page_size`.
    - **Response (200 OK):**
      ```json
      {
@@ -554,7 +548,7 @@ CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id);
    - Failure (400 Bad Request): Malformed JSON (`INVALID_REQUEST`) or quantity <= 0 (`INVALID_INPUT`).
    - Failure (401 Unauthorized): Missing or invalid token.
    - Failure (403 Forbidden): Forbidden.
-   - Failure (404 Not Found): Product SKU or purchasing user not found (`NOT_FOUND`).
+   - Failure (404 Not Found): Product UUID or purchasing user not found (`NOT_FOUND`).
    - Failure (422 Unprocessable Entity): Domain rule violation:
      - `FILTER_RESTRICTION`: Product is outside user's whitelist/access level.
      - `INSUFFICIENT_STOCK`: Product stock is less than requested quantity.

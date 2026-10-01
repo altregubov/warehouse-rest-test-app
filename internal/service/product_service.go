@@ -35,11 +35,11 @@ func (s *productService) ListUserProducts(ctx context.Context, userID uuid.UUID,
 		return nil, 0, err
 	}
 
-	return s.prodRepo.ListPaginated(ctx, params, user.AllowedCategories, user.AllowedManufacturers, user.AccessLevel, user.CatalogAccessEnabled)
+	return s.prodRepo.ListPaginated(ctx, params, user.AllowedCategories, user.AllowedManufacturers)
 }
 
 func (s *productService) ListAllProducts(ctx context.Context) ([]domain.Product, error) {
-	return s.prodRepo.List(ctx, "", nil, nil, "ALL", true)
+	return s.prodRepo.List(ctx, "", nil, nil)
 }
 
 func (s *productService) CreateProduct(ctx context.Context, req *domain.CreateProductRequest) (*domain.Product, error) {

@@ -1239,7 +1239,6 @@ func TestCatalogFilterCaseSensitivityAndAccessDenial(t *testing.T) {
 		Balance:              5000.00,
 		AllowedCategories:   []string{"LAPTOP"},
 		AllowedManufacturers: []string{"apple"},
-		AccessLevel:          "FILTERED",
 	}
 	respCreate, bodyCreate, _ := adminClient.request(http.MethodPost, "/api/admin/users", createReq)
 	if respCreate.StatusCode != http.StatusCreated {
@@ -1298,46 +1297,43 @@ func TestCatalogFilterCaseSensitivityAndAccessDenial(t *testing.T) {
 		t.Errorf("Expected 201 for allowed product order, got %d: %s", respOrder.StatusCode, string(bodyOrder))
 	}
 
-	// 4. Configure user for ZERO catalog access (AccessLevel: NONE)
-	accessFalse := false
-	respZeroAccess, bodyZeroAccess, _ := adminClient.request(
+	// 4. Configure user with filters restricted to a different category (e.g. "smartphone")
+	respRestricted, bodyRestricted, _ := adminClient.request(
 		http.MethodPut,
 		fmt.Sprintf("/api/admin/users/%s/filters", userID),
 		domain.UpdateFiltersRequest{
-			AllowedCategories:    []string{},
-			AllowedManufacturers:  []string{},
-			AccessLevel:          "NONE",
-			CatalogAccessEnabled: &accessFalse,
+			AllowedCategories:   []string{"smartphone"},
+			AllowedManufacturers: []string{"Samsung"},
 		},
 	)
-	if respZeroAccess.StatusCode != http.StatusOK {
-		t.Fatalf("Failed to update filters to zero access: %s", string(bodyZeroAccess))
+	if respRestricted.StatusCode != http.StatusOK {
+		t.Fatalf("Failed to update filters: %s", string(bodyRestricted))
 	}
-	var zeroSummary struct {
+	var restrictedSummary struct {
 		Data domain.UserSummary `json:"data"`
 	}
-	_ = json.Unmarshal(bodyZeroAccess, &zeroSummary)
-	if zeroSummary.Data.AccessLevel != "NONE" || zeroSummary.Data.CatalogAccessEnabled != false {
-		t.Errorf("Expected access_level=NONE and catalog_access_enabled=false, got %s / %v", zeroSummary.Data.AccessLevel, zeroSummary.Data.CatalogAccessEnabled)
+	_ = json.Unmarshal(bodyRestricted, &restrictedSummary)
+	if len(restrictedSummary.Data.AllowedCategories) != 1 || restrictedSummary.Data.AllowedCategories[0] != "smartphone" {
+		t.Errorf("Expected allowed_categories=['smartphone'], got %v", restrictedSummary.Data.AllowedCategories)
 	}
 
-	// Verify catalog exploration returns 0 products
-	_, bodyEmptyList, _ := caseClient.request(http.MethodGet, "/api/user/products", nil)
-	var emptyProds struct {
+	// Verify catalog exploration for laptops returns 0 products
+	_, bodyCatQuery, _ := caseClient.request(http.MethodGet, "/api/user/products?category=laptop", nil)
+	var catProds struct {
 		Data []domain.Product `json:"data"`
 	}
-	_ = json.Unmarshal(bodyEmptyList, &emptyProds)
-	if len(emptyProds.Data) != 0 {
-		t.Errorf("Expected 0 products for zero-access user, got %d", len(emptyProds.Data))
+	_ = json.Unmarshal(bodyCatQuery, &catProds)
+	if len(catProds.Data) != 0 {
+		t.Errorf("Expected 0 products for disallowed category query, got %d", len(catProds.Data))
 	}
 
-	// Verify order attempt is rejected with 422 FILTER_RESTRICTION
+	// Verify order attempt for Apple laptop is rejected with 422 FILTER_RESTRICTION
 	respDeniedOrder, bodyDeniedOrder, _ := caseClient.request(http.MethodPost, "/api/user/orders", domain.CreateOrderRequest{
 		ProductID: appleLaptop.ID,
 		Quantity:  1,
 	})
 	if respDeniedOrder.StatusCode != 422 {
-		t.Errorf("Expected 422 FILTER_RESTRICTION for zero-access user order, got %d: %s", respDeniedOrder.StatusCode, string(bodyDeniedOrder))
+		t.Errorf("Expected 422 FILTER_RESTRICTION for disallowed product order, got %d: %s", respDeniedOrder.StatusCode, string(bodyDeniedOrder))
 	}
 	var errDenied domain.ErrorEnvelope
 	_ = json.Unmarshal(bodyDeniedOrder, &errDenied)
@@ -1345,25 +1341,34 @@ func TestCatalogFilterCaseSensitivityAndAccessDenial(t *testing.T) {
 		t.Errorf("Expected code FILTER_RESTRICTION, got %s", errDenied.Error.Code)
 	}
 
-	// 5. Restore user to ALL access
-	accessTrue := true
-	_, _, _ = adminClient.request(
+	// 5. Restore user to empty filters -> full access to all entries by default
+	respOpenFilters, bodyOpenFilters, _ := adminClient.request(
 		http.MethodPut,
 		fmt.Sprintf("/api/admin/users/%s/filters", userID),
 		domain.UpdateFiltersRequest{
-			AllowedCategories:    []string{},
-			AllowedManufacturers:  []string{},
-			AccessLevel:          "ALL",
-			CatalogAccessEnabled: &accessTrue,
+			AllowedCategories:   []string{},
+			AllowedManufacturers: []string{},
 		},
 	)
+	if respOpenFilters.StatusCode != http.StatusOK {
+		t.Fatalf("Failed to restore open filters: %s", string(bodyOpenFilters))
+	}
 	_, bodyFullList, _ := caseClient.request(http.MethodGet, "/api/user/products", nil)
 	var fullProds struct {
 		Data []domain.Product `json:"data"`
 	}
 	_ = json.Unmarshal(bodyFullList, &fullProds)
 	if len(fullProds.Data) < 3 {
-		t.Errorf("Expected full catalog for restored user, got %d products", len(fullProds.Data))
+		t.Errorf("Expected full catalog for user with empty filters, got %d products", len(fullProds.Data))
+	}
+
+	// Verify user can now order the Apple laptop without filter restriction
+	respAllowedOrder, bodyAllowedOrder, _ := caseClient.request(http.MethodPost, "/api/user/orders", domain.CreateOrderRequest{
+		ProductID: appleLaptop.ID,
+		Quantity:  1,
+	})
+	if respAllowedOrder.StatusCode != http.StatusCreated {
+		t.Errorf("Expected 201 Created for open access order, got %d: %s", respAllowedOrder.StatusCode, string(bodyAllowedOrder))
 	}
 }
 
@@ -1460,7 +1465,7 @@ func TestStatusCodesAlignment404And409(t *testing.T) {
 		t.Errorf("Expected 404 for status update on non-existent order, got %d: %s", respOrderStatus.StatusCode, string(bodyOrderStatus))
 	}
 
-	// 8. User ordering non-existent product SKU -> 404
+	// 8. User ordering non-existent product UUID -> 404
 	userToken, _ := login(t, "/api/user/login", username, "password123")
 	userClient := newClient(userToken)
 	respOrderMissing, bodyOrderMissing, _ := userClient.request(
@@ -2337,6 +2342,13 @@ func TestOrderThreeStatusesAndCancellationRefund(t *testing.T) {
 		t.Errorf("Expected 422 when updating status to obsolete 'DELIVERED', got %d", respInvalid2.StatusCode)
 	}
 
+	respInvalid3, _, _ := adminClient.request(http.MethodPatch, fmt.Sprintf("/api/admin/orders/%s/status", orderID), domain.UpdateOrderStatusRequest{
+		Status: "CREATED",
+	})
+	if respInvalid3.StatusCode != 422 {
+		t.Errorf("Expected 422 when updating status to obsolete 'CREATED', got %d", respInvalid3.StatusCode)
+	}
+
 	// 5. Admin cancels the order -> expect 200 OK, status CANCELLED
 	respCancel, bodyCancel, _ := adminClient.request(http.MethodPatch, fmt.Sprintf("/api/admin/orders/%s/status", orderID), domain.UpdateOrderStatusRequest{
 		Status: "CANCELLED",
@@ -2379,12 +2391,19 @@ func TestOrderThreeStatusesAndCancellationRefund(t *testing.T) {
 		}
 	}
 
-	// 8. Attempting to cancel an already cancelled order must fail with 422
+	// 8. Attempting to cancel or fail an already cancelled order must fail with 422
 	respReCancel, _, _ := adminClient.request(http.MethodPatch, fmt.Sprintf("/api/admin/orders/%s/status", orderID), domain.UpdateOrderStatusRequest{
 		Status: "CANCELLED",
 	})
 	if respReCancel.StatusCode != 422 {
 		t.Errorf("Expected 422 when re-cancelling already cancelled order, got %d", respReCancel.StatusCode)
+	}
+
+	respCancelToFail, _, _ := adminClient.request(http.MethodPatch, fmt.Sprintf("/api/admin/orders/%s/status", orderID), domain.UpdateOrderStatusRequest{
+		Status: "FAILED",
+	})
+	if respCancelToFail.StatusCode != 422 {
+		t.Errorf("Expected 422 when transitioning cancelled order to FAILED, got %d", respCancelToFail.StatusCode)
 	}
 
 	// Verify balance is still 1000.00 (no double refund)
@@ -2394,5 +2413,82 @@ func TestOrderThreeStatusesAndCancellationRefund(t *testing.T) {
 		if profileResult.Data.Balance != 1000.00 {
 			t.Errorf("Balance changed after rejected re-cancellation: %f", profileResult.Data.Balance)
 		}
+	}
+
+	// 9. Verify admin CANNOT set status to FAILED (Admin can only set status Cancelled)
+	respAdminFail, _, _ := adminClient.request(http.MethodPatch, fmt.Sprintf("/api/admin/orders/%s/status", orderID), domain.UpdateOrderStatusRequest{
+		Status: "FAILED",
+	})
+	if respAdminFail.StatusCode != 422 {
+		t.Errorf("Expected 422 when admin attempts to set status FAILED, got %d", respAdminFail.StatusCode)
+	}
+
+	// 10. Verify that POST /api/user/orders pre-condition failures persist a FAILED order in the database
+	// Case A: Insufficient stock failure
+	respOrderStockFail, _, _ := userClient.request(http.MethodPost, "/api/user/orders", domain.CreateOrderRequest{
+		ProductID: productID,
+		Quantity:  999999, // Exceeds available stock
+	})
+	if respOrderStockFail.StatusCode != 422 {
+		t.Errorf("Expected 422 for insufficient stock, got %d", respOrderStockFail.StatusCode)
+	}
+
+	// Case B: Insufficient balance failure
+	// Create user with $5.00 balance
+	lowBalUser := fmt.Sprintf("failed_order_usr_%d", time.Now().UnixNano())
+	_, _, _ = adminClient.request(http.MethodPost, "/api/admin/users", domain.CreateUserRequest{
+		Username: lowBalUser,
+		Password: "Password123!",
+		Role:     "user",
+		Balance:  5.00,
+	})
+	lowToken, _ := login(t, "/api/user/login", lowBalUser, "Password123!")
+	lowClient := newClient(lowToken)
+	respOrderBalFail, _, _ := lowClient.request(http.MethodPost, "/api/user/orders", domain.CreateOrderRequest{
+		ProductID: productID,
+		Quantity:  1, // price is 100.00, exceeds 5.00
+	})
+	if respOrderBalFail.StatusCode != 422 {
+		t.Errorf("Expected 422 for insufficient balance, got %d", respOrderBalFail.StatusCode)
+	}
+
+	// Verify that the failed order was persisted in the database for lowClient
+	respLowOrders, bodyLowOrders, _ := lowClient.request(http.MethodGet, "/api/user/orders", nil)
+	if respLowOrders.StatusCode != http.StatusOK {
+		t.Fatalf("Failed to fetch lowClient orders: %d", respLowOrders.StatusCode)
+	}
+	var lowOrdersResult struct {
+		Data []domain.OrderResponse `json:"data"`
+	}
+	_ = json.Unmarshal(bodyLowOrders, &lowOrdersResult)
+	if len(lowOrdersResult.Data) != 1 {
+		t.Fatalf("Expected 1 failed order recorded in DB, got %d", len(lowOrdersResult.Data))
+	}
+	failedOrder := lowOrdersResult.Data[0]
+	if failedOrder.Status != "FAILED" {
+		t.Errorf("Expected persisted order status 'FAILED', got '%s'", failedOrder.Status)
+	}
+	if failedOrder.Quantity != 1 {
+		t.Errorf("Expected failed order quantity 1, got %d", failedOrder.Quantity)
+	}
+
+	// Verify user balance was untouched ($5.00)
+	respLowProfile, bodyLowProfile, _ := lowClient.request(http.MethodGet, "/api/user/profile", nil)
+	if respLowProfile.StatusCode == http.StatusOK {
+		var lowProf struct {
+			Data domain.UserSummary `json:"data"`
+		}
+		_ = json.Unmarshal(bodyLowProfile, &lowProf)
+		if lowProf.Data.Balance != 5.00 {
+			t.Errorf("Expected balance to remain 5.00 after FAILED order, got %f", lowProf.Data.Balance)
+		}
+	}
+
+	// 11. Admin CANNOT change the status of an order that is in status FAILED
+	respAdminCancelFailed, _, _ := adminClient.request(http.MethodPatch, fmt.Sprintf("/api/admin/orders/%s/status", failedOrder.OrderID), domain.UpdateOrderStatusRequest{
+		Status: "CANCELLED",
+	})
+	if respAdminCancelFailed.StatusCode != 422 {
+		t.Errorf("Expected 422 when admin attempts to cancel a FAILED order, got %d", respAdminCancelFailed.StatusCode)
 	}
 }

@@ -60,7 +60,7 @@ Act as a Senior Go Backend Engineer. Build a clean, lightweight, and highly read
 
 #### Admin Endpoints (`/api/admin/...`, requires Admin JWT)
 - `POST /api/admin/users` — Create a user (can create both `admin` and regular `user` accounts).
-- `PATCH /api/admin/users/{id}/balance` — Top up or modify a user's balance (`{ "amount": 500.00 }`).
+- `POST /api/admin/users/{id}/balance/top-up` — Top up a user's balance (`{ "increment_amount": 500.00 }`).
 - `PUT /api/admin/users/{id}/filters` — Configure catalog access filters for a user:
   - `allowed_categories`: list of allowed category strings (`["laptop"]`, `["smartphone"]`, or `[]` for unrestricted).
   - `allowed_manufacturers`: list of allowed brands (`["Apple", "Dell"]`, or `[]` for unrestricted).

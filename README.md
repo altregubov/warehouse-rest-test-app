@@ -100,14 +100,14 @@ The database is initialized with the following test accounts:
 
 ### Admin Endpoints (Requires Admin Bearer Token)
 - `POST /api/admin/users` — Create admin or regular user accounts
-- `PATCH /api/admin/users/{id}/balance` — Adjust or top up user balance
+- `POST /api/admin/users/{id}/balance/top-up` — Top up user balance
 - `PUT /api/admin/users/{id}/filters` — Update user catalog permissions (`allowed_categories`, `allowed_manufacturers`)
 - `POST /api/admin/products` — Add a new product to inventory
 - `PATCH /api/admin/products/{id}/stock` — Update stock quantity for a product
 
 ### User Endpoints (Requires User Bearer Token)
 - `GET /api/user/profile` — View authenticated user profile, balance, and filter rules
-- `GET /api/user/products?category={category}` — Browse catalog with strict filter enforcement
+- `GET /api/user/products` — Browse catalog with filtering, sorting, and pagination
 - `POST /api/user/orders` — Atomically purchase products
 
 ---
