@@ -548,7 +548,7 @@ CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id);
    - Failure (400 Bad Request): Malformed JSON (`INVALID_REQUEST`) or quantity <= 0 (`INVALID_INPUT`).
    - Failure (401 Unauthorized): Missing or invalid token.
    - Failure (403 Forbidden): Forbidden.
-   - Failure (404 Not Found): Product SKU or purchasing user not found (`NOT_FOUND`).
+   - Failure (404 Not Found): Product UUID or purchasing user not found (`NOT_FOUND`).
    - Failure (422 Unprocessable Entity): Domain rule violation:
      - `FILTER_RESTRICTION`: Product is outside user's whitelist/access level.
      - `INSUFFICIENT_STOCK`: Product stock is less than requested quantity.

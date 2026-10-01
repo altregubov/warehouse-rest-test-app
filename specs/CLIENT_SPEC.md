@@ -105,7 +105,7 @@ erDiagram
     }
 
     PRODUCT {
-        string sku "Unique product catalog SKU"
+        uuid id "Unique product UUID identifier"
         string category "Product classification (e.g., Electronics, Hardware)"
         string manufacturer "Brand or manufacturer (e.g., Apple, Dell)"
         string model "Commercial product model name"
@@ -149,7 +149,7 @@ erDiagram
 3. **Catalog Presentation:** The system presents permitted items along with live warehouse stock availability and pagination metadata.
 
 #### Journey 3: Atomic Order Placement
-1. **Purchase Intent Submission:** The client submits a purchase request specifying target product SKU and desired quantity.
+1. **Purchase Intent Submission:** The client submits a purchase request specifying target product UUID and desired quantity.
 2. **Eligibility & Inventory Validation:** The platform verifies product existence, ensures the item is within the client's whitelist, confirms warehouse stock sufficiency, and verifies credit adequacy.
 3. **Atomic Settlement:** The service executes balance debit and inventory decrement as a single atomic operation, captures an immutable price/model snapshot, and records the confirmed order.
 4. **Outcome Delivery:** An order confirmation receipt containing the transaction reference, purchased units, and remaining balance is returned to the client.
@@ -184,7 +184,7 @@ sequenceDiagram
     Service-->>Customer: Present filtered catalog to client
 
     Note over Customer,Ledger: Phase 2: Atomic Order Placement
-    Customer->>Service: Submit order (SKU, Quantity)
+    Customer->>Service: Submit order (Product UUID, Quantity)
     
     Service->>Ledger: Lock customer balance & product stock deterministically
     Ledger-->>Service: Resources locked for atomic settlement
@@ -269,9 +269,9 @@ Integrators can design predictable recovery workflows and client user interfaces
 | :--- | :--- | :--- | :--- |
 | **Order Confirmation** | Client balance $\ge$ total cost, stock $\ge$ quantity, and product allowed by whitelist. | Balance debited, stock decremented, immutable price snapshot recorded, and confirmation issued. | Display order receipt, update account balance badge, and present confirmed order details. |
 | **Catalog Policy Restriction** | Client attempts to order an item outside contractual category/brand whitelists. | Operation declined; order recorded with status FAILED. Inventory and balance untouched. | Inform client of commercial agreement boundaries; prompt client to request whitelist updates from administrators. |
-| **Insufficient Warehouse Stock** | Requested units exceed currently available inventory for the target SKU. | Operation declined; order recorded with status FAILED. Balance remains untouched. | Inform user of available stock; offer partial quantity purchase or notify upon restock. |
+| **Insufficient Warehouse Stock** | Requested units exceed currently available inventory for the target product UUID. | Operation declined; order recorded with status FAILED. Balance remains untouched. | Inform user of available stock; offer partial quantity purchase or notify upon restock. |
 | **Insufficient Account Balance** | Total purchase amount exceeds available purchasing balance. | Operation declined; order recorded with status FAILED. Inventory remains untouched. | Prompt client to request balance top-up from administrator. |
-| **Entity Not Found** | Target SKU, order reference, or account identifier does not exist or was archived. | Request rejected without data mutation. | Refresh client catalog cache and verify entity identifiers before resubmitting. |
+| **Entity Not Found** | Target product UUID, order reference, or account identifier does not exist or was archived. | Request rejected without data mutation. | Refresh client catalog cache and verify entity identifiers before resubmitting. |
 | **Input Boundary Violation** | Submitting non-positive quantity, negative balance, or malformed identifiers. | Request rejected at input boundary before touching database or acquiring locks. | Ensure client form validation enforces non-negative inputs and valid identifier formats. |
 | **Channel Privilege Rejection** | Missing valid session credentials or attempting administrative functions with client credentials. | Request rejected at security boundary. | Direct client to commercial login portal or check organizational role privileges. |
 | **System Disruption / Maintenance** | Temporary infrastructure unavailability, maintenance window, or unhandled system fault. | Transaction safely aborted and rolled back. Ledger integrity preserved with zero side effects. | Implement exponential backoff retry policy; include request correlation reference if reporting issue. |

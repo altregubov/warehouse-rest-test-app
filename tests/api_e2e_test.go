@@ -1465,7 +1465,7 @@ func TestStatusCodesAlignment404And409(t *testing.T) {
 		t.Errorf("Expected 404 for status update on non-existent order, got %d: %s", respOrderStatus.StatusCode, string(bodyOrderStatus))
 	}
 
-	// 8. User ordering non-existent product SKU -> 404
+	// 8. User ordering non-existent product UUID -> 404
 	userToken, _ := login(t, "/api/user/login", username, "password123")
 	userClient := newClient(userToken)
 	respOrderMissing, bodyOrderMissing, _ := userClient.request(
