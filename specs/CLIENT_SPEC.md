@@ -27,14 +27,14 @@ The platform serves two primary commercial personas within an enterprise warehou
 
 | Persona | Business Role & Objectives | Key Responsibilities & Capabilities |
 | :--- | :--- | :--- |
-| **Warehouse Administrator** | Operational Overseer & System Governance | • Onboard new client accounts and govern organizational credentials.<br>• Credit customer balances via incremental top-ups upon invoice settlement.<br>• Configure category and manufacturer whitelists aligned with partner contracts.<br>• Register catalog items, manage inventory, and oversee fulfillment lifecycles. |
-| **Purchasing Client** | Commercial Partner & Authorized Buyer | • Authenticate securely through commercial role channels.<br>• Explore permitted warehouse products with real-time stock availability.<br>• Monitor active purchasing credit and available operational balances.<br>• Submit binding purchase orders with real-time settlement.<br>• Inspect transaction history and track fulfillment status through delivery. |
+| **Warehouse Administrator** | Operational Overseer & System Governance | • Onboard new client accounts and govern organizational credentials.<br>• Credit customer balances via incremental top-ups upon invoice settlement.<br>• Configure category and manufacturer whitelists aligned with partner contracts.<br>• Register catalog items, manage inventory, and oversee order lifecycles (auditing orders and processing cancellations). |
+| **Purchasing Client** | Commercial Partner & Authorized Buyer | • Authenticate securely through commercial role channels.<br>• Explore permitted warehouse products with real-time stock availability.<br>• Monitor active purchasing credit and available operational balances.<br>• Submit binding purchase orders with real-time settlement.<br>• Inspect transaction history and review order lifecycle status (`Processed`, `Cancelled`, `Failed`). |
 
 #### Core Business Use Cases
 1. **Contract-Governed Catalog Browsing:** A purchasing client explores warehouse stock. The system dynamically filters the catalog based on contractual permissions, presenting only authorized product lines and hiding restricted inventory.
 2. **Atomic Inventory Ordering:** A client places an order for multiple units of high-demand items. The platform atomically validates product permissions, confirms available warehouse stock, checks credit adequacy, reserves inventory, and settles payment in a single indivisible transaction.
 3. **Operational Credit Management:** Following receipt of a wire transfer or commercial invoice payment, an operations administrator credits the customer's balance via an incremental top-up, immediately unlocking purchasing capacity.
-4. **Fulfillment Tracking & Reconciliation:** Operations teams progress orders from warehouse packing through carrier dispatch and delivery, providing end-to-end status visibility for customer operations and financial audits.
+4. **Order Lifecycle Governance & Reconciliation:** Operations teams audit confirmed orders, review automatically recorded failed order attempts for compliance, and execute cancellations with automated inventory restocking and customer balance refunds.
 
 ---
 
@@ -154,10 +154,10 @@ erDiagram
 3. **Atomic Settlement:** The service executes balance debit and inventory decrement as a single atomic operation, captures an immutable price/model snapshot, and records the confirmed order.
 4. **Outcome Delivery:** An order confirmation receipt containing the transaction reference, purchased units, and remaining balance is returned to the client.
 
-#### Journey 4: Administrative Balance & Fulfillment Governance
+#### Journey 4: Administrative Balance & Order Governance
 1. **Balance Adjustment:** Administrators deposit funds into customer accounts via relative top-ups (e.g., following wire transfers).
 2. **Permission Maintenance:** Administrators update category and brand whitelists as partner agreements expand.
-3. **Fulfillment Progress:** Warehouse staff progress orders through operational fulfillment stages from receipt through packing, dispatch, and delivery.
+3. **Order Lifecycle Governance:** Administrators audit confirmed and failed orders, and can execute cancellations on processed orders when needed, automatically restocking warehouse inventory and refunding customer balances.
 
 ---
 
@@ -190,17 +190,18 @@ sequenceDiagram
     Ledger-->>Service: Resources locked for atomic settlement
 
     alt Policy Check: Restricted Product Line
+        Service->>Ledger: Record order attempt with status FAILED (balance & stock untouched)
         Service-->>Customer: Purchase rejected (Product restricted by commercial policy)
     else Availability Check: Insufficient Stock
-        Service->>Ledger: Release locks without modification
+        Service->>Ledger: Record order attempt with status FAILED (balance & stock untouched)
         Service-->>Customer: Purchase rejected (Requested quantity exceeds available stock)
     else Credit Check: Insufficient Balance
-        Service->>Ledger: Release locks without modification
+        Service->>Ledger: Record order attempt with status FAILED (balance & stock untouched)
         Service-->>Customer: Purchase rejected (Total order amount exceeds available balance)
     else Validation Passed: Atomic Settlement
         Service->>Ledger: Debit total cost from customer balance
         Service->>Ledger: Decrement reserved units from warehouse stock
-        Service->>Ledger: Record confirmed order with immutable price snapshot
+        Service->>Ledger: Record confirmed order with status PROCESSED and immutable price snapshot
         Ledger-->>Service: Commit transaction successfully
         Service-->>Customer: Order confirmed (Receipt, order reference & remaining balance)
     end
@@ -210,7 +211,7 @@ sequenceDiagram
 
 ### Entity Lifecycle / State Diagram
 
-Every order progresses through a deterministic lifecycle, transitioning from initial draft intent to final delivery or cancellation:
+Every order progresses through a deterministic lifecycle, transitioning from initial draft intent to processed settlement, failure recording, or administrative cancellation:
 
 ```mermaid
 stateDiagram-v2
@@ -266,7 +267,7 @@ Integrators can design predictable recovery workflows and client user interfaces
 
 | Business Condition | Trigger & Cause | System Behavior | Client Integrator Guidance |
 | :--- | :--- | :--- | :--- |
-| **Order Confirmation** | Client balance $\ge$ total cost, stock $\ge$ quantity, and product allowed by whitelist. | Balance debited, stock decremented, immutable price snapshot recorded, and confirmation issued. | Display order receipt, update account balance badge, and offer shipment tracking. |
+| **Order Confirmation** | Client balance $\ge$ total cost, stock $\ge$ quantity, and product allowed by whitelist. | Balance debited, stock decremented, immutable price snapshot recorded, and confirmation issued. | Display order receipt, update account balance badge, and present confirmed order details. |
 | **Catalog Policy Restriction** | Client attempts to order an item outside contractual category/brand whitelists. | Operation declined; order recorded with status FAILED. Inventory and balance untouched. | Inform client of commercial agreement boundaries; prompt client to request whitelist updates from administrators. |
 | **Insufficient Warehouse Stock** | Requested units exceed currently available inventory for the target SKU. | Operation declined; order recorded with status FAILED. Balance remains untouched. | Inform user of available stock; offer partial quantity purchase or notify upon restock. |
 | **Insufficient Account Balance** | Total purchase amount exceeds available purchasing balance. | Operation declined; order recorded with status FAILED. Inventory remains untouched. | Prompt client to request balance top-up from administrator. |
