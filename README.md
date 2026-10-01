@@ -130,10 +130,9 @@ All tests verify Swagger endpoints, authentication separation, RBAC guards, cate
 - **Algorithm:** Exclusively pinned to `HS256` (HMAC with SHA-256) to prevent algorithm-confusion and `alg: none` exploits.
 - **Claims:** Verifies `iss` (`warehouse-api`), `aud` (`warehouse-clients`), and expiration bounded to 24 hours.
 
-### Password Security & Complexity Policy
+### Password Security Policy
 - **Hashing:** User passwords are encrypted using **bcrypt** with a computational work factor $\ge 12$.
 - **Anti-Enumeration:** Constant-time dummy hash evaluations prevent user enumeration and timing attacks.
-- **Complexity:** All passwords require a minimum of 8 characters (`minLength: 8`) and must contain both alphabetic letters and numbers.
 
 ### Secret Key Provisioning & Zero-Downtime Rotation
 - **Provisioning:** Production deployments must generate a cryptographically strong 256-bit secret via:

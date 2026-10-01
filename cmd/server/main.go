@@ -92,8 +92,6 @@ func main() {
 		adminRouter.Delete("/api/admin/users/{id}", adminHandler.DeleteUser)
 		adminRouter.Post("/api/admin/users", adminHandler.CreateUser)
 		adminRouter.Post("/api/admin/users/{id}/balance/top-up", adminHandler.TopUpBalance)
-		adminRouter.Put("/api/admin/users/{id}/balance", adminHandler.SetBalance)
-		adminRouter.Patch("/api/admin/users/{id}/balance", adminHandler.UpdateBalance)
 		adminRouter.Put("/api/admin/users/{id}/filters", adminHandler.UpdateFilters)
 		adminRouter.Get("/api/admin/products", adminHandler.ListProducts)
 		adminRouter.Post("/api/admin/products", adminHandler.CreateProduct)

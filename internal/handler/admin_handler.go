@@ -137,124 +137,6 @@ func (h *AdminHandler) TopUpBalance(w http.ResponseWriter, r *http.Request) {
 	JSON(w, http.StatusOK, updatedUser)
 }
 
-// SetBalance godoc
-// @Summary Set absolute user balance
-// @Description Replaces the user account balance with a specified new balance (minimum 0.00)
-// @Tags Admin
-// @Accept json
-// @Produce json
-// @Security BearerAuth
-// @Param id path string true "User ID (UUID)" Format(uuid)
-// @Param request body domain.SetBalanceRequest true "Absolute balance payload"
-// @Success 200 {object} domain.SuccessEnvelope{data=domain.UserSummary} "Balance set"
-// @Failure 400 {object} domain.ErrorEnvelope "Invalid input"
-// @Failure 401 {object} domain.ErrorEnvelope "Unauthorized"
-// @Failure 403 {object} domain.ErrorEnvelope "Forbidden"
-// @Failure 404 {object} domain.ErrorEnvelope "User not found"
-// @Failure 422 {object} domain.ErrorEnvelope "Unprocessable entity / validation failure"
-// @Failure 500 {object} domain.ErrorEnvelope "Internal server error"
-// @Failure 503 {object} domain.ErrorEnvelope "Service unavailable"
-// @Router /api/admin/users/{id}/balance [put]
-// @ID setUserBalance
-func (h *AdminHandler) SetBalance(w http.ResponseWriter, r *http.Request) {
-	idStr := chi.URLParam(r, "id")
-	userID, err := uuid.Parse(idStr)
-	if err != nil {
-		Error(w, http.StatusBadRequest, "INVALID_ID", "Invalid user ID format (UUID expected)")
-		return
-	}
-
-	var req struct {
-		NewBalance *float64 `json:"new_balance"`
-		Amount     *float64 `json:"amount"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		Error(w, http.StatusBadRequest, "INVALID_REQUEST", "Failed to parse JSON body")
-		return
-	}
-
-	newBalance := 0.0
-	if req.NewBalance != nil {
-		newBalance = *req.NewBalance
-	} else if req.Amount != nil {
-		newBalance = *req.Amount
-	} else {
-		Error(w, http.StatusBadRequest, "INVALID_INPUT", "new_balance is required")
-		return
-	}
-
-	if newBalance < 0 {
-		Error(w, 422, "INVALID_INPUT", "new_balance cannot be negative")
-		return
-	}
-
-	updatedUser, err := h.userService.SetBalance(r.Context(), userID, newBalance)
-	if err != nil {
-		if errors.Is(err, domain.ErrNotFound) {
-			Error(w, http.StatusNotFound, "NOT_FOUND", "User not found")
-			return
-		}
-		if errors.Is(err, domain.ErrInvalidInput) {
-			Error(w, 422, "INVALID_INPUT", err.Error())
-			return
-		}
-		Error(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to set balance")
-		return
-	}
-
-	JSON(w, http.StatusOK, updatedUser)
-}
-
-// UpdateBalance godoc
-// @Summary Update or top up user balance (Legacy)
-// @Description Adjust user account balance by a specified amount (e.g. +500.00)
-// @Tags Admin
-// @Accept json
-// @Produce json
-// @Security BearerAuth
-// @Param id path string true "User ID (UUID)" Format(uuid)
-// @Param request body domain.UpdateBalanceRequest true "Balance adjustment payload"
-// @Success 200 {object} domain.SuccessEnvelope{data=domain.UserSummary} "Balance updated"
-// @Failure 400 {object} domain.ErrorEnvelope "Invalid input or negative balance"
-// @Failure 401 {object} domain.ErrorEnvelope "Unauthorized"
-// @Failure 403 {object} domain.ErrorEnvelope "Forbidden"
-// @Failure 404 {object} domain.ErrorEnvelope "User not found"
-// @Failure 422 {object} domain.ErrorEnvelope "Unprocessable entity / validation failure"
-// @Failure 500 {object} domain.ErrorEnvelope "Internal server error"
-// @Failure 503 {object} domain.ErrorEnvelope "Service unavailable"
-// @Router /api/admin/users/{id}/balance [patch]
-// @ID adjustUserBalance
-func (h *AdminHandler) UpdateBalance(w http.ResponseWriter, r *http.Request) {
-	idStr := chi.URLParam(r, "id")
-	userID, err := uuid.Parse(idStr)
-	if err != nil {
-		Error(w, http.StatusBadRequest, "INVALID_ID", "Invalid user ID format (UUID expected)")
-		return
-	}
-
-	var req domain.UpdateBalanceRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		Error(w, http.StatusBadRequest, "INVALID_REQUEST", "Failed to parse JSON body")
-		return
-	}
-
-	updatedUser, err := h.userService.UpdateBalance(r.Context(), userID, req.Amount)
-	if err != nil {
-		if errors.Is(err, domain.ErrNotFound) {
-			Error(w, http.StatusNotFound, "NOT_FOUND", "User not found")
-			return
-		}
-		if errors.Is(err, domain.ErrInvalidInput) {
-			Error(w, http.StatusBadRequest, "INVALID_INPUT", err.Error())
-			return
-		}
-		Error(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to update balance")
-		return
-	}
-
-	JSON(w, http.StatusOK, updatedUser)
-}
-
 // UpdateFilters godoc
 // @Summary Configure catalog access filters for a user
 // @Description Set allowed categories and manufacturers for a user. Empty array removes restrictions.
@@ -545,8 +427,8 @@ func (h *AdminHandler) ListOrders(w http.ResponseWriter, r *http.Request) {
 }
 
 // UpdateOrderStatus godoc
-// @Summary Update order fulfillment status
-// @Description Update the fulfillment status of an order (e.g. PROCESSING, SHIPPED, DELIVERED, CANCELLED)
+// @Summary Update order status
+// @Description Update the lifecycle status of an order (Valid: CREATED, PROCESSED, CANCELLED). Setting CANCELLED automatically refunds the customer balance and restores product stock.
 // @Tags Admin
 // @Accept json
 // @Produce json

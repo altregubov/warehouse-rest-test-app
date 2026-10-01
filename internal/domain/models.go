@@ -61,7 +61,7 @@ type Order struct {
 	UnitPrice    float64   `json:"unit_price" binding:"required" format:"double" minimum:"0"`
 	Quantity     int       `json:"quantity" binding:"required" minimum:"1"`
 	TotalPrice   float64   `json:"total_price" binding:"required" format:"double" minimum:"0"`
-	Status       string    `json:"status" binding:"required" enums:"CREATED,PROCESSING,SHIPPED,DELIVERED,CANCELLED"`
+	Status       string    `json:"status" binding:"required" enums:"CREATED,PROCESSED,CANCELLED"`
 	CreatedAt    time.Time `json:"created_at" binding:"required" format:"date-time"`
 }
 
@@ -69,7 +69,7 @@ type Order struct {
 
 type LoginRequest struct {
 	Username string `json:"username" binding:"required" example:"admin" minLength:"1"`
-	Password string `json:"password" binding:"required" example:"admin123" minLength:"8"`
+	Password string `json:"password" binding:"required" example:"admin123"`
 }
 
 // DollarsToCents converts dollar amount to integer cents, rounding to avoid floating-point drift
@@ -100,7 +100,7 @@ type LoginResponse struct {
 
 type CreateUserRequest struct {
 	Username             string   `json:"username" binding:"required" example:"john_doe" minLength:"1"`
-	Password             string   `json:"password" binding:"required" example:"secret123" minLength:"8"`
+	Password             string   `json:"password" binding:"required" example:"secret123"`
 	Role                 string   `json:"role" binding:"required" example:"user" enums:"admin,user"`
 	Balance              float64  `json:"balance" binding:"required" example:"1000.00" format:"double" minimum:"0"`
 	AllowedCategories   []string `json:"allowed_categories" example:"laptop"`
@@ -109,16 +109,8 @@ type CreateUserRequest struct {
 	CatalogAccessEnabled *bool    `json:"catalog_access_enabled,omitempty" example:"true"`
 }
 
-type UpdateBalanceRequest struct {
-	Amount float64 `json:"amount" binding:"required" example:"500.00" format:"double"`
-}
-
 type TopUpBalanceRequest struct {
 	IncrementAmount float64 `json:"increment_amount" binding:"required" example:"500.00" format:"double" minimum:"0.01"`
-}
-
-type SetBalanceRequest struct {
-	NewBalance float64 `json:"new_balance" binding:"required" example:"5000.00" format:"double" minimum:"0"`
 }
 
 type UpdateFiltersRequest struct {
@@ -153,13 +145,13 @@ type OrderResponse struct {
 	Quantity         int       `json:"quantity" binding:"required" example:"1" minimum:"1"`
 	UnitPrice        float64   `json:"unit_price" binding:"required" example:"2499.00" format:"double" minimum:"0"`
 	TotalPrice       float64   `json:"total_price" binding:"required" example:"4998.00" format:"double" minimum:"0"`
-	Status           string    `json:"status" binding:"required" example:"CREATED" enums:"CREATED,PROCESSING,SHIPPED,DELIVERED,CANCELLED"`
+	Status           string    `json:"status" binding:"required" example:"PROCESSED" enums:"CREATED,PROCESSED,CANCELLED"`
 	RemainingBalance float64   `json:"remaining_balance,omitempty" example:"500.00" format:"double" minimum:"0"`
 	CreatedAt        time.Time `json:"created_at" binding:"required" format:"date-time"`
 }
 
 type UpdateOrderStatusRequest struct {
-	Status string `json:"status" binding:"required" example:"SHIPPED" enums:"CREATED,PROCESSING,SHIPPED,DELIVERED,CANCELLED"`
+	Status string `json:"status" binding:"required" example:"CANCELLED" enums:"CREATED,PROCESSED,CANCELLED"`
 }
 
 type PaginationMetadata struct {

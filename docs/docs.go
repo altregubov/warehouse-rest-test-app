@@ -158,7 +158,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Update the fulfillment status of an order (e.g. PROCESSING, SHIPPED, DELIVERED, CANCELLED)",
+                "description": "Update the lifecycle status of an order (Valid: CREATED, PROCESSED, CANCELLED). Setting CANCELLED automatically refunds the customer balance and restores product stock.",
                 "consumes": [
                     "application/json"
                 ],
@@ -168,7 +168,7 @@ const docTemplate = `{
                 "tags": [
                     "Admin"
                 ],
-                "summary": "Update order fulfillment status",
+                "summary": "Update order status",
                 "operationId": "updateOrderStatus",
                 "parameters": [
                     {
@@ -818,208 +818,6 @@ const docTemplate = `{
                     },
                     "404": {
                         "description": "User not found",
-                        "schema": {
-                            "$ref": "#/definitions/ErrorEnvelope"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "schema": {
-                            "$ref": "#/definitions/ErrorEnvelope"
-                        }
-                    },
-                    "503": {
-                        "description": "Service unavailable",
-                        "schema": {
-                            "$ref": "#/definitions/ErrorEnvelope"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/admin/users/{id}/balance": {
-            "put": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Replaces the user account balance with a specified new balance (minimum 0.00)",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Admin"
-                ],
-                "summary": "Set absolute user balance",
-                "operationId": "setUserBalance",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "format": "uuid",
-                        "description": "User ID (UUID)",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "Absolute balance payload",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/SetBalanceRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Balance set",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/SuccessEnvelope"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/UserSummary"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "400": {
-                        "description": "Invalid input",
-                        "schema": {
-                            "$ref": "#/definitions/ErrorEnvelope"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/ErrorEnvelope"
-                        }
-                    },
-                    "403": {
-                        "description": "Forbidden",
-                        "schema": {
-                            "$ref": "#/definitions/ErrorEnvelope"
-                        }
-                    },
-                    "404": {
-                        "description": "User not found",
-                        "schema": {
-                            "$ref": "#/definitions/ErrorEnvelope"
-                        }
-                    },
-                    "422": {
-                        "description": "Unprocessable entity / validation failure",
-                        "schema": {
-                            "$ref": "#/definitions/ErrorEnvelope"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "schema": {
-                            "$ref": "#/definitions/ErrorEnvelope"
-                        }
-                    },
-                    "503": {
-                        "description": "Service unavailable",
-                        "schema": {
-                            "$ref": "#/definitions/ErrorEnvelope"
-                        }
-                    }
-                }
-            },
-            "patch": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Adjust user account balance by a specified amount (e.g. +500.00)",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Admin"
-                ],
-                "summary": "Update or top up user balance (Legacy)",
-                "operationId": "adjustUserBalance",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "format": "uuid",
-                        "description": "User ID (UUID)",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "Balance adjustment payload",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/UpdateBalanceRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Balance updated",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/SuccessEnvelope"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/UserSummary"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "400": {
-                        "description": "Invalid input or negative balance",
-                        "schema": {
-                            "$ref": "#/definitions/ErrorEnvelope"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/ErrorEnvelope"
-                        }
-                    },
-                    "403": {
-                        "description": "Forbidden",
-                        "schema": {
-                            "$ref": "#/definitions/ErrorEnvelope"
-                        }
-                    },
-                    "404": {
-                        "description": "User not found",
-                        "schema": {
-                            "$ref": "#/definitions/ErrorEnvelope"
-                        }
-                    },
-                    "422": {
-                        "description": "Unprocessable entity / validation failure",
                         "schema": {
                             "$ref": "#/definitions/ErrorEnvelope"
                         }
@@ -1850,7 +1648,6 @@ const docTemplate = `{
                 },
                 "password": {
                     "type": "string",
-                    "minLength": 8,
                     "example": "secret123"
                 },
                 "role": {
@@ -1937,7 +1734,6 @@ const docTemplate = `{
             "properties": {
                 "password": {
                     "type": "string",
-                    "minLength": 8,
                     "example": "admin123"
                 },
                 "username": {
@@ -2008,12 +1804,10 @@ const docTemplate = `{
                     "type": "string",
                     "enum": [
                         "CREATED",
-                        "PROCESSING",
-                        "SHIPPED",
-                        "DELIVERED",
+                        "PROCESSED",
                         "CANCELLED"
                     ],
-                    "example": "CREATED"
+                    "example": "PROCESSED"
                 },
                 "total_price": {
                     "type": "number",
@@ -2117,20 +1911,6 @@ const docTemplate = `{
                 }
             }
         },
-        "SetBalanceRequest": {
-            "type": "object",
-            "required": [
-                "new_balance"
-            ],
-            "properties": {
-                "new_balance": {
-                    "type": "number",
-                    "format": "double",
-                    "minimum": 0,
-                    "example": 5000
-                }
-            }
-        },
         "SuccessEnvelope": {
             "type": "object",
             "required": [
@@ -2178,19 +1958,6 @@ const docTemplate = `{
                     "type": "number",
                     "format": "double",
                     "minimum": 0.01,
-                    "example": 500
-                }
-            }
-        },
-        "UpdateBalanceRequest": {
-            "type": "object",
-            "required": [
-                "amount"
-            ],
-            "properties": {
-                "amount": {
-                    "type": "number",
-                    "format": "double",
                     "example": 500
                 }
             }
@@ -2246,12 +2013,10 @@ const docTemplate = `{
                     "type": "string",
                     "enum": [
                         "CREATED",
-                        "PROCESSING",
-                        "SHIPPED",
-                        "DELIVERED",
+                        "PROCESSED",
                         "CANCELLED"
                     ],
-                    "example": "SHIPPED"
+                    "example": "CANCELLED"
                 }
             }
         },

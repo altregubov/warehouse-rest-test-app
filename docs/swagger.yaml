@@ -72,7 +72,6 @@ definitions:
         type: boolean
       password:
         example: secret123
-        minLength: 8
         type: string
       role:
         enum:
@@ -136,7 +135,6 @@ definitions:
     properties:
       password:
         example: admin123
-        minLength: 8
         type: string
       username:
         example: admin
@@ -184,11 +182,9 @@ definitions:
       status:
         enum:
         - CREATED
-        - PROCESSING
-        - SHIPPED
-        - DELIVERED
+        - PROCESSED
         - CANCELLED
-        example: CREATED
+        example: PROCESSED
         type: string
       total_price:
         example: 4998
@@ -279,16 +275,6 @@ definitions:
     - stock_quantity
     - updated_at
     type: object
-  SetBalanceRequest:
-    properties:
-      new_balance:
-        example: 5000
-        format: double
-        minimum: 0
-        type: number
-    required:
-    - new_balance
-    type: object
   SuccessEnvelope:
     properties:
       data: {}
@@ -326,15 +312,6 @@ definitions:
     required:
     - increment_amount
     type: object
-  UpdateBalanceRequest:
-    properties:
-      amount:
-        example: 500
-        format: double
-        type: number
-    required:
-    - amount
-    type: object
   UpdateFiltersRequest:
     properties:
       access_level:
@@ -369,11 +346,9 @@ definitions:
       status:
         enum:
         - CREATED
-        - PROCESSING
-        - SHIPPED
-        - DELIVERED
+        - PROCESSED
         - CANCELLED
-        example: SHIPPED
+        example: CANCELLED
         type: string
     required:
     - status
@@ -536,8 +511,9 @@ paths:
     patch:
       consumes:
       - application/json
-      description: Update the fulfillment status of an order (e.g. PROCESSING, SHIPPED,
-        DELIVERED, CANCELLED)
+      description: 'Update the lifecycle status of an order (Valid: CREATED, PROCESSED,
+        CANCELLED). Setting CANCELLED automatically refunds the customer balance and
+        restores product stock.'
       operationId: updateOrderStatus
       parameters:
       - description: Order ID (UUID)
@@ -594,7 +570,7 @@ paths:
             $ref: '#/definitions/ErrorEnvelope'
       security:
       - BearerAuth: []
-      summary: Update order fulfillment status
+      summary: Update order status
       tags:
       - Admin
   /api/admin/products:
@@ -957,134 +933,6 @@ paths:
       security:
       - BearerAuth: []
       summary: Get user by ID
-      tags:
-      - Admin
-  /api/admin/users/{id}/balance:
-    patch:
-      consumes:
-      - application/json
-      description: Adjust user account balance by a specified amount (e.g. +500.00)
-      operationId: adjustUserBalance
-      parameters:
-      - description: User ID (UUID)
-        format: uuid
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Balance adjustment payload
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/UpdateBalanceRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: Balance updated
-          schema:
-            allOf:
-            - $ref: '#/definitions/SuccessEnvelope'
-            - properties:
-                data:
-                  $ref: '#/definitions/UserSummary'
-              type: object
-        "400":
-          description: Invalid input or negative balance
-          schema:
-            $ref: '#/definitions/ErrorEnvelope'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/ErrorEnvelope'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/ErrorEnvelope'
-        "404":
-          description: User not found
-          schema:
-            $ref: '#/definitions/ErrorEnvelope'
-        "422":
-          description: Unprocessable entity / validation failure
-          schema:
-            $ref: '#/definitions/ErrorEnvelope'
-        "500":
-          description: Internal server error
-          schema:
-            $ref: '#/definitions/ErrorEnvelope'
-        "503":
-          description: Service unavailable
-          schema:
-            $ref: '#/definitions/ErrorEnvelope'
-      security:
-      - BearerAuth: []
-      summary: Update or top up user balance (Legacy)
-      tags:
-      - Admin
-    put:
-      consumes:
-      - application/json
-      description: Replaces the user account balance with a specified new balance
-        (minimum 0.00)
-      operationId: setUserBalance
-      parameters:
-      - description: User ID (UUID)
-        format: uuid
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Absolute balance payload
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/SetBalanceRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: Balance set
-          schema:
-            allOf:
-            - $ref: '#/definitions/SuccessEnvelope'
-            - properties:
-                data:
-                  $ref: '#/definitions/UserSummary'
-              type: object
-        "400":
-          description: Invalid input
-          schema:
-            $ref: '#/definitions/ErrorEnvelope'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/ErrorEnvelope'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/ErrorEnvelope'
-        "404":
-          description: User not found
-          schema:
-            $ref: '#/definitions/ErrorEnvelope'
-        "422":
-          description: Unprocessable entity / validation failure
-          schema:
-            $ref: '#/definitions/ErrorEnvelope'
-        "500":
-          description: Internal server error
-          schema:
-            $ref: '#/definitions/ErrorEnvelope'
-        "503":
-          description: Service unavailable
-          schema:
-            $ref: '#/definitions/ErrorEnvelope'
-      security:
-      - BearerAuth: []
-      summary: Set absolute user balance
       tags:
       - Admin
   /api/admin/users/{id}/balance/top-up:

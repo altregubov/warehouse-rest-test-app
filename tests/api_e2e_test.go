@@ -293,10 +293,7 @@ func TestAtomicOrderPlacement(t *testing.T) {
 	}
 	_ = json.Unmarshal(bodyProf, &profA)
 
-	_, _, _ = adminClient.request(http.MethodPut, fmt.Sprintf("/api/admin/users/%s/balance", profA.Data.ID), domain.SetBalanceRequest{
-		NewBalance: 5000.00,
-	})
-	initialBalance := 5000.00
+	initialBalance := profA.Data.Balance
 
 	// Fetch available products
 	_, bodyProds, _ := clientA.request(http.MethodGet, "/api/user/products?category=laptop", nil)
@@ -367,14 +364,20 @@ func TestAtomicOrderPlacement(t *testing.T) {
 		}
 	}
 
-	// 3. Insufficient balance: set low balance with valid in-stock quantity -> 422 INSUFFICIENT_FUNDS
+	// 3. Insufficient balance: user with balance lower than product price -> 422 INSUFFICIENT_FUNDS
 	_, _, _ = adminClient.request(http.MethodPatch, fmt.Sprintf("/api/admin/products/%s/stock", testProduct.ID), domain.UpdateStockRequest{
 		StockQuantity: 10,
 	})
-	_, _, _ = adminClient.request(http.MethodPut, fmt.Sprintf("/api/admin/users/%s/balance", profA.Data.ID), domain.SetBalanceRequest{
-		NewBalance: 10.00,
+	lowBalUsername := fmt.Sprintf("lowbal_%d", time.Now().UnixNano())
+	_, _, _ = adminClient.request(http.MethodPost, "/api/admin/users", domain.CreateUserRequest{
+		Username: lowBalUsername,
+		Password: "Password123!",
+		Role:     "user",
+		Balance:  10.00,
 	})
-	respInsufficientFunds, bodyFunds, _ := clientA.request(http.MethodPost, "/api/user/orders", domain.CreateOrderRequest{
+	lowToken, _ := login(t, "/api/user/login", lowBalUsername, "Password123!")
+	clientLow := newClient(lowToken)
+	respInsufficientFunds, bodyFunds, _ := clientLow.request(http.MethodPost, "/api/user/orders", domain.CreateOrderRequest{
 		ProductID: testProduct.ID,
 		Quantity:  1, // price is > 10.00, stock is available
 	})
@@ -388,10 +391,6 @@ func TestAtomicOrderPlacement(t *testing.T) {
 	}
 
 	// 4. Insufficient stock: attempt to purchase quantity exceeding warehouse stock -> 422 INSUFFICIENT_STOCK
-	// Top up balance first so balance check passes
-	_, _, _ = adminClient.request(http.MethodPut, fmt.Sprintf("/api/admin/users/%s/balance", profA.Data.ID), domain.SetBalanceRequest{
-		NewBalance: 5000000.00,
-	})
 	respInsufficientStock, bodyStock, _ := clientA.request(http.MethodPost, "/api/user/orders", domain.CreateOrderRequest{
 		ProductID: testProduct.ID,
 		Quantity:  999999, // exceeds stock
@@ -473,21 +472,14 @@ func TestAdminManagementEndpoints(t *testing.T) {
 	}
 	_ = json.Unmarshal(bodyCreateUser, &newUser)
 
-	// 4. Update user balance (+500 via legacy PATCH)
-	respBalance, bodyBalance, _ := adminClient.request(
+	// 4. Verify legacy PATCH /api/admin/users/{id}/balance is rejected (404/405)
+	respBalance, _, _ := adminClient.request(
 		http.MethodPatch,
 		fmt.Sprintf("/api/admin/users/%s/balance", newUser.Data.ID),
-		domain.UpdateBalanceRequest{Amount: 500.00},
+		map[string]float64{"amount": 500.00},
 	)
-	if respBalance.StatusCode != http.StatusOK {
-		t.Fatalf("Expected 200 for balance topup, got %d: %s", respBalance.StatusCode, string(bodyBalance))
-	}
-	var updatedUserBalance struct {
-		Data domain.UserSummary `json:"data"`
-	}
-	_ = json.Unmarshal(bodyBalance, &updatedUserBalance)
-	if updatedUserBalance.Data.Balance != 600.00 {
-		t.Errorf("Expected balance 600.00, got %f", updatedUserBalance.Data.Balance)
+	if respBalance.StatusCode != http.StatusNotFound && respBalance.StatusCode != http.StatusMethodNotAllowed {
+		t.Fatalf("Expected 404 or 405 for removed PATCH balance endpoint, got %d", respBalance.StatusCode)
 	}
 
 	// 4a. Dedicated TopUpBalance POST /api/admin/users/{id}/balance/top-up (+250)
@@ -503,8 +495,8 @@ func TestAdminManagementEndpoints(t *testing.T) {
 		Data domain.UserSummary `json:"data"`
 	}
 	_ = json.Unmarshal(bodyTopUp, &topUpResult)
-	if topUpResult.Data.Balance != 850.00 {
-		t.Errorf("Expected balance 850.00, got %f", topUpResult.Data.Balance)
+	if topUpResult.Data.Balance != 350.00 {
+		t.Errorf("Expected balance 350.00, got %f", topUpResult.Data.Balance)
 	}
 
 	// 4b. Invalid TopUpBalance (< 0.01) -> 422
@@ -517,31 +509,14 @@ func TestAdminManagementEndpoints(t *testing.T) {
 		t.Errorf("Expected 422 for invalid top-up amount, got %d", respInvalidTopUp.StatusCode)
 	}
 
-	// 4c. Dedicated SetBalance PUT /api/admin/users/{id}/balance (new_balance = 1500)
-	respSetBalance, bodySetBalance, _ := adminClient.request(
+	// 4c. Verify removed PUT /api/admin/users/{id}/balance is rejected (404/405)
+	respSetBalance, _, _ := adminClient.request(
 		http.MethodPut,
 		fmt.Sprintf("/api/admin/users/%s/balance", newUser.Data.ID),
-		domain.SetBalanceRequest{NewBalance: 1500.00},
+		map[string]float64{"new_balance": 1500.00},
 	)
-	if respSetBalance.StatusCode != http.StatusOK {
-		t.Fatalf("Expected 200 for dedicated set balance, got %d: %s", respSetBalance.StatusCode, string(bodySetBalance))
-	}
-	var setResult struct {
-		Data domain.UserSummary `json:"data"`
-	}
-	_ = json.Unmarshal(bodySetBalance, &setResult)
-	if setResult.Data.Balance != 1500.00 {
-		t.Errorf("Expected balance 1500.00, got %f", setResult.Data.Balance)
-	}
-
-	// 4d. Invalid SetBalance (< 0) -> 422
-	respInvalidSet, _, _ := adminClient.request(
-		http.MethodPut,
-		fmt.Sprintf("/api/admin/users/%s/balance", newUser.Data.ID),
-		domain.SetBalanceRequest{NewBalance: -50.00},
-	)
-	if respInvalidSet.StatusCode != 422 {
-		t.Errorf("Expected 422 for negative balance set, got %d", respInvalidSet.StatusCode)
+	if respSetBalance.StatusCode != http.StatusNotFound && respSetBalance.StatusCode != http.StatusMethodNotAllowed {
+		t.Fatalf("Expected 404 or 405 for removed PUT balance endpoint, got %d", respSetBalance.StatusCode)
 	}
 
 	// 5. Update user filters
@@ -642,8 +617,8 @@ func TestResourceDiscoveryAndOrderLifecycle(t *testing.T) {
 		Data domain.OrderResponse `json:"data"`
 	}
 	_ = json.Unmarshal(bodyOrder, &orderResult)
-	if orderResult.Data.Status != "CREATED" {
-		t.Errorf("Expected order status 'CREATED', got %s", orderResult.Data.Status)
+	if orderResult.Data.Status != "PROCESSED" {
+		t.Errorf("Expected order status 'PROCESSED', got %s", orderResult.Data.Status)
 	}
 	orderID := orderResult.Data.OrderID
 
@@ -679,11 +654,11 @@ func TestResourceDiscoveryAndOrderLifecycle(t *testing.T) {
 		t.Fatalf("Expected 200 for admin orders list, got %d: %s", respAdminOrders.StatusCode, string(bodyAdminOrders))
 	}
 
-	// 8. Admin updates order status to SHIPPED
+	// 8. Admin updates order status to CANCELLED
 	respStatus, bodyStatus, _ := adminClient.request(
 		http.MethodPatch,
 		fmt.Sprintf("/api/admin/orders/%s/status", orderID),
-		domain.UpdateOrderStatusRequest{Status: "SHIPPED"},
+		domain.UpdateOrderStatusRequest{Status: "CANCELLED"},
 	)
 	if respStatus.StatusCode != http.StatusOK {
 		t.Fatalf("Expected 200 for status update, got %d: %s", respStatus.StatusCode, string(bodyStatus))
@@ -692,8 +667,8 @@ func TestResourceDiscoveryAndOrderLifecycle(t *testing.T) {
 		Data domain.OrderResponse `json:"data"`
 	}
 	_ = json.Unmarshal(bodyStatus, &updatedStatusResult)
-	if updatedStatusResult.Data.Status != "SHIPPED" {
-		t.Errorf("Expected status 'SHIPPED', got %s", updatedStatusResult.Data.Status)
+	if updatedStatusResult.Data.Status != "CANCELLED" {
+		t.Errorf("Expected status 'CANCELLED', got %s", updatedStatusResult.Data.Status)
 	}
 
 	// 9. Admin invalid status update -> 422
@@ -1030,15 +1005,15 @@ func TestSchemaValidationAndOpenAPIContracts(t *testing.T) {
 		t.Errorf("Expected 400 for invalid role enum, got %d", respInvalidRole.StatusCode)
 	}
 
-	// 3. String length constraints: empty username or short password rejected as 400
-	respShortPass, _, _ := adminClient.request(http.MethodPost, "/api/admin/users", map[string]any{
-		"username": "valid_user_short_pass",
-		"password": "12",
+	// 3. String length constraints: empty password rejected as 400
+	respEmptyPass, _, _ := adminClient.request(http.MethodPost, "/api/admin/users", map[string]any{
+		"username": "valid_user_empty_pass",
+		"password": "",
 		"role":     "user",
 		"balance":  100.0,
 	})
-	if respShortPass.StatusCode != http.StatusBadRequest {
-		t.Errorf("Expected 400 for password length < 4, got %d", respShortPass.StatusCode)
+	if respEmptyPass.StatusCode != http.StatusBadRequest {
+		t.Errorf("Expected 400 for empty password, got %d", respEmptyPass.StatusCode)
 	}
 
 	// 4. Numeric boundary violations: negative balance rejected as 400
@@ -1146,8 +1121,8 @@ func TestHistoricalOrderSnapshotImmutability(t *testing.T) {
 		Data domain.UserSummary `json:"data"`
 	}
 	_ = json.Unmarshal(bodyProf, &profA)
-	_, _, _ = adminClient.request(http.MethodPut, fmt.Sprintf("/api/admin/users/%s/balance", profA.Data.ID), domain.SetBalanceRequest{
-		NewBalance: 10000.00,
+	_, _, _ = adminClient.request(http.MethodPost, fmt.Sprintf("/api/admin/users/%s/balance/top-up", profA.Data.ID), domain.TopUpBalanceRequest{
+		IncrementAmount: 10000.00,
 	})
 
 	// Place order for 2 units
@@ -1235,7 +1210,7 @@ func TestHistoricalOrderSnapshotImmutability(t *testing.T) {
 
 	// 4. Verify PATCH /api/admin/orders/{id}/status preserves historical snapshots
 	respStatus, bodyStatus, _ := adminClient.request(http.MethodPatch, fmt.Sprintf("/api/admin/orders/%s/status", orderID), domain.UpdateOrderStatusRequest{
-		Status: "SHIPPED",
+		Status: "CANCELLED",
 	})
 	if respStatus.StatusCode != http.StatusOK {
 		t.Fatalf("Failed to update order status: %s", string(bodyStatus))
@@ -1435,15 +1410,6 @@ func TestStatusCodesAlignment404And409(t *testing.T) {
 		t.Errorf("Expected 404 for top-up of non-existent user, got %d: %s", respTopUp.StatusCode, string(bodyTopUp))
 	}
 
-	respSetBal, bodySetBal, _ := adminClient.request(
-		http.MethodPut,
-		fmt.Sprintf("/api/admin/users/%s/balance", randomUUID),
-		domain.SetBalanceRequest{NewBalance: 100.0},
-	)
-	if respSetBal.StatusCode != http.StatusNotFound {
-		t.Errorf("Expected 404 for set balance of non-existent user, got %d: %s", respSetBal.StatusCode, string(bodySetBal))
-	}
-
 	// 3. 404 on filters endpoint for non-existent user
 	respFilters, bodyFilters, _ := adminClient.request(
 		http.MethodPut,
@@ -1488,7 +1454,7 @@ func TestStatusCodesAlignment404And409(t *testing.T) {
 	respOrderStatus, bodyOrderStatus, _ := adminClient.request(
 		http.MethodPatch,
 		fmt.Sprintf("/api/admin/orders/%s/status", randomUUID),
-		domain.UpdateOrderStatusRequest{Status: "SHIPPED"},
+		domain.UpdateOrderStatusRequest{Status: "CANCELLED"},
 	)
 	if respOrderStatus.StatusCode != http.StatusNotFound {
 		t.Errorf("Expected 404 for status update on non-existent order, got %d: %s", respOrderStatus.StatusCode, string(bodyOrderStatus))
@@ -1875,7 +1841,7 @@ func TestCleanOpenAPIArrayExamples(t *testing.T) {
 // TestJWTSecurityAndComplexityPolicy tests Issue #19:
 // 1. JWT verification explicitly validates algorithm (HS256 pinned), issuer, and audience
 // 2. Rejecting tokens signed with alg:none, wrong issuer, or wrong audience
-// 3. User creation enforces password minLength: 8 and complexity (letters and digits)
+// 3. User creation accepts passwords without minLength 8 or complexity constraints
 func TestJWTSecurityAndComplexityPolicy(t *testing.T) {
 	jwtSecret := []byte("warehouse-secret-key-change-in-production")
 	validUserID := "b0000000-0000-0000-0000-000000000002"
@@ -1943,56 +1909,55 @@ func TestJWTSecurityAndComplexityPolicy(t *testing.T) {
 		t.Errorf("Expected 401 Unauthorized for bad audience, got %d", respBadAud.StatusCode)
 	}
 
-	// 4. Test password length & complexity during user creation
+	// 4. Test that passwords without minLength: 8 or complexity constraints are accepted
 	adminToken, code := login(t, "/api/admin/login", "admin", "admin123")
 	if code != http.StatusOK {
 		t.Fatalf("Admin login failed: %d", code)
 	}
 	adminClient := newClient(adminToken)
 
-	// 4a. Short password (< 8 chars)
+	// 4a. Short password (< 8 chars) accepted
 	respShort, _, _ := adminClient.request(http.MethodPost, "/api/admin/users", domain.CreateUserRequest{
 		Username: fmt.Sprintf("short_%d", time.Now().UnixNano()),
 		Password: "pass12", // 6 chars
 		Role:     "user",
 		Balance:  100.0,
 	})
-	if respShort.StatusCode != http.StatusBadRequest {
-		t.Errorf("Expected 400 for password < 8 chars, got %d", respShort.StatusCode)
+	if respShort.StatusCode != http.StatusCreated {
+		t.Errorf("Expected 201 for password < 8 chars, got %d", respShort.StatusCode)
 	}
 
-	// 4b. Letters only (no digits)
+	// 4b. Letters only (no digits) accepted
 	respNoDigits, _, _ := adminClient.request(http.MethodPost, "/api/admin/users", domain.CreateUserRequest{
 		Username: fmt.Sprintf("nodigits_%d", time.Now().UnixNano()),
-		Password: "passwordonly", // >= 8 chars, but no digits
+		Password: "passwordonly", // no digits
 		Role:     "user",
 		Balance:  100.0,
 	})
-	if respNoDigits.StatusCode != http.StatusBadRequest {
-		t.Errorf("Expected 400 for password without digits, got %d", respNoDigits.StatusCode)
+	if respNoDigits.StatusCode != http.StatusCreated {
+		t.Errorf("Expected 201 for password without digits, got %d", respNoDigits.StatusCode)
 	}
 
-	// 4c. Digits only (no letters)
+	// 4c. Digits only (no letters) accepted
 	respNoLetters, _, _ := adminClient.request(http.MethodPost, "/api/admin/users", domain.CreateUserRequest{
 		Username: fmt.Sprintf("noletters_%d", time.Now().UnixNano()),
-		Password: "1234567890", // >= 8 chars, but no letters
+		Password: "12345678", // no letters
 		Role:     "user",
 		Balance:  100.0,
 	})
-	if respNoLetters.StatusCode != http.StatusBadRequest {
-		t.Errorf("Expected 400 for password without letters, got %d", respNoLetters.StatusCode)
+	if respNoLetters.StatusCode != http.StatusCreated {
+		t.Errorf("Expected 201 for password without letters, got %d", respNoLetters.StatusCode)
 	}
 
-	// 4d. Valid password meeting length and complexity
-	validUsername := fmt.Sprintf("validuser_%d", time.Now().UnixNano())
-	respValid, _, _ := adminClient.request(http.MethodPost, "/api/admin/users", domain.CreateUserRequest{
-		Username: validUsername,
-		Password: "ValidPass123", // letters + digits, length >= 8
-		Role:     "user",
-		Balance:  500.0,
+	// 4d. Empty password rejected as 400
+	respEmpty, _, _ := adminClient.request(http.MethodPost, "/api/admin/users", map[string]any{
+		"username": fmt.Sprintf("empty_%d", time.Now().UnixNano()),
+		"password": "",
+		"role":     "user",
+		"balance":  100.0,
 	})
-	if respValid.StatusCode != http.StatusCreated {
-		t.Errorf("Expected 201 Created for valid password, got %d", respValid.StatusCode)
+	if respEmpty.StatusCode != http.StatusBadRequest {
+		t.Errorf("Expected 400 for empty password, got %d", respEmpty.StatusCode)
 	}
 }
 
@@ -2202,7 +2167,6 @@ func TestCleanSwaggerSchemaDefinitionNames(t *testing.T) {
 		"LoginResponse",
 		"OrderResponse",
 		"Product",
-		"SetBalanceRequest",
 		"TopUpBalanceRequest",
 		"UpdateStockRequest",
 		"UserSummary",
@@ -2274,5 +2238,161 @@ func TestOpenAPIStructuralHygiene(t *testing.T) {
 
 	if totalOperations < 15 {
 		t.Errorf("Expected at least 15 operations, found %d", totalOperations)
+	}
+}
+
+func TestOrderThreeStatusesAndCancellationRefund(t *testing.T) {
+	adminToken, status := login(t, "/api/admin/login", "admin", "admin123")
+	if status != http.StatusOK || adminToken == "" {
+		t.Fatalf("Admin login failed: %d", status)
+	}
+	adminClient := newClient(adminToken)
+
+	// 1. Create a dedicated test user with 1000.00 balance
+	username := fmt.Sprintf("refunduser_%d", time.Now().UnixNano())
+	respCreateUser, bodyCreateUser, _ := adminClient.request(http.MethodPost, "/api/admin/users", domain.CreateUserRequest{
+		Username: username,
+		Password: "Password123!",
+		Role:     "user",
+		Balance:  1000.00,
+	})
+	if respCreateUser.StatusCode != http.StatusCreated {
+		t.Fatalf("Failed to create user: %d: %s", respCreateUser.StatusCode, string(bodyCreateUser))
+	}
+
+	// 2. Create a dedicated product with 10 stock and 150.00 price
+	respCreateProd, bodyCreateProd, _ := adminClient.request(http.MethodPost, "/api/admin/products", domain.CreateProductRequest{
+		Category:      "hardware",
+		Manufacturer:  "RefundCo",
+		Model:         fmt.Sprintf("RefundModel_%d", time.Now().UnixNano()),
+		Price:         150.00,
+		StockQuantity: 10,
+	})
+	if respCreateProd.StatusCode != http.StatusCreated {
+		t.Fatalf("Failed to create product: %d: %s", respCreateProd.StatusCode, string(bodyCreateProd))
+	}
+	var createdProd struct {
+		Data domain.Product `json:"data"`
+	}
+	_ = json.Unmarshal(bodyCreateProd, &createdProd)
+	productID := createdProd.Data.ID
+
+	// 3. User logs in and places order for 2 units (total = 300.00)
+	userToken, status := login(t, "/api/user/login", username, "Password123!")
+	if status != http.StatusOK || userToken == "" {
+		t.Fatalf("User login failed: %d", status)
+	}
+	userClient := newClient(userToken)
+
+	respOrder, bodyOrder, _ := userClient.request(http.MethodPost, "/api/user/orders", domain.CreateOrderRequest{
+		ProductID: productID,
+		Quantity:  2,
+	})
+	if respOrder.StatusCode != http.StatusCreated {
+		t.Fatalf("Expected 201 for order creation, got %d: %s", respOrder.StatusCode, string(bodyOrder))
+	}
+	var orderResult struct {
+		Data domain.OrderResponse `json:"data"`
+	}
+	_ = json.Unmarshal(bodyOrder, &orderResult)
+
+	// Verify order status is PROCESSED upon completion
+	if orderResult.Data.Status != "PROCESSED" {
+		t.Errorf("Expected completed order status 'PROCESSED', got '%s'", orderResult.Data.Status)
+	}
+	if orderResult.Data.TotalPrice != 300.00 {
+		t.Errorf("Expected total price 300.00, got %f", orderResult.Data.TotalPrice)
+	}
+	if orderResult.Data.RemainingBalance != 700.00 {
+		t.Errorf("Expected remaining balance 700.00, got %f", orderResult.Data.RemainingBalance)
+	}
+	orderID := orderResult.Data.OrderID
+
+	// Verify product stock is decremented to 8
+	respProdAfter, bodyProdAfter, _ := adminClient.request(http.MethodGet, "/api/admin/products", nil)
+	if respProdAfter.StatusCode == http.StatusOK {
+		var prods struct {
+			Data []domain.Product `json:"data"`
+		}
+		_ = json.Unmarshal(bodyProdAfter, &prods)
+		for _, p := range prods.Data {
+			if p.ID == productID && p.StockQuantity != 8 {
+				t.Errorf("Expected stock quantity 8 after order, got %d", p.StockQuantity)
+			}
+		}
+	}
+
+	// 4. Verify invalid status transitions (e.g. SHIPPED, DELIVERED) return 422
+	respInvalid1, _, _ := adminClient.request(http.MethodPatch, fmt.Sprintf("/api/admin/orders/%s/status", orderID), domain.UpdateOrderStatusRequest{
+		Status: "SHIPPED",
+	})
+	if respInvalid1.StatusCode != 422 {
+		t.Errorf("Expected 422 when updating status to obsolete 'SHIPPED', got %d", respInvalid1.StatusCode)
+	}
+
+	respInvalid2, _, _ := adminClient.request(http.MethodPatch, fmt.Sprintf("/api/admin/orders/%s/status", orderID), domain.UpdateOrderStatusRequest{
+		Status: "DELIVERED",
+	})
+	if respInvalid2.StatusCode != 422 {
+		t.Errorf("Expected 422 when updating status to obsolete 'DELIVERED', got %d", respInvalid2.StatusCode)
+	}
+
+	// 5. Admin cancels the order -> expect 200 OK, status CANCELLED
+	respCancel, bodyCancel, _ := adminClient.request(http.MethodPatch, fmt.Sprintf("/api/admin/orders/%s/status", orderID), domain.UpdateOrderStatusRequest{
+		Status: "CANCELLED",
+	})
+	if respCancel.StatusCode != http.StatusOK {
+		t.Fatalf("Expected 200 for order cancellation, got %d: %s", respCancel.StatusCode, string(bodyCancel))
+	}
+	var cancelResult struct {
+		Data domain.OrderResponse `json:"data"`
+	}
+	_ = json.Unmarshal(bodyCancel, &cancelResult)
+	if cancelResult.Data.Status != "CANCELLED" {
+		t.Errorf("Expected order status 'CANCELLED', got '%s'", cancelResult.Data.Status)
+	}
+
+	// 6. Verify user balance was refunded back to 1000.00
+	respProfile, bodyProfile, _ := userClient.request(http.MethodGet, "/api/user/profile", nil)
+	if respProfile.StatusCode != http.StatusOK {
+		t.Fatalf("Failed to fetch user profile: %d", respProfile.StatusCode)
+	}
+	var profileResult struct {
+		Data domain.UserSummary `json:"data"`
+	}
+	_ = json.Unmarshal(bodyProfile, &profileResult)
+	if profileResult.Data.Balance != 1000.00 {
+		t.Errorf("Expected refunded balance 1000.00, got %f", profileResult.Data.Balance)
+	}
+
+	// 7. Verify product stock was restored back to 10
+	respProdFinal, bodyProdFinal, _ := adminClient.request(http.MethodGet, "/api/admin/products", nil)
+	if respProdFinal.StatusCode == http.StatusOK {
+		var prods struct {
+			Data []domain.Product `json:"data"`
+		}
+		_ = json.Unmarshal(bodyProdFinal, &prods)
+		for _, p := range prods.Data {
+			if p.ID == productID && p.StockQuantity != 10 {
+				t.Errorf("Expected restocked quantity 10 after cancellation, got %d", p.StockQuantity)
+			}
+		}
+	}
+
+	// 8. Attempting to cancel an already cancelled order must fail with 422
+	respReCancel, _, _ := adminClient.request(http.MethodPatch, fmt.Sprintf("/api/admin/orders/%s/status", orderID), domain.UpdateOrderStatusRequest{
+		Status: "CANCELLED",
+	})
+	if respReCancel.StatusCode != 422 {
+		t.Errorf("Expected 422 when re-cancelling already cancelled order, got %d", respReCancel.StatusCode)
+	}
+
+	// Verify balance is still 1000.00 (no double refund)
+	respProfileAgain, bodyProfileAgain, _ := userClient.request(http.MethodGet, "/api/user/profile", nil)
+	if respProfileAgain.StatusCode == http.StatusOK {
+		_ = json.Unmarshal(bodyProfileAgain, &profileResult)
+		if profileResult.Data.Balance != 1000.00 {
+			t.Errorf("Balance changed after rejected re-cancellation: %f", profileResult.Data.Balance)
+		}
 	}
 }

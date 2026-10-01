@@ -163,7 +163,7 @@ To ensure client SDK predictability and prevent unhandled database violations:
   - `increment_amount`: `minimum: 0.01`
 - **String Length Constraints**:
   - `username`: `minLength: 1`
-  - `password`: `minLength: 8`, requires at least one letter and one number
+  - `password`: Non-empty string required (`binding:"required"`). No minLength or complexity restrictions in schemas.
 All boundary, complexity, or type violations are caught at the HTTP handler layer and rejected with `400 Bad Request` (`INVALID_INPUT` / `INVALID_REQUEST`) before invoking backend services or touching the database.
 
 ---
@@ -210,7 +210,7 @@ CREATE TABLE IF NOT EXISTS orders (
     unit_price NUMERIC(12, 2) NOT NULL CHECK (unit_price >= 0),
     quantity INTEGER NOT NULL CHECK (quantity > 0),
     total_price NUMERIC(12, 2) NOT NULL CHECK (total_price >= 0),
-    status VARCHAR(50) NOT NULL DEFAULT 'CREATED',
+    status VARCHAR(50) NOT NULL DEFAULT 'CREATED' CHECK (status IN ('CREATED', 'PROCESSED', 'CANCELLED')),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -239,6 +239,14 @@ CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id);
 5. **Historical Snapshot Immutability:**
    - When an order is placed, the product's current model and unit price are permanently snapshotted into `orders.product_model` and `orders.unit_price`.
    - Subsequent modifications to product prices or catalog descriptions do not alter historical orders, ensuring immutable receipts for financial audits.
+6. **Order Lifecycle & Cancellation Refund Invariants:**
+   - **Allowed Statuses:** Order status strictly accepts only three values: `CREATED`, `PROCESSED`, and `CANCELLED`.
+   - **Automatic Processing:** When a customer submits an order (`POST /api/user/orders`), the transaction creates the order with initial status `CREATED`. Once balance debit, inventory decrement, and validation succeed, the status automatically updates to `PROCESSED` as the transaction commits. The API responds with `status: "PROCESSED"`.
+   - **Admin Cancellation with Restocking & Refund:** An administrator can transition an active order to `CANCELLED` (`PATCH /api/admin/orders/{id}/status`). This operation runs in a deterministic serializable transaction that:
+     - Restores ordered quantities to `products.stock_quantity`.
+     - Refunds the order's `total_price` back to the customer's `users.balance` in exact integer cents.
+     - Sets order status to `CANCELLED`.
+     - Rejects any subsequent modification or re-cancellation of an already cancelled order with `422 Unprocessable Entity` (`INVALID_STATUS`) to protect against duplicate refunds.
 
 ---
 
@@ -272,10 +280,8 @@ CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id);
 - **Salt Generation:** Cryptographically random, unique per-user salt automatically embedded within each hash string (`$2a$12$...`).
 - **Anti-Enumeration Protection:** Login authentication employs constant-time dummy bcrypt verification on non-existent usernames, defeating timing side-channel attacks and eliminating user existence oracles.
 
-### 4.4 Password Complexity & Lifecycle Policies
-- **Minimum Length:** Passwords must contain a minimum of 8 characters (`minLength: 8`).
-- **Complexity Requirement:** Passwords must contain a combination of alphabetic letters (`[a-zA-Z]`) and numeric digits (`[0-9]`).
-- **Validation Failure:** Any registration or account creation violating complexity rules is rejected with `400 Bad Request` (`INVALID_INPUT`) before password hashing or database interaction occurs.
+### 4.4 Password Storage & Policies
+- **Storage & Security:** Passwords are required upon account creation and are securely hashed using bcrypt (cost 12). Schema and complexity restrictions (`minLength: 8` and character set rules) are removed to support flexible client credential schemes.
 
 ### 4.5 Segregated Login Endpoints & RBAC Enforcement
 1. `POST /api/admin/login`
@@ -338,36 +344,16 @@ CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id);
    - Failure (409 Conflict): `{ "code": "USERNAME_TAKEN", "message": "Username already exists" }`.
    - Failure (500 Internal Server Error): Database persistence failure.
 
-2. Balance Management Operations
-   - **Top-Up Balance (Relative Increment):** `POST /api/admin/users/{id}/balance/top-up`
-     - Increases customer balance by a specified positive increment (`increment_amount >= 0.01`).
-     - Request: `{ "increment_amount": 500.00 }`
-     - Response (200 OK): `{ "success": true, "data": { "id": "...", "username": "...", "balance": 5500.00 } }`
-     - Failure (400 Bad Request): Invalid user ID format (`INVALID_ID`) or malformed JSON (`INVALID_REQUEST`).
-     - Failure (401 Unauthorized): Missing or invalid token.
-     - Failure (403 Forbidden): Insufficient admin privileges.
-     - Failure (404 Not Found): Target user account does not exist or has been deactivated (`NOT_FOUND`).
-     - Failure (422 Unprocessable Entity): `{ "code": "INVALID_INPUT", "message": "increment_amount must be at least 0.01" }`.
-     - Failure (500 Internal Server Error): Server or persistence failure.
-   - **Set Absolute Balance:** `PUT /api/admin/users/{id}/balance`
-     - Sets customer balance to an absolute new amount (`new_balance >= 0.00`).
-     - Request: `{ "new_balance": 5000.00 }`
-     - Response (200 OK): `{ "success": true, "data": { "id": "...", "username": "...", "balance": 5000.00 } }`
-     - Failure (400 Bad Request): Invalid user ID format (`INVALID_ID`) or malformed JSON (`INVALID_REQUEST`).
-     - Failure (401 Unauthorized): Missing or invalid token.
-     - Failure (403 Forbidden): Insufficient admin privileges.
-     - Failure (404 Not Found): Target user account does not exist or has been deactivated (`NOT_FOUND`).
-     - Failure (422 Unprocessable Entity): `{ "code": "INVALID_INPUT", "message": "balance cannot be negative" }`.
-     - Failure (500 Internal Server Error): Server or persistence failure.
-   - **Legacy Balance Adjustment:** `PATCH /api/admin/users/{id}/balance`
-     - Maintained for backward compatibility. Accepts `{ "amount": 500.00 }`.
-     - Response (200 OK): Updated user details.
-     - Failure (400 Bad Request): Invalid user ID format or malformed request.
-     - Failure (401 Unauthorized): Missing or invalid token.
-     - Failure (403 Forbidden): Insufficient admin privileges.
-     - Failure (404 Not Found): Target user does not exist (`NOT_FOUND`).
-     - Failure (422 Unprocessable Entity): Input validation failure.
-     - Failure (500 Internal Server Error): Persistence failure.
+2. `POST /api/admin/users/{id}/balance/top-up`
+   - Dedicated financial credit operation that increases customer balance by a positive increment (`increment_amount >= 0.01`).
+   - Request: `{ "increment_amount": 500.00 }`
+   - Response (200 OK): `{ "success": true, "data": { "id": "...", "username": "...", "balance": 5500.00 } }`
+   - Failure (400 Bad Request): Invalid user ID format (`INVALID_ID`) or malformed JSON (`INVALID_REQUEST`).
+   - Failure (401 Unauthorized): Missing or invalid token.
+   - Failure (403 Forbidden): Insufficient admin privileges.
+   - Failure (404 Not Found): Target user account does not exist or has been deactivated (`NOT_FOUND`).
+   - Failure (422 Unprocessable Entity): `{ "code": "INVALID_INPUT", "message": "increment_amount must be at least 0.01" }`.
+   - Failure (500 Internal Server Error): Server or persistence failure.
 
 3. `PUT /api/admin/users/{id}/filters`
    - Configures catalog visibility rules and access tier for a user.
@@ -447,14 +433,15 @@ CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id);
    - Failure (500 Internal Server Error): Persistence failure.
 
 10. `PATCH /api/admin/orders/{id}/status`
-    - Updates order fulfillment lifecycle status.
-    - Body: `{ "status": "SHIPPED" }` (Valid: `CREATED`, `PROCESSING`, `SHIPPED`, `DELIVERED`, `CANCELLED`).
+    - Updates order lifecycle status.
+    - Body: `{ "status": "CANCELLED" }` (Valid: `CREATED`, `PROCESSED`, `CANCELLED`).
+    - Transitioning to `CANCELLED` atomically returns ordered units to product stock and refunds order total to user balance. Re-cancelling or modifying a cancelled order is rejected.
     - Response (200 OK): Updated `OrderResponse` object.
     - Failure (400 Bad Request): Invalid order UUID (`INVALID_ID`) or malformed JSON (`INVALID_REQUEST`).
     - Failure (401 Unauthorized): Missing or invalid token.
     - Failure (403 Forbidden): Insufficient admin privileges.
     - Failure (404 Not Found): Target order not found (`NOT_FOUND`).
-    - Failure (422 Unprocessable Entity): Invalid status transition (`INVALID_STATUS`).
+    - Failure (422 Unprocessable Entity): Invalid status transition or order already cancelled (`INVALID_STATUS`).
     - Failure (500 Internal Server Error): Persistence failure.
 
 11. `DELETE /api/admin/users/{id}`
@@ -558,6 +545,7 @@ CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id);
          "quantity": 2,
          "unit_price": 2499.00,
          "total_price": 4998.00,
+         "status": "PROCESSED",
          "remaining_balance": 2.00,
          "created_at": "2026-09-23T20:40:00Z"
        }

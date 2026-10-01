@@ -121,7 +121,7 @@ erDiagram
         decimal snapshotUnitPrice "Agreed unit price at time of purchase"
         integer quantity "Number of units acquired"
         decimal totalAmount "Settled order total amount"
-        string fulfillmentStatus "Lifecycle state: Created, Processing, Shipped, Delivered, or Cancelled"
+        string fulfillmentStatus "Lifecycle state: Created, Processed, or Cancelled"
     }
 ```
 
@@ -235,23 +235,19 @@ stateDiagram-v2
     state Committing {
         [*] --> DebitAccount : Deduct total amount from balance
         DebitAccount --> DecrementInventory : Reserve warehouse units
-        DecrementInventory --> PersistOrderRecord : Store immutable order & price snapshot
-        PersistOrderRecord --> [*]
+        DecrementInventory --> InsertCreatedRecord : Record order with initial status Created
+        InsertCreatedRecord --> FinalizeProcessed : Auto-transition status to Processed on completion
+        FinalizeProcessed --> [*]
     }
 
-    Committing --> Confirmed : Atomic ledger commit successful
+    Committing --> Processed : Atomic transaction committed successfully
     Committing --> Failed : System lock conflict or transaction aborted
 
-    Confirmed --> Processing : Order sent to warehouse floor for picking & packing
-    Processing --> Shipped : Consigned to logistics carrier with tracking reference
-    Shipped --> Delivered : Customer receipt verified & order completed
-    
-    Confirmed --> Cancelled : Administrative reversal (Restores balance & inventory)
-    Processing --> Cancelled : Operational cancellation prior to dispatch
+    Processed --> Cancelled : Administrative cancellation (Restores balance & restocks inventory)
 
     Declined --> [*]
     Failed --> [*]
-    Delivered --> [*]
+    Processed --> [*]
     Cancelled --> [*]
 ```
 
@@ -260,11 +256,9 @@ stateDiagram-v2
 - **`ValidationPending`**: The platform is validating commercial eligibility, whitelist rules, real-time warehouse inventory, and account balance.
 - **`Declined`**: A business rule was breached (item restricted by contract, insufficient stock, or balance shortage). No funds or inventory are altered.
 - **`Committing`**: The system is executing an atomic database lock, updating customer balance, and decreasing inventory units.
-- **`Confirmed`**: The transaction is committed and bound to the commercial ledger. An immutable price and product snapshot is recorded.
-- **`Processing`**: Warehouse staff are picking, packing, and preparing items for dispatch.
-- **`Shipped`**: The order has been transferred to a carrier for transport.
-- **`Delivered`**: Goods have arrived at the customer destination, successfully completing the commercial order.
-- **`Cancelled`**: An administrator has annulled the order prior to delivery, releasing stock back to the catalog and refunding the customer balance.
+- **`Created`**: The order is initialized within the placement transaction.
+- **`Processed`**: The transaction is committed and bound to the commercial ledger. An immutable price and product snapshot is recorded.
+- **`Cancelled`**: An administrator has annulled the order, releasing stock back to warehouse inventory and refunding the customer balance in full.
 
 ---
 
