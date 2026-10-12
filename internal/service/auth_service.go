@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/altregubov/warehouse-rest-test-app/internal/domain"
@@ -41,6 +42,13 @@ func NewAuthService(userRepo repository.UserRepository, jwtSecret string) AuthSe
 const dummyPasswordHash = "$2a$10$RUP6Lknor1aYWPyngT8WjOkiwFpkibEmguyv7e5gTbKae/hn5OAKW"
 
 func (s *authService) Login(ctx context.Context, username, password, expectedRole string) (*domain.LoginResponse, error) {
+	if strings.TrimSpace(username) == "" {
+		return nil, fmt.Errorf("%w: username must not be empty", domain.ErrInvalidInput)
+	}
+	if strings.TrimSpace(password) == "" {
+		return nil, fmt.Errorf("%w: password must not be empty", domain.ErrInvalidInput)
+	}
+
 	user, err := s.userRepo.GetByUsername(ctx, username)
 	if err != nil {
 		if errors.Is(err, domain.ErrNotFound) {

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strings"
 
 	"github.com/altregubov/warehouse-rest-test-app/internal/domain"
 	"github.com/altregubov/warehouse-rest-test-app/internal/service"
@@ -38,8 +39,21 @@ func (h *AuthHandler) AdminLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if strings.TrimSpace(req.Username) == "" {
+		Error(w, http.StatusBadRequest, "INVALID_INPUT", "username must not be empty")
+		return
+	}
+	if strings.TrimSpace(req.Password) == "" {
+		Error(w, http.StatusBadRequest, "INVALID_INPUT", "password must not be empty")
+		return
+	}
+
 	resp, err := h.authService.Login(r.Context(), req.Username, req.Password, domain.RoleAdmin)
 	if err != nil {
+		if errors.Is(err, domain.ErrInvalidInput) {
+			Error(w, http.StatusBadRequest, "INVALID_INPUT", err.Error())
+			return
+		}
 		if errors.Is(err, domain.ErrInvalidCredentials) || errors.Is(err, domain.ErrForbiddenRole) {
 			Error(w, http.StatusUnauthorized, "INVALID_CREDENTIALS", "Invalid username or password")
 			return
@@ -72,8 +86,21 @@ func (h *AuthHandler) UserLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if strings.TrimSpace(req.Username) == "" {
+		Error(w, http.StatusBadRequest, "INVALID_INPUT", "username must not be empty")
+		return
+	}
+	if strings.TrimSpace(req.Password) == "" {
+		Error(w, http.StatusBadRequest, "INVALID_INPUT", "password must not be empty")
+		return
+	}
+
 	resp, err := h.authService.Login(r.Context(), req.Username, req.Password, domain.RoleUser)
 	if err != nil {
+		if errors.Is(err, domain.ErrInvalidInput) {
+			Error(w, http.StatusBadRequest, "INVALID_INPUT", err.Error())
+			return
+		}
 		if errors.Is(err, domain.ErrInvalidCredentials) || errors.Is(err, domain.ErrForbiddenRole) {
 			Error(w, http.StatusUnauthorized, "INVALID_CREDENTIALS", "Invalid username or password")
 			return

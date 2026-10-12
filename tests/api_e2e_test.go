@@ -2492,3 +2492,80 @@ func TestOrderThreeStatusesAndCancellationRefund(t *testing.T) {
 		t.Errorf("Expected 422 when admin attempts to cancel a FAILED order, got %d", respAdminCancelFailed.StatusCode)
 	}
 }
+
+// TestLoginEmptyCredentialsValidation tests Issue #30:
+// Submitting empty username or password to /api/admin/login or /api/user/login
+// must return 400 Bad Request (INVALID_INPUT) and short-circuit before bcrypt.
+func TestLoginEmptyCredentialsValidation(t *testing.T) {
+	c := newClient("")
+
+	cases := []struct {
+		name     string
+		endpoint string
+		payload  domain.LoginRequest
+	}{
+		{
+			name:     "admin login empty username",
+			endpoint: "/api/admin/login",
+			payload:  domain.LoginRequest{Username: "", Password: "password123"},
+		},
+		{
+			name:     "admin login empty password",
+			endpoint: "/api/admin/login",
+			payload:  domain.LoginRequest{Username: "admin", Password: ""},
+		},
+		{
+			name:     "admin login both empty",
+			endpoint: "/api/admin/login",
+			payload:  domain.LoginRequest{Username: "", Password: ""},
+		},
+		{
+			name:     "user login empty username",
+			endpoint: "/api/user/login",
+			payload:  domain.LoginRequest{Username: "", Password: "user123"},
+		},
+		{
+			name:     "user login empty password",
+			endpoint: "/api/user/login",
+			payload:  domain.LoginRequest{Username: "userA", Password: ""},
+		},
+		{
+			name:     "user login whitespace username",
+			endpoint: "/api/user/login",
+			payload:  domain.LoginRequest{Username: "   ", Password: "user123"},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			start := time.Now()
+			resp, body, err := c.request(http.MethodPost, tc.endpoint, tc.payload)
+			elapsed := time.Since(start)
+			if err != nil {
+				t.Fatalf("Request failed: %v", err)
+			}
+			if resp.StatusCode != http.StatusBadRequest {
+				t.Errorf("Expected 400 Bad Request, got %d. Body: %s", resp.StatusCode, string(body))
+			}
+
+			var errEnv domain.ErrorEnvelope
+			if err := json.Unmarshal(body, &errEnv); err != nil {
+				t.Fatalf("Failed to unmarshal error envelope: %v", err)
+			}
+			if errEnv.Success {
+				t.Errorf("Expected success=false, got true")
+			}
+			if errEnv.Error.Code != "INVALID_INPUT" {
+				t.Errorf("Expected error.code INVALID_INPUT, got %s", errEnv.Error.Code)
+			}
+			if errEnv.Error.Message == "" {
+				t.Errorf("Expected non-empty error.message")
+			}
+			// Handler should short-circuit before bcrypt (< 30ms)
+			if elapsed > 30*time.Millisecond {
+				t.Errorf("Expected fast handler short-circuit (< 30ms), took %v", elapsed)
+			}
+		})
+	}
+}
+

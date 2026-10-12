@@ -308,13 +308,13 @@ CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id);
 - `POST /api/admin/login`
   - Body: `{ "username": "admin", "password": "admin123" }`
   - Response (200 OK): `{ "success": true, "data": { "token": "<jwt>", "user": { "id": "...", "username": "admin", "role": "admin" } } }`
-  - Failure (400 Bad Request): `{ "success": false, "error": {"code": "INVALID_REQUEST", "message": "Failed to parse JSON body"} }`
+  - Failure (400 Bad Request): Malformed JSON (`INVALID_REQUEST`) or empty username/password (`INVALID_INPUT`).
   - Failure (401 Unauthorized): `{ "success": false, "error": {"code": "INVALID_CREDENTIALS", "message": "Invalid username or password"} }`
   - Failure (500 Internal Server Error): `{ "success": false, "error": {"code": "INTERNAL_ERROR", "message": "Internal server error"} }`
 - `POST /api/user/login`
   - Body: `{ "username": "userA", "password": "user123" }`
   - Response (200 OK): `{ "success": true, "data": { "token": "<jwt>", "user": { "id": "...", "username": "userA", "role": "user" } } }`
-  - Failure (400 Bad Request): `{ "success": false, "error": {"code": "INVALID_REQUEST", "message": "Failed to parse JSON body"} }`
+  - Failure (400 Bad Request): Malformed JSON (`INVALID_REQUEST`) or empty username/password (`INVALID_INPUT`).
   - Failure (401 Unauthorized): `{ "success": false, "error": {"code": "INVALID_CREDENTIALS", "message": "Invalid username or password"} }`
   - Failure (500 Internal Server Error): `{ "success": false, "error": {"code": "INTERNAL_ERROR", "message": "Internal server error"} }`
 
