@@ -123,7 +123,7 @@ Every HTTP interaction emits a structured JSON line to standard output (`stdout`
 To facilitate direct web client and single-page application (SPA) integration across staging, testing, and production origins:
 - **Allowed Origins:** `*` (wildcard, permitting public educational testbench consumption).
 - **Allowed HTTP Methods:** `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `OPTIONS`.
-- **Allowed Headers:** `Accept`, `Authorization`, `Content-Type`, `X-CSRF-Token`, `X-Request-ID`, `Idempotency-Key`.
+- **Allowed Headers:** `Accept`, `Authorization`, `Content-Type`, `X-CSRF-Token`, `X-Request-ID`.
 - **Exposed Response Headers:** `Link`, `X-Request-ID`.
 - **Credentials Policy:** `AllowCredentials: false` (stateless Bearer JWT authentication avoids cross-site cookie vulnerabilities).
 - **Pre-flight Caching:** `MaxAge: 300` (pre-flight OPTIONS requests cached for 5 minutes).

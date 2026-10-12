@@ -2073,7 +2073,7 @@ func TestUpdateStockQuantityBoundaryValidation(t *testing.T) {
 }
 
 // TestOperationalMiddlewareConfiguration tests Issue #22:
-// 1. CORS pre-flight OPTIONS request returns 200, allows headers including X-Request-ID and Idempotency-Key
+// 1. CORS pre-flight OPTIONS request returns 200, allows headers including X-Request-ID
 // 2. Panic recovery middleware catches unhandled exceptions and returns standard 500 ErrorEnvelope with requestId
 func TestOperationalMiddlewareConfiguration(t *testing.T) {
 	// 1. Test CORS Pre-flight on live server
@@ -2081,7 +2081,7 @@ func TestOperationalMiddlewareConfiguration(t *testing.T) {
 	corsHeaders := map[string]string{
 		"Origin":                         "http://localhost:3000",
 		"Access-Control-Request-Method":  "POST",
-		"Access-Control-Request-Headers": "authorization,content-type,idempotency-key,x-request-id",
+		"Access-Control-Request-Headers": "authorization,content-type,x-request-id",
 	}
 	respCors, _, err := client.requestWithHeaders(http.MethodOptions, "/api/user/orders", nil, corsHeaders)
 	if err != nil {
@@ -2095,8 +2095,8 @@ func TestOperationalMiddlewareConfiguration(t *testing.T) {
 		t.Errorf("Expected Access-Control-Allow-Origin, got '%s'", originHeader)
 	}
 	allowHeaders := strings.ToLower(respCors.Header.Get("Access-Control-Allow-Headers"))
-	if !strings.Contains(allowHeaders, "x-request-id") || !strings.Contains(allowHeaders, "idempotency-key") {
-		t.Errorf("Expected allow-headers to contain x-request-id and idempotency-key, got '%s'", allowHeaders)
+	if !strings.Contains(allowHeaders, "x-request-id") {
+		t.Errorf("Expected allow-headers to contain x-request-id, got '%s'", allowHeaders)
 	}
 
 	// 2. Test Panic Recovery middleware unit contract
