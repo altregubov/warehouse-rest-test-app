@@ -22,7 +22,7 @@ import (
 )
 
 // @title Warehouse REST API Testbench
-// @version 1.0
+// @version 1.2.0
 // @description Clean, lightweight, and idiomatic Go backend for warehouse inventory and transactional ordering.
 // @host localhost:8080
 // @BasePath /

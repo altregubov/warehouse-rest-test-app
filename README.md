@@ -1,6 +1,7 @@
 # Warehouse REST API Testbench
 
 <p align="center">
+  <img src="https://img.shields.io/badge/Version-1.2.0-blue?style=for-the-badge" alt="Version 1.2.0" />
   <img src="https://img.shields.io/badge/Purpose-Educational%20Testbench-orange?style=for-the-badge&logo=mortarboard" alt="Educational Purpose" />
   <img src="https://img.shields.io/badge/Go-1.24+-00ADD8?style=for-the-badge&logo=go&logoColor=white" alt="Go" />
   <img src="https://img.shields.io/badge/PostgreSQL-16-336791?style=for-the-badge&logo=postgresql&logoColor=white" alt="PostgreSQL" />

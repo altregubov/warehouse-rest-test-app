@@ -1,5 +1,8 @@
 # Warehouse REST API Testbench Specification
 
+> **Specification Version:** 1.2.0  
+> **Application Version:** 1.2.0  
+
 ## 1. Executive Summary & Objective
 
 The Warehouse REST API Testbench is a lightweight, idiomatic Go backend service designed for API testing, interactive Swagger UI exploration, and seamless future frontend integration. The service provides role-based access control (RBAC), user catalog filtering permissions, inventory management, and transactional ordering with PostgreSQL persistence, containerized via Docker Compose.

@@ -8,7 +8,7 @@
         "description": "Clean, lightweight, and idiomatic Go backend for warehouse inventory and transactional ordering.",
         "title": "Warehouse REST API Testbench",
         "contact": {},
-        "version": "1.0"
+        "version": "1.2.0"
     },
     "host": "localhost:8080",
     "basePath": "/",

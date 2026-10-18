@@ -3,6 +3,8 @@
 > **Document Type:** External Client-Facing Business & Integration Specification  
 > **Audience:** Business Stakeholders, Product Managers, Solutions Architects, Client Integrators  
 > **Reference Domain:** Warehouse Inventory & Transactional Order Management Platform  
+> **Specification Version:** 1.2.0  
+> **Application Version:** 1.2.0  
 
 ---
 
